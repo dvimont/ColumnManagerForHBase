@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <!--
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.commonvox</groupId>
+  <artifactId>hbase-column-manager-parent-pom</artifactId>
+  <version>1.0</version>
+  <packaging>pom</packaging>
+
+  <name>CommonVox tools for HBase™ - ColumnManagerAPI for HBase™ parent POM</name>
+  <description>Parent POM to manage build process for all ColumnManager releases</description>
+  <url>http://commonvox.org/hbase-column-manager</url>
+
+  <modules>
+    <!-- master contains source & generates doc-files for javadocs; all other modules contain pom.xml
+         files establishing dependency on the corresponding hbase-client or hbase-shaded-client release,
+         and following Maven build process each contains jar, source-jar, and javadocs-jar, ready for
+         deployment to Maven Central Repository and upload to Github project.
+         TESTING should be done separately for each build after having started up an instance of hbase
+         using that build's corresponding hbase release.  -->
+    <module>master</module>
+    <module>1.0.0</module>
+    <module>1.0.1</module>
+    <module>1.0.1.1</module>
+    <module>1.0.2</module>
+    <module>1.0.3</module>
+  </modules>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <scm>
+    <connection>scm:git:git@github.com:dvimont/ColumnManagerForHBase.git</connection>
+    <developerConnection>scm:git:git@github.com:dvimont/ColumnManagerForHBase.git</developerConnection>
+    <url>git@github.com:dvimont/ColumnManagerForHBase.git</url>
+  </scm>
+
+  <developers>
+    <developer>
+      <name>Daniel Vimont</name>
+      <email>daniel@commonvox.org</email>
+      <organization>CommonVox.org</organization>
+      <organizationUrl>http://commonvox.org</organizationUrl>
+    </developer>
+  </developers>
+
+  <!-- this may need to go into individual child projects (except for master, which does not get deployed)
+  <distributionManagement>
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
+  </distributionManagement>
+  -->
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
+    <surefire.version>2.19</surefire.version>
+    <junit.version>4.12</junit.version>
+    <developmentDirectory>../master/</developmentDirectory>
+    <docFilesDirectory>master/src/main/java/org/commonvox/hbase_column_manager/doc-files/</docFilesDirectory>
+  </properties>
+
+  <build>
+    <sourceDirectory>${developmentDirectory}src/main/java</sourceDirectory>
+    <testSourceDirectory>${developmentDirectory}src/test/java</testSourceDirectory>
+    <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>2.10.3</version>
+          <executions>
+            <execution>
+              <id>javadocs-to-jar</id>
+              <phase>package</phase>
+              <goals>
+                <goal>jar</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>javadocs</id>
+              <phase>package</phase>
+              <goals>
+                <goal>javadoc</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>2.4</version>
+          <executions>
+            <execution>
+              <id>attach-sources</id>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>1.6</version>
+          <executions>
+            <execution>
+              <id>sign-artifacts</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>sign</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+    </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${surefire.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <dependencies>
+    <dependency>
+        <groupId>org.commonvox.collections</groupId>
+        <artifactId>ordered-set</artifactId>
+        <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>
