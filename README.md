@@ -6,4 +6,6 @@
 3. **SCHEMA CHANGE MONITORING** -- tracks and provides an audit trail for structural modifications made to *Namespaces*, *Tables*, and *Column Families*.
 4. **SCHEMA EXPORT/IMPORT** -- provides schema (metadata) export and import facilities for HBase *Namespace*, *Table*, and all table-component structures.
 
+## The current draft of Javadocs documentation for this project may be viewed here: http://bit.ly/column-manager-docs
+
 **NOTE that this project is currently in final stages of initial development, with core design and coding completed. Currently, extensive test code is being added to the project. Upon final release, jars will be available at GitHub, and all artifacts will be made available from the Maven Central Repository.**
