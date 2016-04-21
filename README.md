@@ -1,5 +1,5 @@
 # ColumnManagerAPI for HBase™
-*ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a>* is a **METADATA REPOSITORY SYSTEM for HBase 1.x** with options for:
+*ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a>* is an extended **METADATA REPOSITORY SYSTEM for HBase 1.x** with options for:
 
 1. **COLUMN AUDITING** -- captures Column metadata (qualifier and max-length) as Tables are updated (or via a discovery facility for previously-existing Tables).
 2. **COLUMN-DEFINITION ENFORCEMENT** -- optionally enforces administratively-managed Column definitions (stipulating valid name, length, and/or value) as Tables are updated, optionally bringing HBase's "on-the-fly" column-qualifier creation under centralized control.
