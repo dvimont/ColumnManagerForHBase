@@ -88,6 +88,7 @@ public class RepositoryAdmin implements Closeable {
     /**
      * Allows administrative override of the default maxVersions setting for the
      * Repository table. The default setting is 50.
+     *
      * @param hbaseAdmin Standard Admin object
      * @param maxVersions Maximum versions for repository to retain of each metadata attribute
      * @throws IOException if a remote or network exception occurs
@@ -98,8 +99,22 @@ public class RepositoryAdmin implements Closeable {
     }
 
     /**
+     * Get the maxVersions setting for the Repository table (maximum versions for repository to
+     * retain of each metadata attribute).
+     *
+     * @param hbaseAdmin Standard Admin object
+     * @return Maximum versions for repository to retain of each metadata attribute
+     * @throws IOException if a remote or network exception occurs
+     */
+    public static int getRepositoryMaxVersions (Admin hbaseAdmin)
+            throws IOException {
+        return Repository.getRepositoryMaxVersions(hbaseAdmin);
+    }
+
+    /**
      * Disable and delete repository table and drop repository namespace
      * (for uninstall or reinstall of ColumnManager).
+     *
      * @param hbaseAdmin standard HBase Admin
      * @throws IOException if a remote or network exception occurs
      */

@@ -18,8 +18,17 @@ package org.commonvox.hbase_column_manager;
 
 import java.io.File;
 import java.util.StringTokenizer;
+import static org.junit.Assert.assertTrue;
 
 public class ClasspathSearcher {
+  static final String TEST_ENVIRONMENT_SETUP_ERROR =
+          "TEST ENVIRONMENT APPARENTLY NOT SET UP CORRECTLY!! ==>>  ";
+
+  public static void confirmFileInClasspath(final String fileType, final String fileName) {
+    assertTrue(TEST_ENVIRONMENT_SETUP_ERROR + "The following required " + fileType
+            + " file not found in classpath: " + fileName,
+            ClasspathSearcher.fileFoundOnClassPath(fileName));
+  }
 
   public static boolean fileFoundOnClassPath(final String fileName) {
 
