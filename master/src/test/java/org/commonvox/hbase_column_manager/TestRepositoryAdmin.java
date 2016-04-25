@@ -68,7 +68,6 @@ public class TestRepositoryAdmin {
             NEW_MAX_VERSIONS,
             RepositoryAdmin.getRepositoryMaxVersions(standardAdmin));
 
-
     RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
     assertTrue(REPOSITORY_ADMIN_FAILURE
             + "The following Repository NAMESPACE failed to be dropped upon "

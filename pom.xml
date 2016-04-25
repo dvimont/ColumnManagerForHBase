@@ -99,6 +99,13 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>2.10.3</version>
+          <configuration>
+            <links>
+              <link>http://hbase.apache.org/apidocs/</link>
+              <link>http://docs.oracle.com/javase/7/docs/api/</link>
+            </links>
+            <noqualifier>all</noqualifier>
+          </configuration>
           <executions>
             <execution>
               <id>javadocs-to-jar</id>
