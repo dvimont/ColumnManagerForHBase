@@ -41,8 +41,9 @@
  * <a href="MConnectionFactory.html">MConnectionFactory</a> class
  * (as shown in the <a href="#usage">USAGE section</a> below).<br>
  * All other interactions with the HBase API are then to be coded as usual; ColumnManager will
- * work behind the scenes to capture HBase metadata as stipulated in the ColumnManager
- * configuration.<br>Any application coded with the ColumnManager API can be made to revert to
+ * work behind the scenes to capture HBase metadata as stipulated by an administrator/developer in
+ * <a href="#config">the ColumnManager configuration</a>.<br><br>
+ * Any application coded with the ColumnManager API can be made to revert to
  * standard HBase API functionality simply by either (a) removing the {@code column_manager.activated}
  * property from all {@code hbase-*.xml} configuration files, or (b) by setting the value of that
  * property to {@code <false>}.<br>
