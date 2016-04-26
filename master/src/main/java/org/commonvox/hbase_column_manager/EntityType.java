@@ -25,59 +25,70 @@ import java.util.TreeMap;
  * used publicly in {@link ChangeEvent} reporting.
  */
 public enum EntityType {
-    /** Namespace *//** Namespace */
-    NAMESPACE ((byte)'N', "Namespace"),
-    /** Table */
-    TABLE ((byte)'T', "Table"),
-    /** Column Family */
-    COLUMN_FAMILY ((byte)'F', "Column Family"),
-    /** Column Auditor */
-    COLUMN_AUDITOR ((byte)'C', "Column Auditor"),
-    /** Column Definition */
-    COLUMN_DEFINITION ((byte)'D', "Column Definition");
 
-    static final Map<Byte,EntityType> ENTITY_TYPE_BYTES_TO_ENUM_MAP = new TreeMap<>();
-    static final Map<String,Byte> ENTITY_TYPE_LABELS_TO_BYTES_MAP = new TreeMap<>();
-        static {
-            ENTITY_TYPE_BYTES_TO_ENUM_MAP.put
-                (EntityType.NAMESPACE.getRecordType(), EntityType.NAMESPACE);
-            ENTITY_TYPE_BYTES_TO_ENUM_MAP.put
-                (EntityType.TABLE.getRecordType(), EntityType.TABLE);
-            ENTITY_TYPE_BYTES_TO_ENUM_MAP.put
-                (EntityType.COLUMN_FAMILY.getRecordType(), EntityType.COLUMN_FAMILY);
-            ENTITY_TYPE_BYTES_TO_ENUM_MAP.put
-                (EntityType.COLUMN_AUDITOR.getRecordType(), EntityType.COLUMN_AUDITOR);
-            ENTITY_TYPE_BYTES_TO_ENUM_MAP.put
-                (EntityType.COLUMN_DEFINITION.getRecordType(), EntityType.COLUMN_DEFINITION);
+  /**
+   * Namespace
+   */
+  /**
+   * Namespace
+   */
+  NAMESPACE((byte) 'N', "Namespace"),
+  /**
+   * Table
+   */
+  TABLE((byte) 'T', "Table"),
+  /**
+   * Column Family
+   */
+  COLUMN_FAMILY((byte) 'F', "Column Family"),
+  /**
+   * Column Auditor
+   */
+  COLUMN_AUDITOR((byte) 'C', "Column Auditor"),
+  /**
+   * Column Definition
+   */
+  COLUMN_DEFINITION((byte) 'D', "Column Definition");
 
-            for (Entry<Byte,EntityType> entry : ENTITY_TYPE_BYTES_TO_ENUM_MAP.entrySet()) {
-                ENTITY_TYPE_LABELS_TO_BYTES_MAP.put(entry.getValue().toString(), entry.getKey());
-            }
-        }
+  static final Map<Byte, EntityType> ENTITY_TYPE_BYTES_TO_ENUM_MAP = new TreeMap<>();
+  static final Map<String, Byte> ENTITY_TYPE_LABELS_TO_BYTES_MAP = new TreeMap<>();
 
-    private final byte recordType;   // in kilograms
-    private final String entityTypeLabel; // in meters
-    EntityType(byte recordType, String entityTypeLabel) {
-        this.recordType = recordType;
-        this.entityTypeLabel = entityTypeLabel;
+  static {
+    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.NAMESPACE.getRecordType(), EntityType.NAMESPACE);
+    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.TABLE.getRecordType(), EntityType.TABLE);
+    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.COLUMN_FAMILY.getRecordType(), EntityType.COLUMN_FAMILY);
+    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.COLUMN_AUDITOR.getRecordType(), EntityType.COLUMN_AUDITOR);
+    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.COLUMN_DEFINITION.getRecordType(), EntityType.COLUMN_DEFINITION);
+
+    for (Entry<Byte, EntityType> entry : ENTITY_TYPE_BYTES_TO_ENUM_MAP.entrySet()) {
+      ENTITY_TYPE_LABELS_TO_BYTES_MAP.put(entry.getValue().toString(), entry.getKey());
     }
+  }
 
-    /**
-     * Get the record type value used for the {@code EntityType} in internal ColumnManager processing.
-     *
-     * @return record type code for {@code EntityType}
-     */
-    byte getRecordType() {
-        return recordType;
-    }
+  private final byte recordType;   // in kilograms
+  private final String entityTypeLabel; // in meters
 
-    /**
-     * Get the String label for the {@code EntityType} used in {@link ChangeEvent} reporting, etc.
-     *
-     * @return String label for {@code EntityType}
-     */
-    @Override
-    public String toString() {
-        return entityTypeLabel;
-    }
+  EntityType(byte recordType, String entityTypeLabel) {
+    this.recordType = recordType;
+    this.entityTypeLabel = entityTypeLabel;
+  }
+
+  /**
+   * Get the record type value used for the {@code EntityType} in internal ColumnManager processing.
+   *
+   * @return record type code for {@code EntityType}
+   */
+  byte getRecordType() {
+    return recordType;
+  }
+
+  /**
+   * Get the String label for the {@code EntityType} used in {@link ChangeEvent} reporting, etc.
+   *
+   * @return String label for {@code EntityType}
+   */
+  @Override
+  public String toString() {
+    return entityTypeLabel;
+  }
 }

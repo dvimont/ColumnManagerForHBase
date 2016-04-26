@@ -1241,19 +1241,19 @@ class Repository {
     return getTableForeignKey(htd.getTableName());
   }
 
-  boolean getColumnDefinitionsEnforced(TableName tableName)
-          throws IOException {
-    return getColumnDefinitionsEnforced(EntityType.TABLE.getRecordType(),
-            getNamespaceForeignKey(tableName.getNamespace()), tableName.getName());
-  }
+//  boolean columnDefinitionsEnforced(TableName tableName)
+//          throws IOException {
+//    return columnDefinitionsEnforced(EntityType.TABLE.getRecordType(),
+//            getNamespaceForeignKey(tableName.getNamespace()), tableName.getName());
+//  }
 
-  boolean getColumnDefinitionsEnforced(TableName tableName, byte[] colFamily)
+  boolean columnDefinitionsEnforced(TableName tableName, byte[] colFamily)
           throws IOException {
-    return getColumnDefinitionsEnforced(EntityType.COLUMN_FAMILY.getRecordType(),
+    return columnDefinitionsEnforced(EntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
   }
 
-  private boolean getColumnDefinitionsEnforced(byte recordType, byte[] parentForeignKey, byte[] entityName)
+  private boolean columnDefinitionsEnforced(byte recordType, byte[] parentForeignKey, byte[] entityName)
           throws IOException {
     Result row = getActiveRow(recordType, parentForeignKey, entityName, COL_DEFINITIONS_ENFORCED_COLUMN);
     if (row == null || row.isEmpty()) {
@@ -1278,9 +1278,10 @@ class Repository {
             getTableForeignKey(tableName), colFamily);
   }
 
-  private void setColumnDefinitionsEnforced(boolean enabled, byte recordType, byte[] parentForeignKey, byte[] entityName)
+  private void setColumnDefinitionsEnforced(
+          boolean enabled, byte recordType, byte[] parentForeignKey, byte[] entityName)
           throws IOException {
-    if (getColumnDefinitionsEnforced(recordType, parentForeignKey, entityName) != enabled) {
+    if (columnDefinitionsEnforced(recordType, parentForeignKey, entityName) != enabled) {
       repositoryTable.put(new Put(buildRowId(recordType, parentForeignKey, entityName))
               .addColumn(REPOSITORY_COLFAMILY, COL_DEFINITIONS_ENFORCED_COLUMN, Bytes.toBytes(enabled))
               .addColumn(REPOSITORY_COLFAMILY, JAVA_USERNAME_PROPERTY_KEY, javaUsername));

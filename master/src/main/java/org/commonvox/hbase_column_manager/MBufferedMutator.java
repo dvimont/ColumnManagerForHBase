@@ -29,83 +29,83 @@ import org.apache.hadoop.hbase.client.Mutation;
  */
 class MBufferedMutator implements BufferedMutator {
 
-    private final BufferedMutator wrappedBufferedMutator;
-    private final Repository repository;
-    private final MTableDescriptor mTableDescriptor;
+  private final BufferedMutator wrappedBufferedMutator;
+  private final Repository repository;
+  private final MTableDescriptor mTableDescriptor;
 
-    MBufferedMutator (BufferedMutator userBufferedMutator, Repository repository)
-            throws IOException {
-        wrappedBufferedMutator = userBufferedMutator;
-        this.repository = repository;
-        if (this.repository.isActivated()) {
-            mTableDescriptor = this.repository.getMTableDescriptor(wrappedBufferedMutator.getName());
-        } else {
-            mTableDescriptor = null;
-        }
+  MBufferedMutator(BufferedMutator userBufferedMutator, Repository repository)
+          throws IOException {
+    wrappedBufferedMutator = userBufferedMutator;
+    this.repository = repository;
+    if (this.repository.isActivated()) {
+      mTableDescriptor = this.repository.getMTableDescriptor(wrappedBufferedMutator.getName());
+    } else {
+      mTableDescriptor = null;
     }
+  }
 
-    @Override
-    public TableName getName() {
-        return wrappedBufferedMutator.getName();
-    }
+  @Override
+  public TableName getName() {
+    return wrappedBufferedMutator.getName();
+  }
 
-    @Override
-    public Configuration getConfiguration() {
-        return wrappedBufferedMutator.getConfiguration();
-    }
+  @Override
+  public Configuration getConfiguration() {
+    return wrappedBufferedMutator.getConfiguration();
+  }
 
-    @Override
-    public void mutate(Mutation mtn) throws IOException {
-        // ColumnManager validation
-        if (repository.isActivated()
-                && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
-            repository.validateColumns(mTableDescriptor, mtn);
-        }
-        // Standard HBase processing
-        wrappedBufferedMutator.mutate(mtn);
-        // ColumnManager auditing
-        if (repository.isActivated()) {
-            repository.putColumnAuditors(mTableDescriptor, mtn);
-        }
+  @Override
+  public void mutate(Mutation mtn) throws IOException {
+    // ColumnManager validation
+    if (repository.isActivated()
+            && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
+      repository.validateColumns(mTableDescriptor, mtn);
     }
+    // Standard HBase processing
+    wrappedBufferedMutator.mutate(mtn);
+    // ColumnManager auditing
+    if (repository.isActivated()) {
+      repository.putColumnAuditors(mTableDescriptor, mtn);
+    }
+  }
 
-    @Override
-    public void mutate(List<? extends Mutation> list) throws IOException {
-        // ColumnManager validation
-        if (repository.isActivated()
-                && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
-            repository.validateColumns(mTableDescriptor, list);
-        }
-        // Standard HBase processing
-        wrappedBufferedMutator.mutate(list);
-        // ColumnManager auditing
-        if (repository.isActivated()) {
-            repository.putColumnAuditors(mTableDescriptor, list);
-        }
+  @Override
+  public void mutate(List<? extends Mutation> list) throws IOException {
+    // ColumnManager validation
+    if (repository.isActivated()
+            && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
+      repository.validateColumns(mTableDescriptor, list);
     }
+    // Standard HBase processing
+    wrappedBufferedMutator.mutate(list);
+    // ColumnManager auditing
+    if (repository.isActivated()) {
+      repository.putColumnAuditors(mTableDescriptor, list);
+    }
+  }
 
-    @Override
-    public void close() throws IOException {
-        wrappedBufferedMutator.close();
-    }
+  @Override
+  public void close() throws IOException {
+    wrappedBufferedMutator.close();
+  }
 
-    @Override
-    public void flush() throws IOException {
-        wrappedBufferedMutator.flush();
-    }
+  @Override
+  public void flush() throws IOException {
+    wrappedBufferedMutator.flush();
+  }
 
-    @Override
-    public long getWriteBufferSize() {
-        return wrappedBufferedMutator.getWriteBufferSize();
-    }
+  @Override
+  public long getWriteBufferSize() {
+    return wrappedBufferedMutator.getWriteBufferSize();
+  }
 
-    @Override
-    public boolean equals (Object otherObject) {
-        return wrappedBufferedMutator.equals(otherObject);
-    }
+  @Override
+  public boolean equals(Object otherObject) {
+    return wrappedBufferedMutator.equals(otherObject);
+  }
 
-    @Override
-    public int hashCode() {
-        return wrappedBufferedMutator.hashCode();
-    }
+  @Override
+  public int hashCode() {
+    return wrappedBufferedMutator.hashCode();
+  }
 }

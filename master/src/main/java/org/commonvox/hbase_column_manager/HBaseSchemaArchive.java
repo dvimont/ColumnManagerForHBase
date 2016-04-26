@@ -27,36 +27,38 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
 
 /**
- * A container class that provides for straightforward JAXB processing (i.e.,
- * XML-formatted serialization and deserialization) of ColumnManager repository metadata.
+ * A container class that provides for straightforward JAXB processing (i.e., XML-formatted
+ * serialization and deserialization) of ColumnManager repository metadata.
+ *
  * @author Daniel Vimont
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name="hbaseSchemaArchive")
+@XmlRootElement(name = "hbaseSchemaArchive")
 class HBaseSchemaArchive {
-    @XmlAttribute
-    private final String fileTimestamp;
-    @XmlElement(name = "hBaseSchemaObject")
-    private final Set<MetadataEntity> hBaseSchemaObjects = new LinkedHashSet<>();
-    @XmlTransient
-    private final String ROOT_ELEMENT = "hbaseSchemaArchive";
 
-    HBaseSchemaArchive () {
-        this.fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
-    }
+  @XmlAttribute
+  private final String fileTimestamp;
+  @XmlElement(name = "hBaseSchemaObject")
+  private final Set<MetadataEntity> hBaseSchemaObjects = new LinkedHashSet<>();
+  @XmlTransient
+  private final String ROOT_ELEMENT = "hbaseSchemaArchive";
 
-    void addMetadataObject(MetadataEntity mEntity) {
-        if (mEntity == null) {
-            return;
-        }
-        hBaseSchemaObjects.add(mEntity);
-    }
+  HBaseSchemaArchive() {
+    this.fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
+  }
 
-    Set<MetadataEntity> getMetadataObjects() {
-        return hBaseSchemaObjects;
+  void addMetadataObject(MetadataEntity mEntity) {
+    if (mEntity == null) {
+      return;
     }
+    hBaseSchemaObjects.add(mEntity);
+  }
 
-    String getArchiveFileTimestampString() {
-        return fileTimestamp;
-    }
+  Set<MetadataEntity> getMetadataObjects() {
+    return hBaseSchemaObjects;
+  }
+
+  String getArchiveFileTimestampString() {
+    return fileTimestamp;
+  }
 }

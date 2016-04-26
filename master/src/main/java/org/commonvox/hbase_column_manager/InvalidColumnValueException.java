@@ -19,36 +19,36 @@ package org.commonvox.hbase_column_manager;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
- * Thrown when a <i>Column Family</i> has its
- * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
- * ColumnDefinitionsEnforced} setting enabled, and
- * the <i>Column value</i> submitted in a {@code put} (i.e., insert/update) to the
+ * Thrown when a <i>Column Family</i> has its  {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+ * ColumnDefinitionsEnforced} setting enabled, and the <i>Column value</i> submitted in a
+ * {@code put} (i.e., insert/update) to the
  * <i>Table:Column-Family</i> does NOT pass a validation stipulated by the
  * <i>Column</i>'s corresponding {@link ColumnDefinition}.
+ *
  * @author Daniel Vimont
  */
 public class InvalidColumnValueException extends ColumnManagerIOException {
 
-    /**
-     * Constructs an instance of <code>InvalidColumnValueException</code> with
-     * the optional message extension appended to a standard "invalid column value
-     * submitted" message.
-     * @param tableName <i>Table</i> name
-     * @param colFamily <i>Column Family</i> name
-     * @param colQualifier <i>Column Qualifier</i>
-     * @param value the invalid value that was submitted in attempted {@code Mutation}
-     * @param msgExtension optional extension to standard message
-     */
-    InvalidColumnValueException(byte[] tableName, byte[] colFamily,
-            byte[] colQualifier, byte[] value, String msgExtension) {
-        super("Invalid column value submitted in attempted Mutation of Table: <"
-                + Bytes.toString(tableName)
-                + "> Column Family: <" + Bytes.toString(colFamily)
-                + "> Column Qualifier: <" + Bytes.toString(colQualifier) + ">"
-                + ((value == null) ? "" :
-                        ". Column Value submitted: " + ((value.length < 120)?
-                                Repository.getPrintableString(value)
-                                : Repository.getPrintableString(Bytes.copy(value, 0, 120))))
-                + ". " + ((msgExtension == null) ? "" : msgExtension) );
-    }
+  /**
+   * Constructs an instance of <code>InvalidColumnValueException</code> with the optional message
+   * extension appended to a standard "invalid column value submitted" message.
+   *
+   * @param tableName <i>Table</i> name
+   * @param colFamily <i>Column Family</i> name
+   * @param colQualifier <i>Column Qualifier</i>
+   * @param value the invalid value that was submitted in attempted {@code Mutation}
+   * @param msgExtension optional extension to standard message
+   */
+  InvalidColumnValueException(byte[] tableName, byte[] colFamily,
+          byte[] colQualifier, byte[] value, String msgExtension) {
+    super("Invalid column value submitted in attempted Mutation of Table: <"
+            + Bytes.toString(tableName)
+            + "> Column Family: <" + Bytes.toString(colFamily)
+            + "> Column Qualifier: <" + Bytes.toString(colQualifier) + ">"
+            + ((value == null) ? ""
+                    : ". Column Value submitted: " + ((value.length < 120)
+                            ? Repository.getPrintableString(value)
+                            : Repository.getPrintableString(Bytes.copy(value, 0, 120))))
+            + ". " + ((msgExtension == null) ? "" : msgExtension));
+  }
 }

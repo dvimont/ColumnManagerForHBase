@@ -17,33 +17,37 @@
 package org.commonvox.hbase_column_manager;
 
 /**
- * Abstract class extended by Column-oriented entities; created to clarify/simplify access
- * to Column Qualifier name. Without the methods of this abstract class, a ColumnManager
- * end-user would have to use the ambiguously-named methods #getName and #getNameAsString.
+ * Abstract class extended by Column-oriented entities; created to clarify/simplify access to Column
+ * Qualifier name. Without the methods of this abstract class, a ColumnManager end-user would have
+ * to use the ambiguously-named methods #getName and #getNameAsString.
+ *
  * @author Daniel Vimont
  */
 abstract class Column extends MetadataEntity {
-    Column (byte entityType, byte[] name) {
-        super(entityType, name);
-    }
 
-    Column (byte entityType, String name) {
-        super(entityType, name);
-    }
+  Column(byte entityType, byte[] name) {
+    super(entityType, name);
+  }
 
-    /**
-     * Get Column Qualifier.
-     * @return Column Qualifier as byte-array
-     */
-    public byte[] getColumnQualifier () {
-        return this.getName();
-    }
+  Column(byte entityType, String name) {
+    super(entityType, name);
+  }
 
-    /**
-     * Get Column Qualifier as a String.
-     * @return Column Qualifier as String
-     */
-    public String getColumnQualifierAsString() {
-        return this.getNameAsString();
-    }
+  /**
+   * Get Column Qualifier.
+   *
+   * @return Column Qualifier as byte-array
+   */
+  public byte[] getColumnQualifier() {
+    return this.getName();
+  }
+
+  /**
+   * Get Column Qualifier as a String.
+   *
+   * @return Column Qualifier as String
+   */
+  public String getColumnQualifierAsString() {
+    return this.getNameAsString();
+  }
 }

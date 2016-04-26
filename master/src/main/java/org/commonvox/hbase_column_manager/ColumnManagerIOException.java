@@ -21,17 +21,17 @@ import java.io.IOException;
 /**
  * All {@code IOException}s in the ColumnManagerAPI package are subclasses of the abstract
  * {@code ColumnManagerIOException}.
+ *
  * @author Daniel Vimont
  */
 public abstract class ColumnManagerIOException extends IOException {
 
-    /**
-     * Constructs an instance of {@code ColumnManagerIOException} with the
-     * specified detail message.
-     *
-     * @param msg the detail message.
-     */
-    ColumnManagerIOException(String msg) {
-        super(msg);
-    }
+  /**
+   * Constructs an instance of {@code ColumnManagerIOException} with the specified detail message.
+   *
+   * @param msg the detail message.
+   */
+  ColumnManagerIOException(String msg) {
+    super(msg);
+  }
 }

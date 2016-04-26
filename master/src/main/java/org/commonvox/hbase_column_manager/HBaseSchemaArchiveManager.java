@@ -25,49 +25,50 @@ import javax.xml.bind.Marshaller;
 /**
  * A container-management class that provides for straightforward JAXB processing (i.e.,
  * XML-formatted serialization and deserialization) of ColumnManager repository metadata.
+ *
  * @author Daniel Vimont
  */
 class HBaseSchemaArchiveManager {
-    private final HBaseSchemaArchive archiveSet;
 
-    HBaseSchemaArchiveManager() {
-        archiveSet = new HBaseSchemaArchive();
-    }
+  private final HBaseSchemaArchive archiveSet;
 
-    private HBaseSchemaArchiveManager(HBaseSchemaArchive archiveSet) {
-        this.archiveSet = archiveSet;
-    }
+  HBaseSchemaArchiveManager() {
+    archiveSet = new HBaseSchemaArchive();
+  }
 
-    static HBaseSchemaArchiveManager deserializeXmlFile (String sourcePathString, String sourceFileNameString)
-            throws JAXBException {
-        HBaseSchemaArchive deserializedArchiveSet
-                = (HBaseSchemaArchive)
-                        JAXBContext.newInstance(HBaseSchemaArchive.class).createUnmarshaller()
-                            .unmarshal(Paths.get(sourcePathString, sourceFileNameString).toFile());
-        return new HBaseSchemaArchiveManager(deserializedArchiveSet);
-    }
+  private HBaseSchemaArchiveManager(HBaseSchemaArchive archiveSet) {
+    this.archiveSet = archiveSet;
+  }
 
-    MetadataEntity addMetadataEntity(MetadataEntity mEntity) {
-        archiveSet.addMetadataObject(mEntity);
-        return mEntity;
-    }
+  static HBaseSchemaArchiveManager deserializeXmlFile(String sourcePathString, String sourceFileNameString)
+          throws JAXBException {
+    HBaseSchemaArchive deserializedArchiveSet
+            = (HBaseSchemaArchive) JAXBContext.newInstance(HBaseSchemaArchive.class).createUnmarshaller()
+            .unmarshal(Paths.get(sourcePathString, sourceFileNameString).toFile());
+    return new HBaseSchemaArchiveManager(deserializedArchiveSet);
+  }
 
-    Set<MetadataEntity> getMetadataEntities () {
-        return archiveSet.getMetadataObjects();
-    }
+  MetadataEntity addMetadataEntity(MetadataEntity mEntity) {
+    archiveSet.addMetadataObject(mEntity);
+    return mEntity;
+  }
 
-    String getArchiveFileTimestampString() {
-        return archiveSet.getArchiveFileTimestampString();
-    }
+  Set<MetadataEntity> getMetadataEntities() {
+    return archiveSet.getMetadataObjects();
+  }
 
-    void exportToXmlFile (String targetPathString, String targetFileNameString, boolean formatted)
-                throws JAXBException {
-        Marshaller marshaller
-                = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
-        if (formatted) {
-            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-        }
-        marshaller.marshal(archiveSet, Paths.get(targetPathString, targetFileNameString).toFile());
+  String getArchiveFileTimestampString() {
+    return archiveSet.getArchiveFileTimestampString();
+  }
+
+  void exportToXmlFile(String targetPathString, String targetFileNameString, boolean formatted)
+          throws JAXBException {
+    Marshaller marshaller
+            = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
+    if (formatted) {
+      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
     }
+    marshaller.marshal(archiveSet, Paths.get(targetPathString, targetFileNameString).toFile());
+  }
 
 }
