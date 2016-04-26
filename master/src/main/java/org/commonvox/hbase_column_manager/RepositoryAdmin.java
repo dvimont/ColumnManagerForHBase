@@ -365,7 +365,7 @@ public class RepositoryAdmin implements Closeable {
 
   /**
    * Ascertains whether or not column definition enforcement is enabled for a specified <i>Column
-   * Family</i>
+   * Family</i>.
    *
    * @param tableName Name of <i>Table</i> to which <i>Column Family</i> belongs.
    * @param colFamily Name of <i>Column Family</i> for which column definition enforcement is to be
@@ -391,10 +391,10 @@ public class RepositoryAdmin implements Closeable {
    * validations (if any) stipulated by the {@code ColumnDefinition}.
    *
    * @param enabled if {@code true}, column definition enforcement is enabled; if {@code false}, it
-   * is disabled.
-   * @param tableName Name of <i>Table</i> to which <i>Column Family</i> belongs.
+   * is disabled
+   * @param tableName Name of <i>Table</i> to which <i>Column Family</i> belongs
    * @param colFamily Name of <i>Column Family</i> for which column definition enforcement is to be
-   * enabled or disabled.
+   * enabled or disabled
    * @throws IOException if a remote or network exception occurs
    */
   public void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
