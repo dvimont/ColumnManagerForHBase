@@ -38,87 +38,87 @@ import org.apache.hadoop.hbase.client.Table;
  */
 class MConnection implements Connection {
 
-  private final Connection WRAPPED_HBASE_CONNECTION;
+  private final Connection STANDARD_HBASE_CONNECTION;
   private final Repository REPOSITORY;
 
   MConnection(Connection hBaseClientConnection)
           throws IOException {
-    WRAPPED_HBASE_CONNECTION = hBaseClientConnection;
-    REPOSITORY = new Repository(WRAPPED_HBASE_CONNECTION, this);
+    STANDARD_HBASE_CONNECTION = hBaseClientConnection;
+    REPOSITORY = new Repository(STANDARD_HBASE_CONNECTION, this);
   }
 
   Repository getRepository() {
     return REPOSITORY;
   }
 
-  Connection getWrappedConnection() {
-    return WRAPPED_HBASE_CONNECTION;
+  Connection getStandardConnection() {
+    return STANDARD_HBASE_CONNECTION;
   }
 
   /* Start of ColumnManager-related overrides */
   @Override
   public Admin getAdmin() throws IOException {
-    return new MAdmin(WRAPPED_HBASE_CONNECTION.getAdmin(), REPOSITORY);
+    return new MAdmin(STANDARD_HBASE_CONNECTION.getAdmin(), REPOSITORY);
   }
 
   @Override
   public Table getTable(TableName tn) throws IOException {
-    return new MTable(WRAPPED_HBASE_CONNECTION.getTable(tn), REPOSITORY);
+    return new MTable(STANDARD_HBASE_CONNECTION.getTable(tn), REPOSITORY);
   }
 
   @Override
   public Table getTable(TableName tn, ExecutorService es) throws IOException {
-    return new MTable(WRAPPED_HBASE_CONNECTION.getTable(tn, es), REPOSITORY);
+    return new MTable(STANDARD_HBASE_CONNECTION.getTable(tn, es), REPOSITORY);
   }
 
   @Override
   public BufferedMutator getBufferedMutator(TableName tn) throws IOException {
-    return new MBufferedMutator(WRAPPED_HBASE_CONNECTION.getBufferedMutator(tn), REPOSITORY);
+    return new MBufferedMutator(STANDARD_HBASE_CONNECTION.getBufferedMutator(tn), REPOSITORY);
   }
 
   @Override
   public BufferedMutator getBufferedMutator(BufferedMutatorParams bmp) throws IOException {
-    return new MBufferedMutator(WRAPPED_HBASE_CONNECTION.getBufferedMutator(bmp), REPOSITORY);
+    return new MBufferedMutator(STANDARD_HBASE_CONNECTION.getBufferedMutator(bmp), REPOSITORY);
   }
 
   /* Start of overrides which simply pass on standard Connection functionality */
   @Override
   public Configuration getConfiguration() {
-    return WRAPPED_HBASE_CONNECTION.getConfiguration();
+    return STANDARD_HBASE_CONNECTION.getConfiguration();
   }
 
   @Override
   public RegionLocator getRegionLocator(TableName tn) throws IOException {
-    return WRAPPED_HBASE_CONNECTION.getRegionLocator(tn);
+    return STANDARD_HBASE_CONNECTION.getRegionLocator(tn);
   }
 
   @Override
   public void close() throws IOException {
-    WRAPPED_HBASE_CONNECTION.close();
+    STANDARD_HBASE_CONNECTION.close();
   }
 
   @Override
   public boolean isClosed() {
-    return WRAPPED_HBASE_CONNECTION.isClosed();
+    return STANDARD_HBASE_CONNECTION.isClosed();
   }
 
   @Override
   public void abort(String string, Throwable thrwbl) {
-    WRAPPED_HBASE_CONNECTION.abort(string, thrwbl);
+    STANDARD_HBASE_CONNECTION.abort(string, thrwbl);
   }
 
   @Override
   public boolean isAborted() {
-    return WRAPPED_HBASE_CONNECTION.isAborted();
+    return STANDARD_HBASE_CONNECTION.isAborted();
   }
 
   @Override
   public boolean equals(Object otherObject) {
-    return WRAPPED_HBASE_CONNECTION.equals(otherObject);
+    return STANDARD_HBASE_CONNECTION.equals(otherObject);
   }
 
   @Override
   public int hashCode() {
-    return WRAPPED_HBASE_CONNECTION.hashCode();
+    return STANDARD_HBASE_CONNECTION.hashCode();
   }
 }

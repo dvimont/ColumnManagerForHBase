@@ -54,6 +54,7 @@ class MTable implements Table {
   private final Table wrappedTable;
   private final Repository repository;
   private final MTableDescriptor mTableDescriptor;
+  private final boolean includeInRepositoryProcessing;
 
   MTable(Table userTable, Repository repository)
           throws IOException {
@@ -63,8 +64,14 @@ class MTable implements Table {
     if (this.repository.isActivated()) {
       mTableDescriptor
               = this.repository.getMTableDescriptor(wrappedTable.getTableDescriptor().getTableName());
+      if (mTableDescriptor == null) {
+        includeInRepositoryProcessing = false;
+      } else {
+        includeInRepositoryProcessing = true;
+      }
     } else {
       mTableDescriptor = null;
+      includeInRepositoryProcessing = false;
     }
   }
 
@@ -97,6 +104,7 @@ class MTable implements Table {
   public void batch(List<? extends Row> list, Object[] os) throws IOException, InterruptedException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       for (Row action : list) {
         if (Mutation.class.isAssignableFrom(action.getClass())) {
@@ -107,7 +115,7 @@ class MTable implements Table {
     // Standard HBase processing
     wrappedTable.batch(list, os);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       int rowCount = 0;
       for (Object actionSucceeded : os) {
         if (actionSucceeded != null) {
@@ -126,6 +134,7 @@ class MTable implements Table {
   public Object[] batch(List<? extends Row> list) throws IOException, InterruptedException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       for (Row action : list) {
         if (Mutation.class.isAssignableFrom(action.getClass())) {
@@ -136,7 +145,7 @@ class MTable implements Table {
     // Standard HBase processing
     Object[] os = wrappedTable.batch(list);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       int rowCount = 0;
       for (Object actionSucceeded : os) {
         if (actionSucceeded != null) {
@@ -155,6 +164,7 @@ class MTable implements Table {
   public <R> void batchCallback(List<? extends Row> list, Object[] os, Callback<R> clbck) throws IOException, InterruptedException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       for (Row action : list) {
         if (Mutation.class.isAssignableFrom(action.getClass())) {
@@ -165,7 +175,7 @@ class MTable implements Table {
     // Standard HBase processing
     wrappedTable.batchCallback(list, os, clbck);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       int rowCount = 0;
       for (Object actionSucceeded : os) {
         if (actionSucceeded != null) {
@@ -184,6 +194,7 @@ class MTable implements Table {
   public <R> Object[] batchCallback(List<? extends Row> list, Callback<R> clbck) throws IOException, InterruptedException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       for (Row action : list) {
         if (Mutation.class.isAssignableFrom(action.getClass())) {
@@ -194,7 +205,7 @@ class MTable implements Table {
     // Standard HBase processing
     Object[] os = wrappedTable.batchCallback(list, clbck);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       int rowCount = 0;
       for (Object actionSucceeded : os) {
         if (actionSucceeded != null) {
@@ -238,13 +249,14 @@ class MTable implements Table {
   public void put(Put put) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, put);
     }
     // Standard HBase processing
     wrappedTable.put(put);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, put);
     }
   }
@@ -260,13 +272,14 @@ class MTable implements Table {
   public boolean checkAndPut(byte[] bytes, byte[] bytes1, byte[] bytes2, byte[] bytes3, Put put) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, put);
     }
     // Standard HBase processing
     boolean putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, bytes3, put);
     // ColumnManager auditing
-    if (putPerformed && repository.isActivated()) {
+    if (putPerformed && repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, put);
     }
     return putPerformed;
@@ -276,13 +289,14 @@ class MTable implements Table {
   public boolean checkAndPut(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, Put put) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, put);
     }
     // Standard HBase processing
     boolean putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, co, bytes3, put);
     // ColumnManager auditing
-    if (putPerformed && repository.isActivated()) {
+    if (putPerformed && repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, put);
     }
     return putPerformed;
@@ -318,13 +332,14 @@ class MTable implements Table {
   public void mutateRow(RowMutations rm) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, rm);
     }
     // Standard HBase processing
     wrappedTable.mutateRow(rm);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, rm);
     }
   }
@@ -333,13 +348,14 @@ class MTable implements Table {
   public Result append(Append append) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, append);
     }
     // Standard HBase processing
     Result result = wrappedTable.append(append);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, append);
     }
     return result;
@@ -349,13 +365,14 @@ class MTable implements Table {
   public Result increment(Increment i) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, i);
     }
     // Standard HBase processing
     Result result = wrappedTable.increment(i);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, i);
     }
     return result;
@@ -365,7 +382,7 @@ class MTable implements Table {
   public long incrementColumnValue(byte[] bytes, byte[] bytes1, byte[] bytes2, long l) throws IOException {
     // ColumnManager validation
     Increment increment = null;
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       increment = new Increment(bytes).addColumn(bytes1, bytes2, l);
       if (mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
         repository.validateColumns(mTableDescriptor, increment);
@@ -374,7 +391,7 @@ class MTable implements Table {
     // Standard HBase processing
     long returnedLong = wrappedTable.incrementColumnValue(bytes, bytes1, bytes2, l);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, increment);
     }
     return returnedLong;
@@ -384,7 +401,7 @@ class MTable implements Table {
   public long incrementColumnValue(byte[] bytes, byte[] bytes1, byte[] bytes2, long l, Durability drblt) throws IOException {
     // ColumnManager validation
     Increment increment = null;
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       increment = new Increment(bytes).addColumn(bytes1, bytes2, l);
       if (mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
         repository.validateColumns(mTableDescriptor, increment);
@@ -393,7 +410,7 @@ class MTable implements Table {
     // Standard HBase processing
     long returnedLong = wrappedTable.incrementColumnValue(bytes, bytes1, bytes2, l, drblt);
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, increment);
     }
     return returnedLong;
@@ -445,13 +462,14 @@ class MTable implements Table {
   public boolean checkAndMutate(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, RowMutations rm) throws IOException {
     // ColumnManager validation
     if (repository.isActivated()
+            && includeInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, rm);
     }
     // Standard HBase processing
     boolean mutationsPerformed = wrappedTable.checkAndMutate(bytes, bytes1, bytes2, co, bytes3, rm);
     // ColumnManager auditing
-    if (mutationsPerformed && repository.isActivated()) {
+    if (mutationsPerformed && repository.isActivated() && includeInRepositoryProcessing) {
       repository.putColumnAuditors(mTableDescriptor, rm);
     }
     return mutationsPerformed;

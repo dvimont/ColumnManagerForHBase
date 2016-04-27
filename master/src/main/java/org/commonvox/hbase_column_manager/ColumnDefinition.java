@@ -137,8 +137,9 @@ public class ColumnDefinition extends Column {
 
   /**
    * Set the defined column length (i.e., the maximum length permitted for any submitted value for
-   * this column when    {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
-     * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>);
+   * this column when
+   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>);
    * setting the value to 0 (the default) will result in NO length validation of column values being
    * performed.
    *
@@ -178,8 +179,9 @@ public class ColumnDefinition extends Column {
 
   /**
    * Get the defined column regex (i.e., the regular expression that any submitted value for this
-   * column must match when    {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
-     * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>); if
+   * column must match when
+   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>); if
    * returned value is blank (the default), NO regular expression validation of column values will
    * be performed.
    *
@@ -189,29 +191,4 @@ public class ColumnDefinition extends Column {
     String value = getValue(COLUMN_VALIDATION_REGEX_KEY);
     return (value == null) ? "" : value;
   }
-
-//    /**
-//     * Set the {@code nameIsRegex} attribute of this object to {@code true}, which will
-//     * cause the {@link #getName() name} of this {@code ColumnDefinition} to be processed as a
-//     * regular expression during <i>Column Qualifier</i> validation (which occurs when
-//     * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName)
-//     * ColumnDefinitionsEnforced} is set to {@code true} for the <i>Table</i> or <i>Column Family</i>
-//     * to which this {@code ColumnDefinition} belongs, and a <i>Column qualifier</i> is
-//     * submitted to the <i>Table</i> in a {@code Mutation}).
-//     * @param nameIsRegex {@code true} or {@code false}
-//     * @return this object, for method chaining
-//     */
-//    public ColumnDefinition setNameIsRegex(boolean nameIsRegex) {
-//        return setValue(NAME_IS_REGEX_KEY, Boolean.toString(nameIsRegex));
-//    }
-//    /**
-//     * Get the {@code nameIsRegex} attribute of this object (see {@link #setNameIsRegex(boolean)}
-//     * for more information).
-//     * @return {@code nameIsRegex} attribute of this object
-//     */
-//    public boolean nameIsRegex() {
-//        String value = getValue(NAME_IS_REGEX_KEY);
-//        return (value == null) ? false : Boolean.getBoolean(value);
-//    }
-//
 }

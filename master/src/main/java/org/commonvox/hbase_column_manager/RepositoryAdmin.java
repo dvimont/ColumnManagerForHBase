@@ -66,7 +66,7 @@ public class RepositoryAdmin implements Closeable {
     logger = Logger.getLogger(this.getClass().getPackage().getName());
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
       MConnection mConnection = (MConnection) connection;
-      this.hbaseConnection = mConnection.getWrappedConnection();
+      this.hbaseConnection = mConnection.getStandardConnection();
       repository = mConnection.getRepository();
     } else {
       this.hbaseConnection = connection;

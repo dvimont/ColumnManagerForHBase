@@ -320,7 +320,7 @@ class Repository {
 
   private static Connection getStandardConnection(Connection connection) {
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
-      return ((MConnection) connection).getWrappedConnection();
+      return ((MConnection) connection).getStandardConnection();
     } else {
       return connection;
     }
@@ -1715,10 +1715,15 @@ class Repository {
 
   static void dropRepository(Admin hbaseAdmin, Logger logger) throws IOException {
     Admin standardAdmin = getStandardAdmin(hbaseAdmin);
-    logger.warn("DROP (disable/delete) of " + PRODUCT_NAME + " Repository table and namespace has been requested.");
+    if (!standardAdmin.tableExists(REPOSITORY_TABLENAME)) {
+      return;
+    }
+    logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
+            + " Repository table and namespace has been requested.");
     standardAdmin.disableTable(REPOSITORY_TABLENAME);
     standardAdmin.deleteTable(REPOSITORY_TABLENAME);
-    logger.warn("DROP (disable/delete) of " + PRODUCT_NAME + " Repository table has been completed: "
+    logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
+            + " Repository table has been completed: "
             + REPOSITORY_TABLENAME.getNameAsString());
     standardAdmin.deleteNamespace(REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
     logger.warn("DROP (delete) of " + PRODUCT_NAME + " Repository namespace has been completed: "

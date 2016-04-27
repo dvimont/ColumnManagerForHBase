@@ -16,12 +16,6 @@
  */
 package org.commonvox.hbase_column_manager;
 
-import org.commonvox.hbase_column_manager.EntityType;
-import org.commonvox.hbase_column_manager.ColumnDefinition;
-import org.commonvox.hbase_column_manager.ColumnAuditor;
-import org.commonvox.hbase_column_manager.ChangeEventMonitor;
-import org.commonvox.hbase_column_manager.MConnectionFactory;
-import org.commonvox.hbase_column_manager.RepositoryAdmin;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -155,7 +149,7 @@ public class MetaRepTest {
                 printColDescriptors(mAdmin.getTableDescriptor(MY_TABLE_NAME));
                 getAndPrintColumnValues(table); // Yes, this will print "Hello World!"
 
-                // Now 'update' the second ColumnAuditor of the same row with another <put>,
+                // Now 'update' the second Column of the same row with another <put>,
                 //   which stores a second 'version' of that column (retaining the first).
                 table.put(new Put(rowId1).
                             addColumn(MY_COLUMN_FAMILY_NAME, MY_SECOND_COLUMN_QUALIFIER,

@@ -30,11 +30,11 @@
 		<value>active</value>
 	</property>
 	<property>
-		<name>column_manager.excludedNamespaces</name>
-		<value>testNamespace02,default</value>
+		<name>column_manager.includedNamespaces</name>
+		<value>testNamespace01</value>
 	</property>
 	<property>
-		<name>column_manager.excludedTables</name>
-		<value>testNamespace03:testTable02,testNamespace03:testTable04</value>
+		<name>column_manager.includedTables</name>
+		<value>testNamespace03:testTable01,testNamespace03:testTable03</value>
 	</property>
 </configuration>
