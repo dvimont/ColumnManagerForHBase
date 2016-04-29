@@ -70,10 +70,11 @@ class Repository {
           = Logger.getLogger(Repository.class.getPackage().getName());
   private final byte[] javaUsername;
   private final boolean columnManagerIsActivated;
-  private final boolean columnManagerInActiveMode;
   private final Set<String> includedNamespaces;
+  private final Set<String> includedEntireNamespaces;
   private final Set<TableName> includedTables;
   private final Set<String> excludedNamespaces;
+  private final Set<String> excludedEntireNamespaces;
   private final Set<TableName> excludedTables;
   private final Connection hbaseConnection;
   private final Admin hbaseAdmin;
@@ -82,8 +83,8 @@ class Repository {
   static final String PRODUCT_NAME = "ColumnManagerAPI";
   private static final byte[] JAVA_USERNAME_PROPERTY_KEY = Bytes.toBytes("user.name");
 
-    // The following HBASE_CONFIG_PARM* keys & values used in hbase-site.xml
-  //   to activate ColumnManager, set its mode, etc.
+  // The following HBASE_CONFIG_PARM* keys & values used in hbase-site.xml
+  //   or hbase-column-manager.xml to activate ColumnManager, include Tables for processing, etc.
   static final String HBASE_CONFIG_PARM_KEY_PREFIX = "column_manager.";
   static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED
           = HBASE_CONFIG_PARM_KEY_PREFIX + "activated";
@@ -91,18 +92,10 @@ class Repository {
   private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_ACTIVATED = "true";
   static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE
           = HBASE_CONFIG_PARM_KEY_PREFIX + "mode";
-  static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_PASSIVE = "passive"; // default
-  static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE = "active";
-  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES
-          = HBASE_CONFIG_PARM_KEY_PREFIX + "includedNamespaces";
   static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "includedTables";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_NAMESPACES
-          = HBASE_CONFIG_PARM_KEY_PREFIX + "excludedNamespaces";
   private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "excludedTables";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_MAX_VERSIONS
-          = HBASE_CONFIG_PARM_KEY_PREFIX + "maxVersions";
 
   private static final int UNIQUE_FOREIGN_KEY_LENGTH = 16;
   private static final NamespaceDescriptor HBASE_SYSTEM_NAMESPACE_DESCRIPTOR
@@ -155,12 +148,10 @@ class Repository {
     String columnManagerActivatedStatus
             = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED,
                     HBASE_CONFIG_PARM_VALUE_COLMANAGER_DEACTIVATED);
-    String columnManagerMode = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE,
-            HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_PASSIVE);
-    String includedNamespacesString = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES);
-    String includedTablesString = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES);
-    String excludedNamespacesString = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_NAMESPACES);
-    String excludedTablesString = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES);
+    String[] includedTablesArray
+            = conf.getStrings(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES);
+    String[] excludedTablesArray
+            = conf.getStrings(HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES);
     logger.info(PRODUCT_NAME + " Repository instance being instantiated by object of "
             + originatingObject.getClass().getSimpleName() + " class.");
     logger.info(PRODUCT_NAME + " config parameter: " + HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED
@@ -173,68 +164,85 @@ class Repository {
       columnManagerIsActivated = false;
       repositoryTable = null;
       logger.info(PRODUCT_NAME + " Repository is NOT ACTIVATED.");
-      columnManagerInActiveMode = false;
       includedNamespaces = null;
+      includedEntireNamespaces = null;
       includedTables = null;
       excludedNamespaces = null;
+      excludedEntireNamespaces = null;
       excludedTables = null;
       return;
     }
-    if (columnManagerMode.equalsIgnoreCase(HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE)) {
-      columnManagerInActiveMode = true;
-      logger.info(PRODUCT_NAME + " Repository is running in ACTIVE mode.");
-    } else {
-      columnManagerInActiveMode = false;
-      logger.info(PRODUCT_NAME + " Repository is running in PASSIVE mode.");
+    if (includedTablesArray != null && excludedTablesArray != null) {
+      logger.warn(PRODUCT_NAME + " " + HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
+              + " parameter will be ignored; overridden by "
+              + HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES + " parameter.");
     }
-    if (includedNamespacesString == null || includedNamespacesString.isEmpty()) {
-      this.includedNamespaces = null;
-      if (excludedNamespacesString == null || excludedNamespacesString.isEmpty()) {
-        this.excludedNamespaces = null;
-        logger.info(PRODUCT_NAME + " Repository activated for ALL user namespaces.");
+    if (includedTablesArray == null) {
+      includedTables = null;
+      includedNamespaces = null;
+      includedEntireNamespaces = null;
+      if (excludedTablesArray == null) {
+        excludedTables = null;
+        excludedNamespaces = null;
+        excludedEntireNamespaces = null;
+        logger.info(PRODUCT_NAME + " Repository activated for ALL user tables.");
       } else {
-        this.excludedNamespaces = new TreeSet<>();
-        String[] excludedNamespaceArray = excludedNamespacesString.split(",");
-        // included namespace may not yet exist, so no validation done here
-        this.excludedNamespaces.addAll(Arrays.asList(excludedNamespaceArray));
-        logger.info(PRODUCT_NAME + " Repository activated for all EXCEPT the following user namespaces: "
-                + excludedNamespacesString);
-      }
-    } else {
-      this.includedNamespaces = new TreeSet<>();
-      this.excludedNamespaces = null; // if included is present, excluded is ignored
-      String[] includedNamespaceArray = includedNamespacesString.split(",");
-      // included namespace may not yet exist, so no validation done here
-      this.includedNamespaces.addAll(Arrays.asList(includedNamespaceArray));
-      logger.info(PRODUCT_NAME + " Repository activated ONLY for the following user namespaces: "
-              + includedNamespacesString);
-    }
-    if (includedTablesString == null || includedTablesString.isEmpty()) {
-      this.includedTables = null;
-      if (excludedTablesString == null || excludedTablesString.isEmpty()) {
-        this.excludedTables = null;
-        logger.info(PRODUCT_NAME + " Repository activated for ALL user tables "
-                + "within included namespaces.");
-      } else {
-        this.excludedTables = new TreeSet<>();
-        String[] excludedTableArray = excludedTablesString.split(",");
-        for (String tableNameString : excludedTableArray) {
-          // excluded table may not yet exist, so no validation done here
-          this.excludedTables.add(TableName.valueOf(tableNameString));
+        excludedTables = new TreeSet<>();
+        excludedNamespaces = new TreeSet<>();
+        excludedEntireNamespaces = new TreeSet<>();
+        for (String excludedTableString : new TreeSet<>(Arrays.asList(excludedTablesArray))) {
+          try {
+            TableName excludedTableName = TableName.valueOf(excludedTableString);
+            excludedTables.add(excludedTableName);
+          } catch (IllegalArgumentException e) {
+            if (excludedTableString.endsWith(":*")) { // exclude entire namespace
+              String excludedNamespaceString
+                      = excludedTableString.substring(0, excludedTableString.length() - 2);
+              try {
+                TableName.isLegalNamespaceName(Bytes.toBytes(excludedNamespaceString));
+                excludedNamespaces.add(excludedNamespaceString);
+                excludedEntireNamespaces.add(excludedNamespaceString);
+              } catch (IllegalArgumentException iae) {
+                logger.warn(PRODUCT_NAME + " Invalid value submitted in "
+                        + HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES + " parameter; value "
+                        + "will be ignored.");
+              }
+            }
+          }
         }
         logger.info(PRODUCT_NAME + " Repository activated for all EXCEPT the following user tables: "
-                + excludedTablesString);
+                + conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES));
       }
     } else {
-      this.includedTables = new TreeSet<>();
-      this.excludedTables = null; // if included is present, excluded is ignored
-      String[] includedTableArray = includedTablesString.split(",");
-      for (String tableNameString : includedTableArray) {
-        // included table may not yet exist, so no validation done here
-        this.includedTables.add(TableName.valueOf(tableNameString));
+      excludedTables = null;
+      excludedNamespaces = null;
+      excludedEntireNamespaces = null;
+      includedTables = new TreeSet<>();
+      includedNamespaces = new TreeSet<>();
+      includedEntireNamespaces = new TreeSet<>();
+      for (String includedTableString : new TreeSet<>(Arrays.asList(includedTablesArray))) {
+        try {
+          TableName includedTableName = TableName.valueOf(includedTableString);
+          includedTables.add(includedTableName);
+          includedNamespaces.add(includedTableName.getNamespaceAsString());
+        } catch (IllegalArgumentException e) {
+          if (includedTableString.endsWith(":*")) { // include entire namespace
+            String includedNamespaceString
+                    = includedTableString.substring(0, includedTableString.length() - 2);
+            try {
+              TableName.isLegalNamespaceName(Bytes.toBytes(includedNamespaceString));
+              includedNamespaces.add(includedNamespaceString);
+              includedEntireNamespaces.add(includedNamespaceString);
+            } catch (IllegalArgumentException iae) {
+              logger.warn(PRODUCT_NAME + " Invalid value submitted in "
+                      + HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES + " parameter; value "
+                      + "will be ignored.");
+            }
+          }
+        }
       }
-      logger.info(PRODUCT_NAME + " Repository activated ONLY for the following user tables: "
-              + includedTablesString);
+      logger.info(PRODUCT_NAME + " Repository activated for ONLY the following user tables: "
+              + conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES));
     }
   }
 
@@ -364,7 +372,7 @@ class Repository {
     }
     if (includedNamespaces == null) {
       if (excludedNamespaces == null) {
-        return true;
+        return true; // if nothing stipulated by administrator, all user namespaces included
       } else {
         return !excludedNamespaces.contains(namespaceName);
       }
@@ -374,23 +382,19 @@ class Repository {
   }
 
   private boolean isIncludedTable(TableName tableName) {
-    System.out.println("Checking whether following table is included in processing: "
-            + tableName.getNameAsString());
     if (!isIncludedNamespace(tableName.getNamespaceAsString())) {
-      System.out.println("NOT: namespace not included");
       return false;
     }
-    if (includedTables == null) {
-      if (excludedTables == null) {
-        System.out.println("IS: includedTable and excludedTables both null");
-        return true;
+    if (includedTables == null && includedEntireNamespaces == null) {
+      if (excludedTables == null && excludedEntireNamespaces == null) {
+        return true; // if nothing stipulated by administrator, all user tables included
       } else {
-        System.out.println("Returning: !excludedTables.contains(tableName)" + !excludedTables.contains(tableName));
-        return !excludedTables.contains(tableName);
+        return excludedTables.contains(tableName) ? false
+                : !excludedEntireNamespaces.contains(tableName.getNamespaceAsString());
       }
     } else {
-        System.out.println("Returning includedTables.contains(tableName): " + includedTables.contains(tableName));
-      return includedTables.contains(tableName);
+      return includedTables.contains(tableName) ? true
+              : includedEntireNamespaces.contains(tableName.getNamespaceAsString());
     }
   }
 
@@ -470,7 +474,7 @@ class Repository {
       return null;
     }
     byte[] tableForeignKey = getTableForeignKey(tn);
-        // Note that ColumnManager can be installed atop an already-existing HBase
+    // Note that ColumnManager can be installed atop an already-existing HBase
     //  installation, so table metadata might not yet have been captured in repository.
     if (tableForeignKey == null) {
       tableForeignKey = putTable(hbaseAdmin.getTableDescriptor(tn));
@@ -916,7 +920,7 @@ class Repository {
     if (!newRow.isEmpty()) {
       if (!suppressUserName) {
         newRow.addColumn(REPOSITORY_COLFAMILY, JAVA_USERNAME_PROPERTY_KEY, javaUsername);
-                    // FOLLOWING FOR TESTING ONLY!! (Remove and uncomment preceding line.)
+        // FOLLOWING FOR TESTING ONLY!! (Remove and uncomment preceding line.)
         //Bytes.toBytes (System.getProperty(Bytes.toString (JAVA_USERNAME_PROPERTY_KEY))));
         // END OF TEMP TESTING LOGIC!!
       }
@@ -1195,7 +1199,7 @@ class Repository {
     byte[] namespaceForeignKey
             = getForeignKey(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
                     namespace);
-        // Note that ColumnManager could be installed atop an already-existing HBase
+    // Note that ColumnManager could be installed atop an already-existing HBase
     //  installation, so namespace metadata might not be in repository the first
     //  time its foreign key is accessed or one of its descendents is modified.
     if (namespaceForeignKey == null) {
@@ -1215,7 +1219,7 @@ class Repository {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tableName.getNamespace());
     byte[] tableForeignKey
             = getForeignKey(EntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
-        // Note that ColumnManager could be installed atop an already-existing HBase
+    // Note that ColumnManager could be installed atop an already-existing HBase
     //  installation, so table metadata might not be in repository the first
     //  time its foreign key is accessed or one of its descendents is modified.
     if (tableForeignKey == null) {
@@ -1251,7 +1255,6 @@ class Repository {
 //    return columnDefinitionsEnforced(EntityType.TABLE.getRecordType(),
 //            getNamespaceForeignKey(tableName.getNamespace()), tableName.getName());
 //  }
-
   boolean columnDefinitionsEnforced(TableName tableName, byte[] colFamily)
           throws IOException {
     return columnDefinitionsEnforced(EntityType.COLUMN_FAMILY.getRecordType(),

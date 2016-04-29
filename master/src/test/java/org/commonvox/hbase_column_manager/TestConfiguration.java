@@ -54,6 +54,7 @@ public class TestConfiguration {
         }
       }
     } catch (Exception e) {
+      e.printStackTrace();
       fail("Exception thrown by MConnectionFactory#createConnection: " + e.getMessage());
     }
   }

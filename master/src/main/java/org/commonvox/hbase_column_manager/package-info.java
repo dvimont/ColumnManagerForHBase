@@ -96,7 +96,7 @@
  * World" application</a>
  * can be successfully compiled and run in it.
  * <br><br>
- * <b>JDK 7</b> -- HBase 1.x requires JDK 7 or later.
+ * <b>JDK 7</b> -- HBase 1.x (upon which this package is dependent) requires JDK 7 or later.
  * </BLOCKQUOTE>
  * <a name="install"></a>
  * <hr style="height:3px;color:black;background-color:black">
@@ -188,53 +188,51 @@
  * <hr style="height:3px;color:black;background-color:black">
  * <b>IV. <u>CONFIGURATION OPTIONS</u></b>
  * <BLOCKQUOTE>
- * <b>A. INCLUDE/EXCLUDE ENTITIES FOR ColumnManager PROCESSING</b>
+ * <b>A. INCLUDE/EXCLUDE TABLES FOR ColumnManager PROCESSING</b>
  * <BLOCKQUOTE>
- * <b>Option 1: Explicitly INCLUDE Namespace and/or Table entities for ColumnManager
- * processing</b><br>
- * Specific <i>Namespaces</i> and/or <i>Tables</i> may optionally be explicitly
- * <b>included</b> in ColumnManager processing (with all others not specified being excluded). This
- * is done by adding the "column_manager.includedNamespaces" property, and/or the
- * "column_manager.includedTables" property to either
- * <a href="https://hbase.apache.org/book.html#_configuration_files" target="_blank">the
+ * <b>Option 1: Explicitly INCLUDE Tables for ColumnManager processing</b><br>
+ * Specific <i>Tables</i> may optionally be explicitly
+ * <b>included</b> in ColumnManager processing (with all others not specified being automatically
+ * excluded).
+ * This is done by adding the {@code [column_manager.includedTables]} property to either the
+ * <a href="https://hbase.apache.org/book.html#_configuration_files" target="_blank">
  * &#60;hbase-site.xml&#62; file</a>
- * or the optional separate <b>{@code <hbase-column-manager.xml>}</b> file. Multiple values are
- * delimited by commas, as in the following examples:
+ * or in an optional, separate <b>{@code <hbase-column-manager.xml>}</b> file. Values are expressed
+ * as fully-qualified <i>Table</i> names (for those <i>Tables</i> not in the default namespace,
+ * the fully-qualified name is the <i>Namespace</i> name followed by the <i>Table</i> name,
+ * delimited by a colon). Multiple values are delimited by commas, as in the following example:
  * <pre>{@code      <property>
- *         <name>column_manager.includedNamespaces</name>
- *         <value>myNamespace,anotherNamespace</value>
- *      </property>
- *      <property>
  *         <name>column_manager.includedTables</name>
- *         <value>goodNamespace:myTable,betterNamespace:yetAnotherTable</value>
- *      </property>}</pre> All <i>Tables</i> in an included <i>Namespace</i> will be included in
- * ColumnManager processing, regardless of whether they are explicitly listed in a
- * "column_manager.includedTables" property element.<br><br>
- * <b>Option 2: Explicitly EXCLUDE Namespace and/or Table entities from ColumnManager
- * processing</b><br>
- * Alternatively, specific Namespaces and/or Tables may optionally be explicitly
- * <b>excluded</b> from ColumnManager processing (with all others not specified being included).
- * This is done by adding the "column_manager.excludedNamespaces" property, and/or the
- * "column_manager.excludedTables" property to
- * <a href="https://hbase.apache.org/book.html#_configuration_files" target="_blank">the
+ *         <value>default:*,goodNamespace:myTable,betterNamespace:yetAnotherTable</value>
+ *      </property>}</pre>
+ * Note that all <i>Tables</i> in a given Namespace may be included by using an
+ * asterisk {@code [*]} symbol in the place of a specific <i>Table</i> qualifier,
+ * as in the example above which includes all Tables in the
+ * "default" namespace via the specification, [{@code default:*}].<br><br>
+ *
+ * <b>Option 2: Explicitly EXCLUDE Tables from ColumnManager processing</b><br>
+ *
+ * Alternatively, specific <i>Tables</i> may optionally be explicitly
+ * <b>excluded</b> from ColumnManager processing (with all others not specified being automatically
+ * included).
+ * This is done by adding the {@code [column_manager.excludedTables]} property to either the
+ * <a href="https://hbase.apache.org/book.html#_configuration_files" target="_blank">
  * &#60;hbase-site.xml&#62; file</a>
- * or the optional separate <b>{@code <hbase-column-manager.xml>}</b> file. Multiple values are
- * delimited by commas, as in the following examples:
+ * or in an optional, separate <b>{@code <hbase-column-manager.xml>}</b> file. Values are expressed
+ * as fully-qualified <i>Table</i> names (for those <i>Tables</i> not in the default namespace,
+ * the fully-qualified name is the <i>Namespace</i> name followed by the <i>Table</i> name,
+ * delimited by a colon). Multiple values are delimited by commas, as in the following example:
  * <pre>{@code      <property>
- *         <name>column_manager.excludedNamespaces</name>
- *         <value>myNamespace,anotherNamespace</value>
- *      </property>
- *      <property>
  *         <name>column_manager.excludedTables</name>
- *         <value>goodNamespace:myTable,betterNamespace:yetAnotherTable</value>
- *      </property>}</pre> All <i>Tables</i> in an excluded <i>Namespace</i> will be excluded from
- * ColumnManager processing, regardless of whether they are explicitly listed in a
- * "column_manager.excludedTables" property element.<br><br>
- * Note that if a "column_manager.includedNamespaces" property is found in the {@code <hbase-*.xml>}
- * files, then any "column_manager.excludedNamespaces" property will be ignored. Likewise, if a
- * "column_manager.includedTables" property is found in the {@code <hbase-*.xml>} files, then any
- * "column_manager.excludedTables" property will be ignored. Also note that <i>Namespace</i>
- * include/exclude processing always takes precedence over <i>Table</i> include/exclude processing.
+ *         <value>myNamespace:*,goodNamespace:myTable,betterNamespace:yetAnotherTable</value>
+ *      </property>}</pre>
+ * Note that all <i>Tables</i> in a given Namespace may be excluded by using an
+ * asterisk {@code [*]} symbol in the place of a specific <i>Table</i> qualifier,
+ * as in the example above which excludes all Tables in the
+ * "myNamespace" namespace via the specification, [{@code myNamespace:*}].<br><br>
+ * Note also that if a {@code [column_manager.includedTables]} property is found in the
+ * {@code <hbase-*.xml>}
+ * files, then any {@code [column_manager.excludedTables]} property will be ignored.
  * </BLOCKQUOTE>
  *
  * <a name="enforcement"></a>
@@ -260,7 +258,7 @@
  * <a href="RepositoryAdmin.html#deleteColumnDefinition-org.apache.hadoop.hbase.TableName-byte:A-byte:A-">
  * delete</a> methods.<br><br>
  * <b>Enable enforcement of <a href="ColumnDefinition.html">ColumnDefinitions</a></b>: Enforcement
- * of the {@code ColumnDefinition}s of a <i>Column Family</i> does not occur until explicitly
+ * of the {@code ColumnDefinition}s of a given <i>Column Family</i> does not occur until explicitly
  * enabled via the RepositoryAdmin method
  * <a href="RepositoryAdmin.html#setColumnDefinitionsEnforced-boolean-org.apache.hadoop.hbase.TableName-byte:A-">
  * setColumnDefinitionsEnforced</a>. This same method may be invoked to toggle enforcement

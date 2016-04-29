@@ -39,6 +39,7 @@ public class MConfiguration {
    * Creates a {@link Configuration} with HBase resources, the submitted {@link Configuration}'s
    * resources, and ColumnManager resources.
    *
+   * @param addedConfiguration Configuration object with resources to be added.
    * @return A {@link Configuration} with HBase resources, the submitted {@link Configuration}'s
    * resources, and ColumnManager resources.
    */

@@ -176,43 +176,114 @@ public class TestRepositoryAdmin {
   }
 
   @Test
-  public void testColumnAuditingWithExcludedNamespacesAndTables() throws IOException {
-    testColumnAuditing(false);
-  }
-
-  @Test
-  public void testColumnAuditingWithIncludedNamespacesAndTables() throws IOException {
-   testColumnAuditing(true);
-  }
-
-
-  private void testColumnAuditing(boolean useAlternateConfigProperties) throws IOException {
-    System.out.println("#testColumnAuditing has been invoked using "
-            + (useAlternateConfigProperties ? "INCLUDE" : "EXCLUDE") + " config properties.");
+  public void testColumnAuditingWithExplicitExcludes() throws IOException {
+    System.out.println("#testColumnAuditing has been invoked using EXCLUDE config properties.");
 
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
 
-    Configuration configuration;
-    if (useAlternateConfigProperties) {
-      configuration = HBaseConfiguration.create();
-      configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
-      configuration.set(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE,
-              Repository.HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE);
-      // NOTE that the "include" settings added here are the inverse of the "exclude" settings
-      //  in the hbase-column-manager.xml file in the test/resources directory. They should
-      //  result in EXACTLY the same results in ColumnManager auditing.
-      configuration.set(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES,
-              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX));
-      configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
-              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString());
+    Configuration configuration = MConfiguration.create();
+    testColumnAuditing(configuration);
+    System.out.println("#testColumnAuditing using EXCLUDE config properties has run to completion.");
+  }
 
-    } else {
-      configuration = MConfiguration.create();
-    }
+  @Test
+  public void testColumnAuditingWithExplicitIncludes() throws IOException {
+    System.out.println("#testColumnAuditing has been invoked using EXPLICIT "
+            + "INCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    Configuration configuration = HBaseConfiguration.create();
+    configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
+
+    // NOTE that the "include" settings added here are the inverse of the "exclude" settings
+    //  in the hbase-column-manager.xml file in the test/resources directory. They should
+    //  result in EXACTLY the same results in ColumnManager auditing.
+    configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
+    );
+
+    testColumnAuditing(configuration);
+    System.out.println("#testColumnAuditing using EXPLICIT INCLUDE config properties has "
+            + "run to completion.");
+  }
+
+  @Test
+  public void testColumnAuditingWithWildcardedIncludes() throws IOException {
+    System.out.println("#testColumnAuditing has been invoked using WILDCARDED "
+            + "INCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    Configuration configuration = HBaseConfiguration.create();
+    configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
+
+    // NOTE that the "include" settings added here are the inverse of the "exclude" settings
+    //  in the hbase-column-manager.xml file in the test/resources directory. They should
+    //  result in EXACTLY the same results in ColumnManager auditing.
+    configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+            TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX) + ":*"  // include all namespace01 tables!!
+    );
+
+    testColumnAuditing(configuration);
+    System.out.println("#testColumnAuditing using WILDCARDED INCLUDE config properties has "
+            + "run to completion.");
+  }
+
+  private void testColumnAuditing(Configuration configuration) throws IOException {
+//    System.out.println("#testColumnAuditing has been invoked using "
+//            + (useAlternateConfigProperties ? "INCLUDE" : "EXCLUDE") + " config properties.");
+//
+//    initializeTestNamespaceAndTableObjects();
+//    clearTestingEnvironment();
+//
+//    Configuration configuration;
+//    if (useAlternateConfigProperties) {
+//      configuration = HBaseConfiguration.create();
+//      configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
+//      configuration.set(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE,
+//              Repository.HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE);
+//      // NOTE that the "include" settings added here are the inverse of the "exclude" settings
+//      //  in the hbase-column-manager.xml file in the test/resources directory. They should
+//      //  result in EXACTLY the same results in ColumnManager auditing.
+////      configuration.set(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES,
+////              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX));
+//      configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
+//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+//                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
+//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+//                                      TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+//                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
+//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+//                                      TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
+//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+//                                      TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+//                                      TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
+//      );
+//
+//    } else {
+//      configuration = MConfiguration.create();
+//    }
 
     createSchemaStructuresInHBase(configuration);
     loadColumnData(configuration);
@@ -371,9 +442,6 @@ public class TestRepositoryAdmin {
 
     clearTestingEnvironment();
 
-    System.out.println("#testColumnAuditing using "
-            + (useAlternateConfigProperties ? "INCLUDE" : "EXCLUDE")
-            + " config properties has run to completion.");
   }
 
   private void clearTestingEnvironment() throws IOException {
@@ -511,7 +579,7 @@ public class TestRepositoryAdmin {
 
   public static void main(String[] args) throws Exception {
    // new TestRepositoryAdmin().testStaticMethods();
-   // new TestRepositoryAdmin().testColumnAuditingWithExcludedNamespacesAndTables();
-    new TestRepositoryAdmin().testColumnAuditingWithIncludedNamespacesAndTables();
+    new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
+    // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
   }
 }
