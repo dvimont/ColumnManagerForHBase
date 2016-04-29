@@ -225,7 +225,7 @@ public class DiscoveryInRealTimeTester {
       repositoryAdmin.exportTableMetadata(TableName.valueOf(MY_NAMESPACE_NAME, "myTable"), TARGET_PATH, "testExportTable.xml", false);
 
 //            System.out.println
-//                (superAdmin.generateHmaFileSummary(TARGET_PATH, "testExportAll.xml"));
+//                (superAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));
 //            System.out.println("Testing get of MNamespace descriptor from Repository");
 //            MNamespaceDescriptor testMnd
 //                    = repositoryAdmin.getMNamespaceDescriptorFromRepository(MY_NAMESPACE_NAME);

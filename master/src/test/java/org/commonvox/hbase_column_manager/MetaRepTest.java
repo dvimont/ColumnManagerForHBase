@@ -364,7 +364,7 @@ public class MetaRepTest {
                     (TableName.valueOf(MY_NAMESPACE_NAME,"myTable"), TARGET_PATH, "testExportTable.xml", false);
 
             System.out.println
-                (repositoryAdmin.generateHmaFileSummary(TARGET_PATH, "testExportAll.xml"));
+                (repositoryAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));
 
 //            System.out.println("Testing get of MNamespace descriptor from Repository");
 //            MNamespaceDescriptor testMnd

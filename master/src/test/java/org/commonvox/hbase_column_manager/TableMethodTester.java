@@ -261,7 +261,7 @@ public class TableMethodTester {
                     (TableName.valueOf(MY_NAMESPACE_NAME,"myTable"), TARGET_PATH, "testExportTable.xml", false);
 
 //            System.out.println
-//                (repositoryAdmin.generateHmaFileSummary(TARGET_PATH, "testExportAll.xml"));
+//                (repositoryAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));
 
 //            System.out.println("DUMPING REPOSITORY *BEFORE* delete of user tables and namespace");
 //            mAdmin.dumpRepositoryTable();

@@ -102,6 +102,7 @@
           <configuration>
             <links>
               <link>http://hbase.apache.org/apidocs/</link>
+              <link>http://hadoop.apache.org/docs/r2.6.1/api/</link>
               <link>http://docs.oracle.com/javase/7/docs/api/</link>
             </links>
             <noqualifier>all</noqualifier>

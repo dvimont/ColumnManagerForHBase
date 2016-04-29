@@ -151,7 +151,7 @@ public class RepositoryAdmin implements Closeable {
    * found
    * @throws IOException if a remote or network exception occurs
    */
-  public Collection<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
+  public Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
       return ((MColumnDescriptor) hcd).getColumnAuditors();
@@ -169,7 +169,7 @@ public class RepositoryAdmin implements Closeable {
    * @return set of {@link ColumnAuditor}s, or null if tableName or colFamily not found
    * @throws IOException if a remote or network exception occurs
    */
-  public Collection<ColumnAuditor> getColumnAuditors(TableName tableName, byte[] colFamily)
+  public Set<ColumnAuditor> getColumnAuditors(TableName tableName, byte[] colFamily)
           throws IOException {
     MTableDescriptor mtd = getRepository().getMTableDescriptor(tableName);
     if (mtd == null) {
@@ -727,7 +727,7 @@ public class RepositoryAdmin implements Closeable {
    * @return A String containing a summary report suitable for printing/viewing.
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public String generateHmaFileSummary(String sourcePathString, String sourceFileNameString)
+  public String generateHsaFileSummary(String sourcePathString, String sourceFileNameString)
           throws JAXBException {
     return repository
             .getHBaseSchemaArchiveSummary(sourcePathString, sourceFileNameString);

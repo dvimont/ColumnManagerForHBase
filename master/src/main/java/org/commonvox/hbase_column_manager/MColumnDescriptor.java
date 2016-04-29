@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
@@ -139,8 +140,8 @@ class MColumnDescriptor extends HColumnDescriptor {
     return columnAuditors.keySet();
   }
 
-  Collection<ColumnAuditor> getColumnAuditors() {
-    return columnAuditors.values();
+  Set<ColumnAuditor> getColumnAuditors() {
+    return new TreeSet<>(columnAuditors.values());
   }
 
   /**

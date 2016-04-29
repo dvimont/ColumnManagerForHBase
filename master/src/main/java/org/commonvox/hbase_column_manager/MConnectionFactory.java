@@ -44,7 +44,6 @@ public class MConnectionFactory {
   static final String COLUMN_MANAGER_CONFIG_FILE = "hbase-column-manager.xml";
 
   // no public constructor
-
   MConnectionFactory() {
   }
 
@@ -69,7 +68,6 @@ public class MConnectionFactory {
    * @throws IOException if a remote or network exception occurs
    */
   public static Connection createConnection(Configuration conf) throws IOException {
-    conf.addResource(COLUMN_MANAGER_CONFIG_FILE);
     return new MConnection(ConnectionFactory.createConnection(conf));
   }
 
@@ -84,7 +82,6 @@ public class MConnectionFactory {
    */
   public static Connection createConnection(Configuration conf, ExecutorService pool)
           throws IOException {
-    conf.addResource(COLUMN_MANAGER_CONFIG_FILE);
     return new MConnection(ConnectionFactory.createConnection(conf, pool));
   }
 
@@ -100,7 +97,6 @@ public class MConnectionFactory {
    */
   public static Connection createConnection(Configuration conf, ExecutorService pool, User user)
           throws IOException {
-    conf.addResource(COLUMN_MANAGER_CONFIG_FILE);
     return new MConnection(ConnectionFactory.createConnection(conf, pool, user));
   }
 
@@ -115,7 +111,6 @@ public class MConnectionFactory {
    */
   public static Connection createConnection(Configuration conf, User user)
           throws IOException {
-    conf.addResource(COLUMN_MANAGER_CONFIG_FILE);
     return new MConnection(ConnectionFactory.createConnection(conf, user));
   }
 }

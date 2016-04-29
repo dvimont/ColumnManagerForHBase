@@ -85,17 +85,17 @@ class Repository {
     // The following HBASE_CONFIG_PARM* keys & values used in hbase-site.xml
   //   to activate ColumnManager, set its mode, etc.
   static final String HBASE_CONFIG_PARM_KEY_PREFIX = "column_manager.";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED
+  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED
           = HBASE_CONFIG_PARM_KEY_PREFIX + "activated";
   private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_DEACTIVATED = "false"; // default
   private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_ACTIVATED = "true";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE
+  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE
           = HBASE_CONFIG_PARM_KEY_PREFIX + "mode";
-  private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_PASSIVE = "passive"; // default
-  private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE = "active";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES
+  static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_PASSIVE = "passive"; // default
+  static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE = "active";
+  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "includedNamespaces";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES
+  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "includedTables";
   private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_NAMESPACES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "excludedNamespaces";
@@ -219,7 +219,7 @@ class Repository {
         this.excludedTables = new TreeSet<>();
         String[] excludedTableArray = excludedTablesString.split(",");
         for (String tableNameString : excludedTableArray) {
-          // included table may not yet exist, so no validation done here
+          // excluded table may not yet exist, so no validation done here
           this.excludedTables.add(TableName.valueOf(tableNameString));
         }
         logger.info(PRODUCT_NAME + " Repository activated for all EXCEPT the following user tables: "
@@ -236,7 +236,6 @@ class Repository {
       logger.info(PRODUCT_NAME + " Repository activated ONLY for the following user tables: "
               + includedTablesString);
     }
-
   }
 
   private Table getRepositoryTable() throws IOException {
@@ -375,16 +374,22 @@ class Repository {
   }
 
   private boolean isIncludedTable(TableName tableName) {
+    System.out.println("Checking whether following table is included in processing: "
+            + tableName.getNameAsString());
     if (!isIncludedNamespace(tableName.getNamespaceAsString())) {
+      System.out.println("NOT: namespace not included");
       return false;
     }
     if (includedTables == null) {
       if (excludedTables == null) {
+        System.out.println("IS: includedTable and excludedTables both null");
         return true;
       } else {
+        System.out.println("Returning: !excludedTables.contains(tableName)" + !excludedTables.contains(tableName));
         return !excludedTables.contains(tableName);
       }
     } else {
+        System.out.println("Returning includedTables.contains(tableName): " + includedTables.contains(tableName));
       return includedTables.contains(tableName);
     }
   }
@@ -924,7 +929,7 @@ class Repository {
           throws IOException {
     Result row = getActiveRow(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
     if (row == null || row.isEmpty()) {
-            // Note that ColumnManager can be installed atop an already-existing HBase
+      // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so namespace metadata might not yet have been captured in repository,
       //  or namespaceName may not represent active namespace (and so not stored in repository).
       //return new MNamespaceDescriptor(hbaseAdmin.getNamespaceDescriptor(namespaceName));
@@ -951,7 +956,7 @@ class Repository {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tn.getNamespace());
     Result row = getActiveRow(EntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
     if (row == null || row.isEmpty()) {
-            // Note that ColumnManager can be installed atop an already-existing HBase
+      // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so table metadata might not yet have been captured in repository,
       //  or TableName may not represent included Table (and so not stored in repository).
       if (isIncludedTable(tn)) {

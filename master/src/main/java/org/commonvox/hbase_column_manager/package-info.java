@@ -380,9 +380,9 @@
  * entire repository or the user-specified <i>Namespace</i> or <i>Table</i>. Conversely, the
  * {@code RepositoryAdmin}
  * <a href="RepositoryAdmin.html#importMetadata-boolean-java.lang.String-java.lang.String-">
- * import methods</a> provide for deserialization of a designated HMA file and importation of its
+ * import methods</a> provide for deserialization of a designated HSA file and importation of its
  * components into HBase (creating any Namespaces or Tables not already found in HBase).<br><br>
- * *An HMA file adheres to the XML Schema layout in
+ * *An HSA file adheres to the XML Schema layout in
  * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
  * </BLOCKQUOTE>
  * </li>
