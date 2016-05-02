@@ -96,7 +96,7 @@ public class ChangeEvent {
    * @return {@link EntityType} of the Entity to which the {@code ChangeEvent} pertains.
    */
   public EntityType getEntityType() {
-    return EntityType.ENTITY_TYPE_BYTES_TO_ENUM_MAP
+    return EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP
             .get(this.entity.getEntityRecordType().getBytes()[0]);
   }
 

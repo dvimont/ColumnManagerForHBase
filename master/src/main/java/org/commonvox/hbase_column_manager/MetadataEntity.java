@@ -60,7 +60,7 @@ class MetadataEntity implements Comparable<MetadataEntity> {
   }
 
   MetadataEntity(byte entityType, byte[] name) {
-    this.entityType = EntityType.ENTITY_TYPE_BYTES_TO_ENUM_MAP.get(entityType).toString();
+    this.entityType = EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType).toString();
     this.name = Bytes.toString(name);
   }
 
@@ -114,7 +114,7 @@ class MetadataEntity implements Comparable<MetadataEntity> {
   }
 
   byte getEntityRecordType() {
-    return EntityType.ENTITY_TYPE_LABELS_TO_BYTES_MAP.get(this.entityType);
+    return EntityType.ENTITY_TYPE_LABEL_TO_BYTE_MAP.get(this.entityType);
   }
 
   /**
@@ -300,8 +300,8 @@ class MetadataEntity implements Comparable<MetadataEntity> {
   }
 
   /**
-   * Returns a String in the format "{@link EntityType}: EntityName" (e.g., "Column Family:
-   * MyColumnFamily").
+   * Returns a String in the format "{@link EntityType}: EntityName"
+   * (e.g., "{@code ColumnFamily: myColumnFamily}").
    *
    * @return formatted String
    */

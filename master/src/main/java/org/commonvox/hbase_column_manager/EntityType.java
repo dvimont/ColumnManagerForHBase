@@ -29,9 +29,6 @@ public enum EntityType {
   /**
    * Namespace
    */
-  /**
-   * Namespace
-   */
   NAMESPACE((byte) 'N', "Namespace"),
   /**
    * Table
@@ -40,28 +37,28 @@ public enum EntityType {
   /**
    * Column Family
    */
-  COLUMN_FAMILY((byte) 'F', "Column Family"),
+  COLUMN_FAMILY((byte) 'F', "ColumnFamily"),
   /**
    * Column Auditor
    */
-  COLUMN_AUDITOR((byte) 'C', "Column Auditor"),
+  COLUMN_AUDITOR((byte) 'C', "ColumnAuditor"),
   /**
    * Column Definition
    */
-  COLUMN_DEFINITION((byte) 'D', "Column Definition");
+  COLUMN_DEFINITION((byte) 'D', "ColumnDefinition");
 
-  static final Map<Byte, EntityType> ENTITY_TYPE_BYTES_TO_ENUM_MAP = new TreeMap<>();
-  static final Map<String, Byte> ENTITY_TYPE_LABELS_TO_BYTES_MAP = new TreeMap<>();
+  static final Map<Byte, EntityType> ENTITY_TYPE_BYTE_TO_ENUM_MAP = new TreeMap<>();
+  static final Map<String, Byte> ENTITY_TYPE_LABEL_TO_BYTE_MAP = new TreeMap<>();
 
   static {
-    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.NAMESPACE.getRecordType(), EntityType.NAMESPACE);
-    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.TABLE.getRecordType(), EntityType.TABLE);
-    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.COLUMN_FAMILY.getRecordType(), EntityType.COLUMN_FAMILY);
-    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.COLUMN_AUDITOR.getRecordType(), EntityType.COLUMN_AUDITOR);
-    ENTITY_TYPE_BYTES_TO_ENUM_MAP.put(EntityType.COLUMN_DEFINITION.getRecordType(), EntityType.COLUMN_DEFINITION);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.NAMESPACE.getRecordType(), EntityType.NAMESPACE);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.TABLE.getRecordType(), EntityType.TABLE);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.COLUMN_FAMILY.getRecordType(), EntityType.COLUMN_FAMILY);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.COLUMN_AUDITOR.getRecordType(), EntityType.COLUMN_AUDITOR);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.COLUMN_DEFINITION.getRecordType(), EntityType.COLUMN_DEFINITION);
 
-    for (Entry<Byte, EntityType> entry : ENTITY_TYPE_BYTES_TO_ENUM_MAP.entrySet()) {
-      ENTITY_TYPE_LABELS_TO_BYTES_MAP.put(entry.getValue().toString(), entry.getKey());
+    for (Entry<Byte, EntityType> entry : ENTITY_TYPE_BYTE_TO_ENUM_MAP.entrySet()) {
+      ENTITY_TYPE_LABEL_TO_BYTE_MAP.put(entry.getValue().toString(), entry.getKey());
     }
   }
 

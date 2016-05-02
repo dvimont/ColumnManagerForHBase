@@ -94,6 +94,12 @@ public class TestRepositoryAdmin {
   static {
     expectedColQualifiersForNamespace1Table1Cf2.add(TEST_COLUMN_QUALIFIER_LIST.get(3));
   }
+  private static Set<byte[]> expectedColQualifiersForNamespace3Table1Cf1
+            = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
+  static {
+    expectedColQualifiersForNamespace3Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(0));
+    expectedColQualifiersForNamespace3Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(2));
+  }
   private static Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf1 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace1Table1Cf1.add(
@@ -107,6 +113,13 @@ public class TestRepositoryAdmin {
   static {
     expectedColAuditorsForNamespace1Table1Cf2.add(
             new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(3)).setMaxValueLengthFound(82));
+  }
+  private static Set<ColumnAuditor> expectedColAuditorsForNamespace3Table1Cf1 = new TreeSet<>();
+  static {
+    expectedColAuditorsForNamespace3Table1Cf1.add(
+            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(0)).setMaxValueLengthFound(9));
+    expectedColAuditorsForNamespace3Table1Cf1.add(
+            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(2)).setMaxValueLengthFound(82));
   }
   private static final String ALTERNATE_USERNAME = "testAlternateUserName";
 
@@ -185,7 +198,9 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    testColumnAuditing(configuration);
+    createSchemaStructuresInHBase(configuration, false);
+    loadColumnData(configuration, false);
+    verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
   }
@@ -216,7 +231,9 @@ public class TestRepositoryAdmin {
                                     TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
     );
 
-    testColumnAuditing(configuration);
+    createSchemaStructuresInHBase(configuration, false);
+    loadColumnData(configuration, false);
+    verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using EXPLICIT EXCLUDE config properties has "
             + "run to completion.");
   }
@@ -250,7 +267,9 @@ public class TestRepositoryAdmin {
                                     TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
     );
 
-    testColumnAuditing(configuration);
+    createSchemaStructuresInHBase(configuration, false);
+    loadColumnData(configuration, false);
+    verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using EXPLICIT INCLUDE config properties has "
             + "run to completion.");
   }
@@ -277,15 +296,201 @@ public class TestRepositoryAdmin {
             TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX) + ":*"  // include all namespace01 tables!!
     );
 
-    testColumnAuditing(configuration);
+    createSchemaStructuresInHBase(configuration, false);
+    loadColumnData(configuration, false);
+    verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using WILDCARDED INCLUDE config properties has "
             + "run to completion.");
   }
 
-  private void testColumnAuditing(Configuration configuration) throws IOException {
+  @Test
+  public void testColumnDiscoveryWithWildcardedExcludes() throws IOException {
+    System.out.println("#testColumnDiscovery has been invoked using WILDCARDED "
+            + "EXCLUDE config properties.");
 
-    createSchemaStructuresInHBase(configuration);
-    loadColumnData(configuration);
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+    loadColumnData(configuration, true);
+    doColumnDiscovery(configuration);
+    verifyColumnAuditing(configuration);
+    System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties has "
+            + "run to completion.");
+  }
+
+  private void clearTestingEnvironment() throws IOException {
+    try (Connection standardConnection = ConnectionFactory.createConnection();
+            Admin standardAdmin = standardConnection.getAdmin();
+            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(standardConnection)) {
+
+      RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
+
+      // loop to disable and drop test tables and namespaces
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        if (!standardAdmin.tableExists(tableName)) {
+          continue;
+        }
+        standardAdmin.disableTable(tableName);
+        standardAdmin.deleteTable(tableName);
+      }
+      for (String namespaceName : testNamespacesAndDescriptors.keySet()) {
+        if (!repositoryAdmin.namespaceExists(namespaceName)) {
+          continue;
+        }
+        standardAdmin.deleteNamespace(namespaceName);
+      }
+    }
+  }
+
+  private void initializeTestNamespaceAndTableObjects() {
+
+    testNamespacesAndDescriptors = new TreeMap<>();
+    testTableNamesAndDescriptors = new TreeMap<>();
+    testColumnFamilyNamesAndDescriptors = new TreeMap<>();
+
+    for (String namespace : TEST_NAMESPACE_LIST) {
+      testNamespacesAndDescriptors.put(namespace, NamespaceDescriptor.create(namespace).build());
+      for (String tableNameString : TEST_TABLE_NAME_LIST) {
+        TableName tableName = TableName.valueOf(namespace, tableNameString);
+        testTableNamesAndDescriptors.
+                put(tableName, new HTableDescriptor(tableName));
+      }
+    }
+    for (byte[] columnFamily : TEST_COLUMN_FAMILY_LIST) {
+      testColumnFamilyNamesAndDescriptors.put(
+              Bytes.toString(columnFamily), new HColumnDescriptor(columnFamily));
+    }
+  }
+
+  private void createSchemaStructuresInHBase(
+          Configuration configuration, boolean bypassColumnManager) throws IOException {
+    int memStoreFlushSize = 60000000;
+    int maxVersions = 8;
+    boolean alternateBooleanAttribute = false;
+
+    try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin();
+            Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
+      for (NamespaceDescriptor nd : testNamespacesAndDescriptors.values()) {
+        nd.setConfiguration("NamespaceConfigTest", "value=" + nd.getName());
+        if (bypassColumnManager) {
+          standardAdmin.createNamespace(nd);
+        } else {
+          mAdmin.createNamespace(nd);
+        }
+      }
+      for (HTableDescriptor htd : testTableNamesAndDescriptors.values()) {
+        htd.setMemStoreFlushSize(memStoreFlushSize++);
+        htd.setDurability(Durability.SKIP_WAL);
+        for (HColumnDescriptor hcd : testColumnFamilyNamesAndDescriptors.values()) {
+          if (alternateBooleanAttribute) {
+            alternateBooleanAttribute = false;
+          } else {
+            alternateBooleanAttribute = true;
+          }
+          hcd.setInMemory(alternateBooleanAttribute);
+          hcd.setMaxVersions(maxVersions++);
+          htd.addFamily(hcd);
+        }
+        if (bypassColumnManager) {
+          standardAdmin.createTable(htd);
+        } else {
+          mAdmin.createTable(htd);
+        }
+      }
+    }
+  }
+
+  private void loadColumnData(Configuration configuration, boolean bypassColumnManager)
+          throws IOException {
+
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration);
+            Connection standardConnection = ConnectionFactory.createConnection(configuration)) {
+
+      Connection connection;
+      if (bypassColumnManager) {
+        connection = standardConnection;
+      } else {
+        connection = mConnection;
+      }
+      // put rows into Table which is INCLUDED for auditing
+      try (Table table01InNamespace01 = connection.getTable(TableName.valueOf(
+              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
+        List<Put> putList = new ArrayList<>();
+        putList.add(new Put(ROW_ID_01).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
+                        VALUE_2_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(1),
+                        VALUE_5_BYTES_LONG));
+        putList.add(new Put(ROW_ID_02).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
+                        VALUE_82_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(2),
+                        VALUE_9_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), TEST_COLUMN_QUALIFIER_LIST.get(3),
+                        VALUE_82_BYTES_LONG));
+        table01InNamespace01.put(putList);
+      }
+
+      try (Table table01InNamespace03 = connection.getTable(TableName.valueOf(
+              TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
+
+        List<Put> putList = new ArrayList<>();
+        putList.add(new Put(ROW_ID_04).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(2),
+                        VALUE_82_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
+                        VALUE_9_BYTES_LONG));
+        table01InNamespace03.put(putList);
+      }
+
+      // put two rows into Table in Namespace which is NOT included for ColumnManager auditing
+      try (Table table01InNamespace02 = connection.getTable(TableName.valueOf(
+              TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
+
+        List<Put> putList = new ArrayList<>();
+        putList.add(new Put(ROW_ID_01).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
+                        VALUE_2_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
+                        VALUE_82_BYTES_LONG));
+        putList.add(new Put(ROW_ID_02).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
+                        VALUE_9_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
+                        VALUE_82_BYTES_LONG));
+        table01InNamespace02.put(putList);
+      }
+
+      // put one row into Table which is explicitly NOT included for ColumnManager auditing
+      try (Table table02InNamespace03 = connection.getTable(TableName.valueOf(
+              TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+              TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)))) {
+
+        List<Put> putList = new ArrayList<>();
+        putList.add(new Put(ROW_ID_03).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
+                        VALUE_9_BYTES_LONG).
+                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
+                        VALUE_5_BYTES_LONG));
+        table02InNamespace03.put(putList);
+      }
+    }
+  }
+
+  private void doColumnDiscovery(Configuration configuration) throws IOException {
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      repositoryAdmin.discoverMetadata();
+    }
+  }
+
+  private void verifyColumnAuditing(Configuration configuration) throws IOException {
 
     try (Connection mConnection = MConnectionFactory.createConnection(configuration);
             RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection)) {
@@ -321,6 +526,17 @@ public class TestRepositoryAdmin {
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
+
+      Set<byte[]> returnedColQualifiersForNamespace3Table1Cf1
+              = repositoryAdmin.getColumnQualifiers(
+                      testTableNamesAndDescriptors.get(
+                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testColumnFamilyNamesAndDescriptors.get(
+                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+      assertTrue(GET_COL_QUALIFIERS_FAILURE,
+              expectedColQualifiersForNamespace3Table1Cf1.equals(
+                      returnedColQualifiersForNamespace3Table1Cf1));
 
       Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
               = repositoryAdmin.getColumnQualifiers(
@@ -396,6 +612,17 @@ public class TestRepositoryAdmin {
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
 
+      Set<ColumnAuditor> returnedColAuditorsForNamespace3Table1Cf1
+              = repositoryAdmin.getColumnAuditors(
+                      testTableNamesAndDescriptors.get(
+                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testColumnFamilyNamesAndDescriptors.get(
+                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+      assertTrue(GET_COL_AUDITORS_FAILURE,
+              expectedColAuditorsForNamespace3Table1Cf1.equals(
+                      returnedColAuditorsForNamespace3Table1Cf1));
+
       Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
               = repositoryAdmin.getColumnAuditors(
                       testTableNamesAndDescriptors.get(
@@ -443,142 +670,10 @@ public class TestRepositoryAdmin {
 
   }
 
-  private void clearTestingEnvironment() throws IOException {
-    try (Connection standardConnection = ConnectionFactory.createConnection();
-            Admin standardAdmin = standardConnection.getAdmin();
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(standardConnection)) {
-
-      RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
-
-      // loop to disable and drop test tables and namespaces
-      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
-        if (!standardAdmin.tableExists(tableName)) {
-          continue;
-        }
-        standardAdmin.disableTable(tableName);
-        standardAdmin.deleteTable(tableName);
-      }
-      for (String namespaceName : testNamespacesAndDescriptors.keySet()) {
-        if (!repositoryAdmin.namespaceExists(namespaceName)) {
-          continue;
-        }
-        standardAdmin.deleteNamespace(namespaceName);
-      }
-    }
-  }
-
-  private void initializeTestNamespaceAndTableObjects() {
-
-    testNamespacesAndDescriptors = new TreeMap<>();
-    testTableNamesAndDescriptors = new TreeMap<>();
-    testColumnFamilyNamesAndDescriptors = new TreeMap<>();
-
-    for (String namespace : TEST_NAMESPACE_LIST) {
-      testNamespacesAndDescriptors.put(namespace, NamespaceDescriptor.create(namespace).build());
-      for (String tableNameString : TEST_TABLE_NAME_LIST) {
-        TableName tableName = TableName.valueOf(namespace, tableNameString);
-        testTableNamesAndDescriptors.
-                put(tableName, new HTableDescriptor(tableName));
-      }
-    }
-    for (byte[] columnFamily : TEST_COLUMN_FAMILY_LIST) {
-      testColumnFamilyNamesAndDescriptors.put(
-              Bytes.toString(columnFamily), new HColumnDescriptor(columnFamily));
-    }
-  }
-
-  private void createSchemaStructuresInHBase(Configuration configuration) throws IOException {
-    int memStoreFlushSize = 60000000;
-    int maxVersions = 8;
-    boolean alternateBooleanAttribute = false;
-
-    try (Connection mConnection = MConnectionFactory.createConnection(configuration);
-            Admin mAdmin = mConnection.getAdmin();
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection)) {
-      for (NamespaceDescriptor nd : testNamespacesAndDescriptors.values()) {
-        nd.setConfiguration("NamespaceConfigTest", "value=" + nd.getName());
-        mAdmin.createNamespace(nd);
-      }
-      for (HTableDescriptor htd : testTableNamesAndDescriptors.values()) {
-        htd.setMemStoreFlushSize(memStoreFlushSize++);
-        htd.setDurability(Durability.SKIP_WAL);
-        for (HColumnDescriptor hcd : testColumnFamilyNamesAndDescriptors.values()) {
-          if (alternateBooleanAttribute) {
-            alternateBooleanAttribute = false;
-          } else {
-            alternateBooleanAttribute = true;
-          }
-          hcd.setInMemory(alternateBooleanAttribute);
-          hcd.setMaxVersions(maxVersions++);
-          htd.addFamily(hcd);
-        }
-        mAdmin.createTable(htd);
-      }
-    }
-  }
-
-  private void loadColumnData(Configuration configuration) throws IOException {
-
-    try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
-
-      // put rows into Table which is INCLUDED for auditing
-      try (Table table01InNamespace01 = mConnection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_01).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
-                        VALUE_2_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(1),
-                        VALUE_5_BYTES_LONG));
-        putList.add(new Put(ROW_ID_02).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
-                        VALUE_82_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(2),
-                        VALUE_9_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), TEST_COLUMN_QUALIFIER_LIST.get(3),
-                        VALUE_82_BYTES_LONG));
-        table01InNamespace01.put(putList);
-      }
-
-      // put two rows into Table in Namespace which is NOT included for ColumnManager auditing
-      try (Table table01InNamespace02 = mConnection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
-
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_01).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_2_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_82_BYTES_LONG));
-        putList.add(new Put(ROW_ID_02).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_9_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_82_BYTES_LONG));
-        table01InNamespace02.put(putList);
-      }
-
-      // put one row into Table which is explicitly NOT included for ColumnManager auditing
-      try (Table table02InNamespace03 = mConnection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)))) {
-
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_03).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_9_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_5_BYTES_LONG));
-        table02InNamespace03.put(putList);
-      }
-    }
-  }
-
   public static void main(String[] args) throws Exception {
    // new TestRepositoryAdmin().testStaticMethods();
-    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
+    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+//    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
   }
 }

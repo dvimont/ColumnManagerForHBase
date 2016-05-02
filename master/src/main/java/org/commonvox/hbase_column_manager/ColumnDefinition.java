@@ -153,7 +153,7 @@ public class ColumnDefinition extends Column {
   /**
    * Get the defined column length (i.e., the maximum length permitted for any submitted value for
    * this column when    {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
-     * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>); if
+   * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>); if
    * returned value is 0 (the default), NO length validation of column values will be performed.
    *
    * @return defined column length for this column
@@ -165,8 +165,9 @@ public class ColumnDefinition extends Column {
 
   /**
    * Set the column's validation regex (i.e., the regular expression that any submitted value for
-   * this column must match when    {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
-     * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>);
+   * this column must match when
+   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>);
    * setting the value to blank (the default) will result in NO regular expression validation of
    * column values being performed.
    *

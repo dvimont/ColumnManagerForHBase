@@ -1293,7 +1293,7 @@ class Repository {
       return null;
     }
     int position;
-    switch (EntityType.ENTITY_TYPE_BYTES_TO_ENUM_MAP.get(rowId[0])) {
+    switch (EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(rowId[0])) {
       case NAMESPACE:
         position = 2;
         break;
@@ -1412,7 +1412,7 @@ class Repository {
 
       // cascade to child entities
       byte childRecordType;
-      switch (EntityType.ENTITY_TYPE_BYTES_TO_ENUM_MAP.get(recordType)) {
+      switch (EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(recordType)) {
         case NAMESPACE:
           childRecordType = EntityType.TABLE.getRecordType();
           break;
