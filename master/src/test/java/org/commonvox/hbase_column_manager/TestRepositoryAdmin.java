@@ -82,25 +82,62 @@ public class TestRepositoryAdmin {
   private static final int CF01_INDEX = 0;
   private static final int CF02_INDEX = 1;
 
-  private static Set<byte[]> expectedColQualifiersForNamespace1Table1Cf1
+  private static final TableName NAMESPACE01_TABLE01
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
+  private static final TableName NAMESPACE01_TABLE02
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE02_INDEX));
+  private static final TableName NAMESPACE01_TABLE03
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE03_INDEX));
+  private static final TableName NAMESPACE01_TABLE04
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE04_INDEX));
+  private static final TableName NAMESPACE02_TABLE01
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
+  private static final TableName NAMESPACE02_TABLE02
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE02_INDEX));
+  private static final TableName NAMESPACE02_TABLE03
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE03_INDEX));
+  private static final TableName NAMESPACE02_TABLE04
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE04_INDEX));
+  private static final TableName NAMESPACE03_TABLE01
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
+  private static final TableName NAMESPACE03_TABLE02
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE02_INDEX));
+  private static final TableName NAMESPACE03_TABLE03
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE03_INDEX));
+  private static final TableName NAMESPACE03_TABLE04
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE04_INDEX));
+
+  private static final Set<byte[]> expectedColQualifiersForNamespace1Table1Cf1
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
   static {
     expectedColQualifiersForNamespace1Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(0));
     expectedColQualifiersForNamespace1Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(1));
     expectedColQualifiersForNamespace1Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(2));
   }
-  private static Set<byte[]> expectedColQualifiersForNamespace1Table1Cf2
+  private static final Set<byte[]> expectedColQualifiersForNamespace1Table1Cf2
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
   static {
     expectedColQualifiersForNamespace1Table1Cf2.add(TEST_COLUMN_QUALIFIER_LIST.get(3));
   }
-  private static Set<byte[]> expectedColQualifiersForNamespace3Table1Cf1
+  private static final Set<byte[]> expectedColQualifiersForNamespace3Table1Cf1
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
   static {
     expectedColQualifiersForNamespace3Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(0));
     expectedColQualifiersForNamespace3Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(2));
   }
-  private static Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf1 = new TreeSet<>();
+  private static final Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf1 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace1Table1Cf1.add(
             new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(0)).setMaxValueLengthFound(82));
@@ -109,12 +146,12 @@ public class TestRepositoryAdmin {
     expectedColAuditorsForNamespace1Table1Cf1.add(
             new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(2)).setMaxValueLengthFound(9));
   }
-  private static Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf2 = new TreeSet<>();
+  private static final Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf2 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace1Table1Cf2.add(
             new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(3)).setMaxValueLengthFound(82));
   }
-  private static Set<ColumnAuditor> expectedColAuditorsForNamespace3Table1Cf1 = new TreeSet<>();
+  private static final Set<ColumnAuditor> expectedColAuditorsForNamespace3Table1Cf1 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace3Table1Cf1.add(
             new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(0)).setMaxValueLengthFound(9));
@@ -215,22 +252,13 @@ public class TestRepositoryAdmin {
 
     Configuration configuration = HBaseConfiguration.create();
     configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
-
     configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES,
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
-    );
-
+            NAMESPACE03_TABLE02.getNameAsString(),
+            NAMESPACE03_TABLE04.getNameAsString(),
+            NAMESPACE02_TABLE01.getNameAsString(),
+            NAMESPACE02_TABLE02.getNameAsString(),
+            NAMESPACE02_TABLE03.getNameAsString(),
+            NAMESPACE02_TABLE04.getNameAsString());
     createSchemaStructuresInHBase(configuration, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
@@ -253,18 +281,12 @@ public class TestRepositoryAdmin {
     //  in the hbase-column-manager.xml file in the test/resources directory. They should
     //  result in EXACTLY the same results in ColumnManager auditing.
     configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
+            NAMESPACE03_TABLE01.getNameAsString(),
+            NAMESPACE03_TABLE03.getNameAsString(),
+            NAMESPACE01_TABLE01.getNameAsString(),
+            NAMESPACE01_TABLE02.getNameAsString(),
+            NAMESPACE01_TABLE03.getNameAsString(),
+            NAMESPACE01_TABLE04.getNameAsString()
     );
 
     createSchemaStructuresInHBase(configuration, false);
@@ -289,10 +311,8 @@ public class TestRepositoryAdmin {
     //  in the hbase-column-manager.xml file in the test/resources directory. They should
     //  result in EXACTLY the same results in ColumnManager auditing.
     configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+            NAMESPACE03_TABLE01.getNameAsString(),
+            NAMESPACE03_TABLE03.getNameAsString(),
             TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX) + ":*"  // include all namespace01 tables!!
     );
 
@@ -319,6 +339,24 @@ public class TestRepositoryAdmin {
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
+  }
+
+  @Test
+  public void testColumnDefinitionAndEnforcement() throws IOException {
+    System.out.println("#testColumnDefinitionAndEnforcement has been invoked using WILDCARDED "
+            + "EXCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+    createAndEnforceColumnDefinitions(configuration);
+    clearTestingEnvironment();
+
+    System.out.println("#testColumnDefinitionAndEnforcement using WILDCARDED EXCLUDE config "
+            + "properties has run to completion.");
   }
 
   private void clearTestingEnvironment() throws IOException {
@@ -416,9 +454,7 @@ public class TestRepositoryAdmin {
         connection = mConnection;
       }
       // put rows into Table which is INCLUDED for auditing
-      try (Table table01InNamespace01 = connection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
+      try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01)) {
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_01).
                 addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
@@ -435,9 +471,7 @@ public class TestRepositoryAdmin {
         table01InNamespace01.put(putList);
       }
 
-      try (Table table01InNamespace03 = connection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
+      try (Table table01InNamespace03 = connection.getTable(NAMESPACE03_TABLE01)) {
 
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_04).
@@ -449,9 +483,7 @@ public class TestRepositoryAdmin {
       }
 
       // put two rows into Table in Namespace which is NOT included for ColumnManager auditing
-      try (Table table01InNamespace02 = connection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)))) {
+      try (Table table01InNamespace02 = connection.getTable(NAMESPACE02_TABLE01)) {
 
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_01).
@@ -468,9 +500,7 @@ public class TestRepositoryAdmin {
       }
 
       // put one row into Table which is explicitly NOT included for ColumnManager auditing
-      try (Table table02InNamespace03 = connection.getTable(TableName.valueOf(
-              TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-              TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)))) {
+      try (Table table02InNamespace03 = connection.getTable(NAMESPACE03_TABLE02)) {
 
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_03).
@@ -498,9 +528,7 @@ public class TestRepositoryAdmin {
       // Test #getColumnQualifiers
       Set<byte[]> returnedColQualifiersForNamespace1Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
@@ -509,9 +537,7 @@ public class TestRepositoryAdmin {
 
       Set<byte[]> returnedColQualifiersForNamespace1Table1Cf2
               = repositoryAdmin.getColumnQualifiers(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX))));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
@@ -520,18 +546,14 @@ public class TestRepositoryAdmin {
 
       Set<byte[]> returnedColQualifiersForNamespace2Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
 
       Set<byte[]> returnedColQualifiersForNamespace3Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
@@ -540,52 +562,40 @@ public class TestRepositoryAdmin {
 
       Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
               = repositoryAdmin.getColumnQualifiers(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE02_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace3Table2Cf1 == null);
 
       // Test #getColumnQualifiers with alternate signature
       returnedColQualifiersForNamespace1Table1Cf1
-              = repositoryAdmin.getColumnQualifiers(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)),
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01,
                       TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace1Table1Cf1.equals(
                       returnedColQualifiersForNamespace1Table1Cf1));
 
       returnedColQualifiersForNamespace1Table1Cf2
-              = repositoryAdmin.getColumnQualifiers(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)),
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01,
                       TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace1Table1Cf2.equals(
                       returnedColQualifiersForNamespace1Table1Cf2));
 
       returnedColQualifiersForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnQualifiers(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)),
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE02_TABLE01,
                       TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
 
       returnedColQualifiersForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnQualifiers(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)),
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02,
                       TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace3Table2Cf1 == null);
 
       // Test #getColumnAuditors
       Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf1
               = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_AUDITORS_FAILURE,
@@ -594,9 +604,7 @@ public class TestRepositoryAdmin {
 
       Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf2
               = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX))));
       assertTrue(GET_COL_AUDITORS_FAILURE,
@@ -605,18 +613,14 @@ public class TestRepositoryAdmin {
 
       Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
               = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
 
       Set<ColumnAuditor> returnedColAuditorsForNamespace3Table1Cf1
               = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_AUDITORS_FAILURE,
@@ -625,55 +629,61 @@ public class TestRepositoryAdmin {
 
       Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
               = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(
-                              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE02_INDEX))),
+                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
                       testColumnFamilyNamesAndDescriptors.get(
                               Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace3Table2Cf1 == null);
 
       // Test #getColumnAuditors with alternate signature
       returnedColAuditorsForNamespace1Table1Cf1
-              = repositoryAdmin.getColumnAuditors(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)),
+              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01,
                       TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace1Table1Cf1.equals(
                       returnedColAuditorsForNamespace1Table1Cf1));
 
       returnedColAuditorsForNamespace1Table1Cf2
-              = repositoryAdmin.getColumnAuditors(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)),
+              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01,
                       TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX));
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace1Table1Cf2.equals(
                       returnedColAuditorsForNamespace1Table1Cf2));
 
       returnedColAuditorsForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnAuditors(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)),
+              = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01,
                       TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
 
       returnedColAuditorsForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnAuditors(
-                      TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-                                      TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)),
+              = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02,
                       TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace3Table2Cf1 == null);
     }
-
     clearTestingEnvironment();
+  }
 
+  private void createAndEnforceColumnDefinitions(Configuration configuration) throws IOException {
+    ColumnDefinition col01Definition
+            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(0));
+    ColumnDefinition col02Definition
+            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(1)).setColumnLength(20L);
+    ColumnDefinition col03Definition
+            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(2)).
+                    setColumnValidationRegex("http.*");
+    ColumnDefinition col04Definition
+            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(3)).setColumnLength(8L);
+
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration);
+            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection)) {
+
+    }
   }
 
   public static void main(String[] args) throws Exception {
-   // new TestRepositoryAdmin().testStaticMethods();
-    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
-//    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testStaticMethods();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
+    new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
   }
 }

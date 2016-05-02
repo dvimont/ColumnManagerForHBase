@@ -16,12 +16,6 @@
  */
 package org.commonvox.hbase_column_manager;
 
-import org.commonvox.hbase_column_manager.ColumnDefinition;
-import org.commonvox.hbase_column_manager.ColumnAuditor;
-import org.commonvox.hbase_column_manager.ColumnManagerIOException;
-import org.commonvox.hbase_column_manager.ChangeEventMonitor;
-import org.commonvox.hbase_column_manager.MConnectionFactory;
-import org.commonvox.hbase_column_manager.RepositoryAdmin;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Map;
