@@ -176,15 +176,49 @@ public class TestRepositoryAdmin {
   }
 
   @Test
-  public void testColumnAuditingWithExplicitExcludes() throws IOException {
-    System.out.println("#testColumnAuditing has been invoked using EXCLUDE config properties.");
+  public void testColumnAuditingWithWildcardedExcludes() throws IOException {
+    System.out.println("#testColumnAuditing has been invoked using WILDCARDED "
+            + "EXCLUDE config properties.");
 
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
 
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
     testColumnAuditing(configuration);
-    System.out.println("#testColumnAuditing using EXCLUDE config properties has run to completion.");
+    System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties has "
+            + "run to completion.");
+  }
+
+  @Test
+  public void testColumnAuditingWithExplicitExcludes() throws IOException {
+    System.out.println("#testColumnAuditing has been invoked using EXPLICIT "
+            + "EXCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    Configuration configuration = HBaseConfiguration.create();
+    configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
+
+    configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES,
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
+            TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                                    TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
+    );
+
+    testColumnAuditing(configuration);
+    System.out.println("#testColumnAuditing using EXPLICIT EXCLUDE config properties has "
+            + "run to completion.");
   }
 
   @Test
@@ -249,41 +283,6 @@ public class TestRepositoryAdmin {
   }
 
   private void testColumnAuditing(Configuration configuration) throws IOException {
-//    System.out.println("#testColumnAuditing has been invoked using "
-//            + (useAlternateConfigProperties ? "INCLUDE" : "EXCLUDE") + " config properties.");
-//
-//    initializeTestNamespaceAndTableObjects();
-//    clearTestingEnvironment();
-//
-//    Configuration configuration;
-//    if (useAlternateConfigProperties) {
-//      configuration = HBaseConfiguration.create();
-//      configuration.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
-//      configuration.set(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE,
-//              Repository.HBASE_CONFIG_PARM_VALUE_COLMANAGER_MODE_ACTIVE);
-//      // NOTE that the "include" settings added here are the inverse of the "exclude" settings
-//      //  in the hbase-column-manager.xml file in the test/resources directory. They should
-//      //  result in EXACTLY the same results in ColumnManager auditing.
-////      configuration.set(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_NAMESPACES,
-////              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX));
-//      configuration.setStrings(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES,
-//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-//                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
-//                                      TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
-//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-//                                      TEST_TABLE_NAME_LIST.get(TABLE01_INDEX)).getNameAsString(),
-//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-//                                      TEST_TABLE_NAME_LIST.get(TABLE02_INDEX)).getNameAsString(),
-//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-//                                      TEST_TABLE_NAME_LIST.get(TABLE03_INDEX)).getNameAsString(),
-//              TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
-//                                      TEST_TABLE_NAME_LIST.get(TABLE04_INDEX)).getNameAsString()
-//      );
-//
-//    } else {
-//      configuration = MConfiguration.create();
-//    }
 
     createSchemaStructuresInHBase(configuration);
     loadColumnData(configuration);
@@ -579,7 +578,7 @@ public class TestRepositoryAdmin {
 
   public static void main(String[] args) throws Exception {
    // new TestRepositoryAdmin().testStaticMethods();
-    new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
+    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
   }
 }

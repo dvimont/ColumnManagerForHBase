@@ -62,6 +62,10 @@
  * (The current discovery facility performs full <i>Table</i> scans [with KeyOnlyFilter] via the
  * HBase API).
  * </li>
+ * <li><b>Capture/discovery of additional schema-oriented metadata:</b>
+ * Users may identify additional schema-oriented metadata that would be worthwhile to capture or
+ * discover using ColumnManager mechanisms.
+ * </li>
  * </ul>
  * <hr>
  * This package transparently complements the standard HBase API provided by the Apache Software

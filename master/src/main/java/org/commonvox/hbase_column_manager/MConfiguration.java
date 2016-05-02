@@ -24,6 +24,9 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
  */
 public class MConfiguration {
 
+  private MConfiguration() { // no public constructor; use static #create methods
+  }
+
   /**
    * Creates a {@link Configuration} with HBase and ColumnManager resources.
    *

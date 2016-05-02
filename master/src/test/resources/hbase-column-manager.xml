@@ -26,10 +26,6 @@
         <value>true</value>
     </property>
     <property>
-        <name>column_manager.mode</name>
-        <value>active</value>
-    </property>
-    <property>
         <name>column_manager.excludedTables</name>
         <value>default:*,testNamespace02:*,testNamespace03:testTable02,testNamespace03:testTable04</value>
     </property>

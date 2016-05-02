@@ -90,11 +90,9 @@ class Repository {
           = HBASE_CONFIG_PARM_KEY_PREFIX + "activated";
   private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_DEACTIVATED = "false"; // default
   private static final String HBASE_CONFIG_PARM_VALUE_COLMANAGER_ACTIVATED = "true";
-  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_MODE
-          = HBASE_CONFIG_PARM_KEY_PREFIX + "mode";
   static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "includedTables";
-  private static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
+  static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "excludedTables";
 
   private static final int UNIQUE_FOREIGN_KEY_LENGTH = 16;
@@ -198,15 +196,12 @@ class Repository {
             if (excludedTableString.endsWith(":*")) { // exclude entire namespace
               String excludedNamespaceString
                       = excludedTableString.substring(0, excludedTableString.length() - 2);
-              try {
-                TableName.isLegalNamespaceName(Bytes.toBytes(excludedNamespaceString));
-                excludedNamespaces.add(excludedNamespaceString);
-                excludedEntireNamespaces.add(excludedNamespaceString);
-              } catch (IllegalArgumentException iae) {
-                logger.warn(PRODUCT_NAME + " Invalid value submitted in "
-                        + HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES + " parameter; value "
-                        + "will be ignored.");
-              }
+              // #isLegalNamespaceName throws IllegalArgumentException if not legal Namespace
+              TableName.isLegalNamespaceName(Bytes.toBytes(excludedNamespaceString));
+              excludedNamespaces.add(excludedNamespaceString);
+              excludedEntireNamespaces.add(excludedNamespaceString);
+            } else {
+              throw e;
             }
           }
         }
@@ -229,15 +224,12 @@ class Repository {
           if (includedTableString.endsWith(":*")) { // include entire namespace
             String includedNamespaceString
                     = includedTableString.substring(0, includedTableString.length() - 2);
-            try {
-              TableName.isLegalNamespaceName(Bytes.toBytes(includedNamespaceString));
-              includedNamespaces.add(includedNamespaceString);
-              includedEntireNamespaces.add(includedNamespaceString);
-            } catch (IllegalArgumentException iae) {
-              logger.warn(PRODUCT_NAME + " Invalid value submitted in "
-                      + HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES + " parameter; value "
-                      + "will be ignored.");
-            }
+            // #isLegalNamespaceName throws IllegalArgumentException if not legal Namespace
+            TableName.isLegalNamespaceName(Bytes.toBytes(includedNamespaceString));
+            includedNamespaces.add(includedNamespaceString);
+            includedEntireNamespaces.add(includedNamespaceString);
+          } else {
+            throw e;
           }
         }
       }
