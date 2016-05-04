@@ -23,7 +23,7 @@ package org.commonvox.hbase_column_manager;
  *
  * @author Daniel Vimont
  */
-abstract class Column extends MetadataEntity {
+abstract class Column extends SchemaEntity {
 
   Column(byte entityType, byte[] name) {
     super(entityType, name);

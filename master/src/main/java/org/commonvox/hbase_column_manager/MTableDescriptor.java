@@ -108,11 +108,11 @@ class MTableDescriptor extends HTableDescriptor {
 
   /**
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
-   * metadata components from Repository or from external archive).
+   * schema components from Repository or from external archive).
    *
    * @param mEntity
    */
-  MTableDescriptor(MetadataEntity mEntity) {
+  MTableDescriptor(SchemaEntity mEntity) {
     super(mEntity.getName());
     this.setForeignKey(mEntity.getForeignKey());
 //        this.columnDefinitionsEnforced = mEntity.getColumnDefinitionsEnforced();

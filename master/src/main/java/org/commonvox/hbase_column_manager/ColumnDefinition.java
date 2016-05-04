@@ -55,24 +55,24 @@ public class ColumnDefinition extends Column {
    * @param columnQualifier Column Qualifier
    */
   public ColumnDefinition(byte[] columnQualifier) {
-    super(EntityType.COLUMN_DEFINITION.getRecordType(), columnQualifier);
+    super(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), columnQualifier);
   }
 
   /**
    * @param columnQualifier Column Qualifier
    */
   public ColumnDefinition(String columnQualifier) {
-    super(EntityType.COLUMN_DEFINITION.getRecordType(), columnQualifier);
+    super(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), columnQualifier);
   }
 
   /**
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
-   * metadata components from Repository or from external archive).
+   * schema components from Repository or from external archive).
    *
-   * @param mEntity MetadataEntity to be deserialized into a ColumnDefinition
+   * @param mEntity SchemaEntity to be deserialized into a ColumnDefinition
    */
-  ColumnDefinition(MetadataEntity mEntity) {
-    super(EntityType.COLUMN_DEFINITION.getRecordType(), mEntity.getName());
+  ColumnDefinition(SchemaEntity mEntity) {
+    super(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), mEntity.getName());
     this.setForeignKey(mEntity.getForeignKey());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mEntity.getValues().entrySet()) {

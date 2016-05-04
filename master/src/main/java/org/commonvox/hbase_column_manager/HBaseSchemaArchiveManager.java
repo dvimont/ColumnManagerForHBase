@@ -16,7 +16,7 @@
  */
 package org.commonvox.hbase_column_manager;
 
-import java.nio.file.Paths;
+import java.io.File;
 import java.util.Set;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -24,7 +24,7 @@ import javax.xml.bind.Marshaller;
 
 /**
  * A container-management class that provides for straightforward JAXB processing (i.e.,
- * XML-formatted serialization and deserialization) of ColumnManager repository metadata.
+ * XML-formatted serialization and deserialization) of ColumnManager repository schema.
  *
  * @author Daniel Vimont
  */
@@ -40,35 +40,34 @@ class HBaseSchemaArchiveManager {
     this.archiveSet = archiveSet;
   }
 
-  static HBaseSchemaArchiveManager deserializeXmlFile(String sourcePathString, String sourceFileNameString)
+  static HBaseSchemaArchiveManager deserializeXmlFile(File sourceFile)
           throws JAXBException {
     HBaseSchemaArchive deserializedArchiveSet
-            = (HBaseSchemaArchive) JAXBContext.newInstance(HBaseSchemaArchive.class).createUnmarshaller()
-            .unmarshal(Paths.get(sourcePathString, sourceFileNameString).toFile());
+            = (HBaseSchemaArchive)JAXBContext.newInstance(HBaseSchemaArchive.class)
+                    .createUnmarshaller().unmarshal(sourceFile);
     return new HBaseSchemaArchiveManager(deserializedArchiveSet);
   }
 
-  MetadataEntity addMetadataEntity(MetadataEntity mEntity) {
-    archiveSet.addMetadataObject(mEntity);
+  SchemaEntity addSchemaEntity(SchemaEntity mEntity) {
+    archiveSet.addSchemaEntity(mEntity);
     return mEntity;
   }
 
-  Set<MetadataEntity> getMetadataEntities() {
-    return archiveSet.getMetadataObjects();
+  Set<SchemaEntity> getSchemaEntities() {
+    return archiveSet.getSchemaEntities();
   }
 
   String getArchiveFileTimestampString() {
     return archiveSet.getArchiveFileTimestampString();
   }
 
-  void exportToXmlFile(String targetPathString, String targetFileNameString, boolean formatted)
+  void exportToXmlFile(File targetFile, boolean formatted)
           throws JAXBException {
     Marshaller marshaller
             = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
     if (formatted) {
       marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
     }
-    marshaller.marshal(archiveSet, Paths.get(targetPathString, targetFileNameString).toFile());
+    marshaller.marshal(archiveSet, targetFile);
   }
-
 }

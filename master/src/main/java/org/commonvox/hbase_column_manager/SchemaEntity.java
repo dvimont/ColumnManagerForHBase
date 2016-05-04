@@ -36,13 +36,13 @@ import org.apache.hadoop.hbase.util.Bytes;
  * @author Daniel Vimont
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "hbaseSchemaObject")
-class MetadataEntity implements Comparable<MetadataEntity> {
+@XmlRootElement(name = "hbaseSchemaEntity")
+class SchemaEntity implements Comparable<SchemaEntity> {
 
   // all simple fields are non-final Strings to facilitate straightforward JAXB marshal/unmarshal
 
   @XmlAttribute
-  private String entityType;
+  private String schemaEntityType;
   @XmlAttribute
   private String name;
   @XmlAttribute
@@ -51,34 +51,35 @@ class MetadataEntity implements Comparable<MetadataEntity> {
   private final Map<String, String> values = new HashMap<>(); // String entries for JAXB!
   private final Map<String, String> configurations = new HashMap<>();
   @XmlElementWrapper(name = "children")
-  @XmlElement(name = "hbaseSchemaObject")
-  private Set<MetadataEntity> children = null;
+  @XmlElement(name = "hbaseSchemaEntity")
+  private Set<SchemaEntity> children = null;
   @XmlTransient
   private byte[] foreignKeyValue;
 
-  public MetadataEntity() {
+  public SchemaEntity() {
   }
 
-  MetadataEntity(byte entityType, byte[] name) {
-    this.entityType = EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType).toString();
+  SchemaEntity(byte entityType, byte[] name) {
+    this.schemaEntityType
+            = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType).toString();
     this.name = Bytes.toString(name);
   }
 
-  MetadataEntity(byte entityType, String name) {
+  SchemaEntity(byte entityType, String name) {
     this(entityType, Bytes.toBytes(name));
   }
 
-  MetadataEntity(MNamespaceDescriptor namespaceDescriptor) {
+  SchemaEntity(MNamespaceDescriptor namespaceDescriptor) {
     this(namespaceDescriptor.getEntityRecordType(), namespaceDescriptor.getName());
     shallowClone(namespaceDescriptor);
   }
 
-  MetadataEntity(MetadataEntity metadataEntity) {
+  SchemaEntity(SchemaEntity metadataEntity) {
     this(metadataEntity.getEntityRecordType(), metadataEntity.getName());
     shallowClone(metadataEntity);
   }
 
-  private void shallowClone(MetadataEntity mEntity) {
+  private void shallowClone(SchemaEntity mEntity) {
     for (Map.Entry<String, String> valueEntry : mEntity.values.entrySet()) {
       this.values.put(valueEntry.getKey(), valueEntry.getValue());
     }
@@ -88,8 +89,8 @@ class MetadataEntity implements Comparable<MetadataEntity> {
     this.columnDefinitionsEnforced = mEntity.columnDefinitionsEnforced;
   }
 
-  MetadataEntity(MTableDescriptor mtd) {
-    this(EntityType.TABLE.getRecordType(), mtd.getNameAsString());
+  SchemaEntity(MTableDescriptor mtd) {
+    this(SchemaEntityType.TABLE.getRecordType(), mtd.getNameAsString());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mtd.getValues().entrySet()) {
       this.values.put(Bytes.toString(valueEntry.getKey().copyBytes()),
@@ -100,8 +101,8 @@ class MetadataEntity implements Comparable<MetadataEntity> {
     }
   }
 
-  MetadataEntity(MColumnDescriptor mcd) {
-    this(EntityType.COLUMN_FAMILY.getRecordType(), mcd.getNameAsString());
+  SchemaEntity(MColumnDescriptor mcd) {
+    this(SchemaEntityType.COLUMN_FAMILY.getRecordType(), mcd.getNameAsString());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mcd.getValues().entrySet()) {
       this.values.put(Bytes.toString(valueEntry.getKey().copyBytes()),
@@ -114,7 +115,7 @@ class MetadataEntity implements Comparable<MetadataEntity> {
   }
 
   byte getEntityRecordType() {
-    return EntityType.ENTITY_TYPE_LABEL_TO_BYTE_MAP.get(this.entityType);
+    return SchemaEntityType.ENTITY_TYPE_LABEL_TO_BYTE_MAP.get(this.schemaEntityType);
   }
 
   /**
@@ -187,7 +188,7 @@ class MetadataEntity implements Comparable<MetadataEntity> {
    * @param value Value value
    * @return this object to allow method chaining
    */
-  MetadataEntity setValue(String key, String value) {
+  SchemaEntity setValue(String key, String value) {
     if (value == null) {
       remove(Bytes.toBytes(key));
     } else {
@@ -196,12 +197,12 @@ class MetadataEntity implements Comparable<MetadataEntity> {
     return this;
   }
 
-  MetadataEntity setValue(byte[] key, byte[] value) {
+  SchemaEntity setValue(byte[] key, byte[] value) {
     values.put(Bytes.toString(key), Bytes.toString(value));
     return this;
   }
 
-  MetadataEntity setValue(final ImmutableBytesWritable key, final ImmutableBytesWritable value) {
+  SchemaEntity setValue(final ImmutableBytesWritable key, final ImmutableBytesWritable value) {
     values.put(Bytes.toString(key.copyBytes()), Bytes.toString(value.copyBytes()));
     return this;
   }
@@ -232,7 +233,7 @@ class MetadataEntity implements Comparable<MetadataEntity> {
    * @param value Value value
    * @return this object to allow method chaining
    */
-  MetadataEntity setConfiguration(String key, String value) {
+  SchemaEntity setConfiguration(String key, String value) {
     if (value == null) {
       removeConfiguration(key);
     } else {
@@ -266,19 +267,19 @@ class MetadataEntity implements Comparable<MetadataEntity> {
     this.columnDefinitionsEnforced = Boolean.toString(enforced);
   }
 
-  void addChild(MetadataEntity child) {
+  void addChild(SchemaEntity child) {
     if (children == null) {
       children = new LinkedHashSet<>();
     }
     children.add(child);
   }
 
-  Set<MetadataEntity> getChildren() {
+  Set<SchemaEntity> getChildren() {
     return children;
   }
 
   @Override
-  public int compareTo(MetadataEntity other) {
+  public int compareTo(SchemaEntity other) {
     int result = this.name.compareTo(other.name);
     if (result == 0) {
       result = this.values.hashCode() - other.values.hashCode();
@@ -300,13 +301,13 @@ class MetadataEntity implements Comparable<MetadataEntity> {
   }
 
   /**
-   * Returns a String in the format "{@link EntityType}: EntityName"
+   * Returns a String in the format "{@link SchemaEntityType}: EntityName"
    * (e.g., "{@code ColumnFamily: myColumnFamily}").
    *
    * @return formatted String
    */
   @Override
   public String toString() {
-    return entityType + ": " + this.name;
+    return schemaEntityType + ": " + this.name;
   }
 }

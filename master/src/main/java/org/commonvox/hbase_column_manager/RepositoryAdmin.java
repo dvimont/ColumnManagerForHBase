@@ -17,6 +17,7 @@
 package org.commonvox.hbase_column_manager;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,9 +38,9 @@ import org.apache.log4j.Logger;
 
 /**
  * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities, as
- * well as metadata {@link #discoverMetadata() discovery},
- * {@link #exportNamespaceMetadata(java.lang.String, java.lang.String, java.lang.String, boolean)
- * export}, and {@link #importMetadata(boolean, java.lang.String, java.lang.String) import}
+ * well as schema metadata {@link #discoverSchema() discovery},
+ * {@link #exportNamespaceSchema(java.lang.String, java.io.File, boolean) export}, and
+ * {@link #importSchema(boolean, java.io.File) import}
  * facilities; it is used as a complement to the standard {@code Admin} interface, with an
  * {@code Admin} instance (provided by an {@link MConnectionFactory#createConnection()
  * MConnectionFactory-created Connection}) being used in a standard manner to maintain
@@ -93,7 +94,7 @@ public class RepositoryAdmin implements Closeable {
    * default setting is 50.
    *
    * @param hbaseAdmin Standard Admin object
-   * @param maxVersions Maximum versions for repository to retain of each metadata attribute
+   * @param maxVersions Maximum versions for repository to retain of each schema metadata attribute
    * @throws IOException if a remote or network exception occurs
    */
   public static void setRepositoryMaxVersions(Admin hbaseAdmin, int maxVersions)
@@ -103,10 +104,10 @@ public class RepositoryAdmin implements Closeable {
 
   /**
    * Get the maxVersions setting for the Repository table (maximum versions for repository to retain
-   * of each metadata attribute).
+   * of each schema metadata attribute).
    *
    * @param hbaseAdmin Standard Admin object
-   * @return Maximum versions for repository to retain of each metadata attribute
+   * @return Maximum versions for repository to retain of each schema metadata attribute
    * @throws IOException if a remote or network exception occurs
    */
   public static int getRepositoryMaxVersions(Admin hbaseAdmin)
@@ -425,12 +426,7 @@ public class RepositoryAdmin implements Closeable {
     if (!repository.isActivated()) {
       return null;
     }
-    // repository.getAdmin().getTableDescriptor(tn); // throws TableNotFoundException if Table not found
-    MTableDescriptor mtd = repository.getMTableDescriptor(tn);
-//        if (mtd == null) {
-//            throw new TableMetadataNotFoundException(tn.getNameAsString());
-//        }
-    return mtd;
+    return repository.getMTableDescriptor(tn);
   }
 
   /**
@@ -444,18 +440,14 @@ public class RepositoryAdmin implements Closeable {
     if (!repository.isActivated()) {
       return null;
     }
-    // repository.getAdmin().getNamespaceDescriptor(namespaceName); // throws NamespaceNotFoundException if not found
-    MNamespaceDescriptor nd = repository.getMNamespaceDescriptor(namespaceName);
-//        if (nd == null) {
-//            throw new NamespaceMetadataNotFoundException(namespaceName);
-//        }
-    return nd;
+    return repository.getMNamespaceDescriptor(namespaceName);
   }
 
   /**
    * Create an HTableMultiplexer object.<br><br>
    * <b>SPECIAL NOTE:</b> An HTableMultiplexer returned by this method will (1) validate submitted
-   * <i>Column</i> qualifiers and values (if {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * <i>Column</i> qualifiers and values (if
+   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the related <i>Column Family</i>), (2)
    * process "put" requests in a standard manner (queuing them for subsequent <b>asynchronous</b>
    * processing by HBase) and then (3) perform <b>synchronous</b> ColumnManager repository
@@ -476,35 +468,38 @@ public class RepositoryAdmin implements Closeable {
   }
 
   /**
-   * Performs discovery of all ColumnManager-included user <i>Table</i>s and stores the metadata in
-   * the ColumnManager repository; includes discovery of {@link ColumnAuditor} metadata (performing
-   * full scan of all <i>Table</i>s that are
+   * Performs discovery of all ColumnManager-included user <i>Table</i>s and stores the schema
+   * metadata in
+   * the ColumnManager repository; includes discovery of {@link ColumnAuditor} schema metadata
+   * (performing full scan [with KeyOnlyFilter] of all <i>Table</i>s that are
    * <a href="package-summary.html#config">included in ColumnManager processing</a>).
    *
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverMetadata() throws IOException {
-    repository.discoverMetadata(true);
+  public void discoverSchema() throws IOException {
+    repository.discoverSchema(true);
   }
 
   /**
-   * Performs discovery of the specified <i>Table</i>'s metadata and stores the metadata in the
-   * ColumnManager repository; includes discovery of {@link ColumnAuditor} metadata (performing full
-   * scan of the <i>Table</i>). Note that the specified <i>Table</i>
+   * Performs discovery of the specified <i>Table</i>'s schema metadata and stores it in the
+   * ColumnManager repository; includes discovery of {@link ColumnAuditor} schema metadata
+   * (performing full scan [with KeyOnlyFilter] of the <i>Table</i>).
+   * Note that the specified <i>Table</i>
    * must be <a href="package-summary.html#config">included in ColumnManager processing</a>;
    * otherwise invocation of this method will have no effect.
    *
-   * @param tableName <i>Table</i> for which metadata is to be discovered; submitted <i>Table</i>
+   * @param tableName <i>Table</i> for which schema metadata is to be discovered; submitted
+   * <i>Table</i>
    * must be <a href="package-summary.html#config">included in ColumnManager processing</a>
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverMetadata(TableName tableName) throws IOException {
-    repository.discoverMetadata(tableName, true);
+  public void discoverSchema(TableName tableName) throws IOException {
+    repository.discoverSchema(tableName, true);
   }
 
   // make this method public if needs dictate
-  void purgeTableMetadata(TableName tn) throws IOException {
-    repository.purgeTableMetadata(tn);
+  void purgeTableSchemaEntity(TableName tn) throws IOException {
+    repository.purgeTableSchemaEntity(tn);
   }
 
   /**
@@ -517,22 +512,21 @@ public class RepositoryAdmin implements Closeable {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param targetPathString path to which target file should be written.
-   * @param targetFileNameString file name to assign to target file.
+   * @param targetFile target file
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportRepository(String targetPathString, String targetFileNameString,
+  public void exportRepository(File targetFile,
           boolean formatted)
           throws IOException, JAXBException {
-    repository.exportMetadata(null, null, targetPathString, targetFileNameString, formatted);
+    repository.exportSchema(null, null, targetFile, formatted);
   }
 
   /**
    * Creates an external HBaseSchemaArchive (HSA) file in XML format* containing the complete
-   * metadata contents (i.e., the <i>Namespace</i>, <i>Table</i>, <i>Column Family</i>,
+   * schema contents (i.e., the <i>Namespace</i>, <i>Table</i>, <i>Column Family</i>,
    * {@link ColumnAuditor}, and {@link ColumnDefinition} metadata) of the specified HBase
    * <i>Namespace</i>. In effect, this is an XML-formatted serialization of objects of the following
    * classes: NamespaceDescriptor, {@link MTableDescriptor}, {@link MColumnDescriptor},
@@ -540,25 +534,22 @@ public class RepositoryAdmin implements Closeable {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceNamespaceName namespace from which to export metadata
-   * @param targetPathString path to which target file should be written.
-   * @param targetFileNameString file name to assign to target file.
+   * @param sourceNamespaceName namespace from which to export schema
+   * @param targetFile target file
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportNamespaceMetadata(String sourceNamespaceName,
-          String targetPathString, String targetFileNameString,
-          boolean formatted)
+  public void exportNamespaceSchema(
+          String sourceNamespaceName, File targetFile, boolean formatted)
           throws IOException, JAXBException {
-    repository.exportMetadata(sourceNamespaceName, null,
-            targetPathString, targetFileNameString, formatted);
+    repository.exportSchema(sourceNamespaceName, null, targetFile, formatted);
   }
 
   /**
    * Creates an external HBaseSchemaArchive (HSA) file in XML format* containing the complete
-   * metadata contents (i.e., the <i>Table</i>, <i>Column Family</i>, {@link ColumnAuditor}, and
+   * schema contents (i.e., the <i>Table</i>, <i>Column Family</i>, {@link ColumnAuditor}, and
    * {@link ColumnDefinition} metadata) of the specified HBase <i>Table</i>. In effect, this is an
    * XML-formatted serialization of objects of the following classes:
    * {@link MTableDescriptor}, {@link MColumnDescriptor}, {@link ColumnAuditor}, and
@@ -566,20 +557,17 @@ public class RepositoryAdmin implements Closeable {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceTableName table to exportMetadata
-   * @param targetPathString path to which target file should be written.
-   * @param targetFileNameString file name to assign to target file.
+   * @param sourceTableName table to exportSchema
+   * @param targetFile target File
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportTableMetadata(TableName sourceTableName,
-          String targetPathString, String targetFileNameString,
-          boolean formatted)
+  public void exportTableSchema(TableName sourceTableName, File targetFile, boolean formatted)
           throws IOException, JAXBException {
-    repository.exportMetadata(sourceTableName.getNamespaceAsString(), sourceTableName,
-            targetPathString, targetFileNameString, formatted);
+    repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName,
+            targetFile, formatted);
   }
 
   /**
@@ -595,19 +583,16 @@ public class RepositoryAdmin implements Closeable {
    *
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
-   * @param sourcePathString path from which source file should be read.
-   * @param sourceFileNameString name of source file.
+   * @param sourceFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importMetadata(boolean includeColumnAuditors,
-          String sourcePathString, String sourceFileNameString)
+  public void importSchema(boolean includeColumnAuditors, File sourceFile)
           throws IOException, JAXBException {
-    submitImportLoggerMessages(includeColumnAuditors, null, null,
-            sourcePathString, sourceFileNameString);
+    submitImportLoggerMessages(includeColumnAuditors, null, null, sourceFile);
     Set<Object> importedDescriptors
-            = repository.deserializeHBaseSchemaArchive(includeColumnAuditors, null, null,
-                    sourcePathString, sourceFileNameString);
+            = repository.deserializeHBaseSchemaArchive(
+                    includeColumnAuditors, null, null, sourceFile);
     createImportedStructures(includeColumnAuditors, importedDescriptors);
   }
 
@@ -625,20 +610,17 @@ public class RepositoryAdmin implements Closeable {
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
    * @param namespaceName namespace to import.
-   * @param sourcePathString path from which source file should be read.
-   * @param sourceFileNameString name of source file.
+   * @param sourceFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importNamespaceMetadata(boolean includeColumnAuditors,
-          String namespaceName, String sourcePathString,
-          String sourceFileNameString)
+  public void importNamespaceSchema(boolean includeColumnAuditors,
+          String namespaceName, File sourceFile)
           throws IOException, JAXBException {
-    submitImportLoggerMessages(includeColumnAuditors, namespaceName, null,
-            sourcePathString, sourceFileNameString);
+    submitImportLoggerMessages(includeColumnAuditors, namespaceName, null, sourceFile);
     Set<Object> importedDescriptors
-            = repository.deserializeHBaseSchemaArchive(includeColumnAuditors, namespaceName, null,
-                    sourcePathString, sourceFileNameString);
+            = repository.deserializeHBaseSchemaArchive(
+                    includeColumnAuditors, namespaceName, null, sourceFile);
     createImportedStructures(includeColumnAuditors, importedDescriptors);
   }
 
@@ -654,28 +636,23 @@ public class RepositoryAdmin implements Closeable {
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
    * @param tableName Name of table to be imported.
-   * @param sourcePathString path from which source file should be read.
-   * @param sourceFileNameString name of source file.
+   * @param sourceFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importTableMetadata(boolean includeColumnAuditors,
-          TableName tableName, String sourcePathString,
-          String sourceFileNameString)
+  public void importTableSchema(
+          boolean includeColumnAuditors, TableName tableName, File sourceFile)
           throws IOException, JAXBException {
-    submitImportLoggerMessages(includeColumnAuditors, null, tableName,
-            sourcePathString, sourceFileNameString);
+    submitImportLoggerMessages(includeColumnAuditors, null, tableName, sourceFile);
     Set<Object> importedDescriptors
             = repository.deserializeHBaseSchemaArchive(includeColumnAuditors,
-                    tableName.getNamespaceAsString(), tableName,
-                    sourcePathString, sourceFileNameString);
+                    tableName.getNamespaceAsString(), tableName, sourceFile);
     createImportedStructures(includeColumnAuditors, importedDescriptors);
   }
 
   private void submitImportLoggerMessages(boolean includeColumnAuditors,
-          String namespaceName, TableName tableName,
-          String sourcePathString, String sourceFileNameString) {
-    logger.info("IMPORT of metadata "
+          String namespaceName, TableName tableName, File sourceFile) {
+    logger.info("IMPORT of schema "
             + ((includeColumnAuditors) ? "<INCLUDING COLUMN AUDITOR METADATA> " : "")
             + "from external HBaseSchemaArchive (XML) file has been requested.");
     if (namespaceName != null && !namespaceName.isEmpty()) {
@@ -684,8 +661,7 @@ public class RepositoryAdmin implements Closeable {
     if (tableName != null && !tableName.getNameAsString().isEmpty()) {
       logger.info("IMPORT TABLE: " + tableName.getNameAsString());
     }
-    logger.info("IMPORT source PATH/FILE-NAME: "
-            + sourcePathString + "/" + sourceFileNameString);
+    logger.info("IMPORT source PATH/FILE-NAME: " + sourceFile.getAbsolutePath());
   }
 
   private void createImportedStructures(boolean includeColumnAuditors,
@@ -722,15 +698,12 @@ public class RepositoryAdmin implements Closeable {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourcePathString path in which source file is stored
-   * @param sourceFileNameString name of source file
+   * @param sourceFile source file
    * @return A String containing a summary report suitable for printing/viewing.
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public String generateHsaFileSummary(String sourcePathString, String sourceFileNameString)
-          throws JAXBException {
-    return repository
-            .getHBaseSchemaArchiveSummary(sourcePathString, sourceFileNameString);
+  public String generateHsaFileSummary(File sourceFile) throws JAXBException {
+    return repository.getHBaseSchemaArchiveSummary(sourceFile);
   }
 
   /**

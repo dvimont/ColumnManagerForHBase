@@ -28,7 +28,7 @@ import javax.xml.bind.annotation.XmlTransient;
 
 /**
  * A container class that provides for straightforward JAXB processing (i.e., XML-formatted
- * serialization and deserialization) of ColumnManager repository metadata.
+ * serialization and deserialization) of ColumnManager repository schema.
  *
  * @author Daniel Vimont
  */
@@ -38,8 +38,8 @@ class HBaseSchemaArchive {
 
   @XmlAttribute
   private final String fileTimestamp;
-  @XmlElement(name = "hBaseSchemaObject")
-  private final Set<MetadataEntity> hBaseSchemaObjects = new LinkedHashSet<>();
+  @XmlElement(name = "hBaseSchemaEntity")
+  private final Set<SchemaEntity> hBaseSchemaEntities = new LinkedHashSet<>();
   @XmlTransient
   private final String ROOT_ELEMENT = "hbaseSchemaArchive";
 
@@ -47,15 +47,15 @@ class HBaseSchemaArchive {
     this.fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
   }
 
-  void addMetadataObject(MetadataEntity mEntity) {
+  void addSchemaEntity(SchemaEntity mEntity) {
     if (mEntity == null) {
       return;
     }
-    hBaseSchemaObjects.add(mEntity);
+    hBaseSchemaEntities.add(mEntity);
   }
 
-  Set<MetadataEntity> getMetadataObjects() {
-    return hBaseSchemaObjects;
+  Set<SchemaEntity> getSchemaEntities() {
+    return hBaseSchemaEntities;
   }
 
   String getArchiveFileTimestampString() {

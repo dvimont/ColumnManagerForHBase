@@ -253,12 +253,12 @@ public class TableMethodTester {
 //            }
 //            System.out.println();
 
-            repositoryAdmin.exportRepository
-                    (TARGET_PATH, "testExportAll.xml", false);
-            repositoryAdmin.exportNamespaceMetadata
-                    (MY_NAMESPACE_NAME, TARGET_PATH, "testExportNamespace.xml", false);
-            repositoryAdmin.exportTableMetadata
-                    (TableName.valueOf(MY_NAMESPACE_NAME,"myTable"), TARGET_PATH, "testExportTable.xml", false);
+//            repositoryAdmin.exportRepository
+//                    (TARGET_PATH, "testExportAll.xml", false);
+//            repositoryAdmin.exportNamespaceSchema
+//                    (MY_NAMESPACE_NAME, TARGET_PATH, "testExportNamespace.xml", false);
+//            repositoryAdmin.exportTableSchema
+//                    (TableName.valueOf(MY_NAMESPACE_NAME,"myTable"), TARGET_PATH, "testExportTable.xml", false);
 
 //            System.out.println
 //                (repositoryAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));

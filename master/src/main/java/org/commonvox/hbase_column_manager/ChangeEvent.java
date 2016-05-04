@@ -91,12 +91,12 @@ public class ChangeEvent {
   }
 
   /**
-   * Get the {@link EntityType} of the Entity to which the {@code ChangeEvent} pertains.
+   * Get the {@link SchemaEntityType} of the Entity to which the {@code ChangeEvent} pertains.
    *
-   * @return {@link EntityType} of the Entity to which the {@code ChangeEvent} pertains.
+   * @return {@link SchemaEntityType} of the Entity to which the {@code ChangeEvent} pertains.
    */
-  public EntityType getEntityType() {
-    return EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP
+  public SchemaEntityType getEntityType() {
+    return SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP
             .get(this.entity.getEntityRecordType().getBytes()[0]);
   }
 

@@ -16,8 +16,6 @@
  */
 package org.commonvox.hbase_column_manager;
 
-import org.commonvox.hbase_column_manager.MConnectionFactory;
-import org.commonvox.hbase_column_manager.RepositoryAdmin;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;

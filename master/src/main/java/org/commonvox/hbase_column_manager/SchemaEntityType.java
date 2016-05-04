@@ -24,7 +24,7 @@ import java.util.TreeMap;
  * Enum for all the types of metadata entities tracked and managed in the ColumnManager repository;
  * used publicly in {@link ChangeEvent} reporting.
  */
-public enum EntityType {
+public enum SchemaEntityType {
 
   /**
    * Namespace
@@ -47,17 +47,17 @@ public enum EntityType {
    */
   COLUMN_DEFINITION((byte) 'D', "ColumnDefinition");
 
-  static final Map<Byte, EntityType> ENTITY_TYPE_BYTE_TO_ENUM_MAP = new TreeMap<>();
+  static final Map<Byte, SchemaEntityType> ENTITY_TYPE_BYTE_TO_ENUM_MAP = new TreeMap<>();
   static final Map<String, Byte> ENTITY_TYPE_LABEL_TO_BYTE_MAP = new TreeMap<>();
 
   static {
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.NAMESPACE.getRecordType(), EntityType.NAMESPACE);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.TABLE.getRecordType(), EntityType.TABLE);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.COLUMN_FAMILY.getRecordType(), EntityType.COLUMN_FAMILY);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.COLUMN_AUDITOR.getRecordType(), EntityType.COLUMN_AUDITOR);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(EntityType.COLUMN_DEFINITION.getRecordType(), EntityType.COLUMN_DEFINITION);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.NAMESPACE.getRecordType(), SchemaEntityType.NAMESPACE);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.TABLE.getRecordType(), SchemaEntityType.TABLE);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.COLUMN_FAMILY.getRecordType(), SchemaEntityType.COLUMN_FAMILY);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), SchemaEntityType.COLUMN_AUDITOR);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), SchemaEntityType.COLUMN_DEFINITION);
 
-    for (Entry<Byte, EntityType> entry : ENTITY_TYPE_BYTE_TO_ENUM_MAP.entrySet()) {
+    for (Entry<Byte, SchemaEntityType> entry : ENTITY_TYPE_BYTE_TO_ENUM_MAP.entrySet()) {
       ENTITY_TYPE_LABEL_TO_BYTE_MAP.put(entry.getValue().toString(), entry.getKey());
     }
   }
@@ -65,24 +65,24 @@ public enum EntityType {
   private final byte recordType;   // in kilograms
   private final String entityTypeLabel; // in meters
 
-  EntityType(byte recordType, String entityTypeLabel) {
+  SchemaEntityType(byte recordType, String entityTypeLabel) {
     this.recordType = recordType;
     this.entityTypeLabel = entityTypeLabel;
   }
 
   /**
-   * Get the record type value used for the {@code EntityType} in internal ColumnManager processing.
+   * Get the record type value used for the {@code SchemaEntityType} in internal ColumnManager processing.
    *
-   * @return record type code for {@code EntityType}
+   * @return record type code for {@code SchemaEntityType}
    */
   byte getRecordType() {
     return recordType;
   }
 
   /**
-   * Get the String label for the {@code EntityType} used in {@link ChangeEvent} reporting, etc.
+   * Get the String label for the {@code SchemaEntityType} used in {@link ChangeEvent} reporting, etc.
    *
-   * @return String label for {@code EntityType}
+   * @return String label for {@code SchemaEntityType}
    */
   @Override
   public String toString() {

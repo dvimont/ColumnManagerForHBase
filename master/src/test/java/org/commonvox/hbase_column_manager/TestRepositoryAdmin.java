@@ -15,6 +15,7 @@
  */
 package org.commonvox.hbase_column_manager;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import javax.xml.bind.JAXBException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -38,7 +40,10 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Running of these methods requires that an up-and-running instance of HBase be accessible. (The
@@ -118,45 +123,51 @@ public class TestRepositoryAdmin {
   private static final TableName NAMESPACE03_TABLE04
           = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
                   TEST_TABLE_NAME_LIST.get(TABLE04_INDEX));
+  private static final byte[] CF01 = TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX);
+  private static final byte[] CF02 = TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX);
+  private static final byte[] COLQUALIFIER01 = TEST_COLUMN_QUALIFIER_LIST.get(0);
+  private static final byte[] COLQUALIFIER02 = TEST_COLUMN_QUALIFIER_LIST.get(1);
+  private static final byte[] COLQUALIFIER03 = TEST_COLUMN_QUALIFIER_LIST.get(2);
+  private static final byte[] COLQUALIFIER04 = TEST_COLUMN_QUALIFIER_LIST.get(3);
 
   private static final Set<byte[]> expectedColQualifiersForNamespace1Table1Cf1
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
   static {
-    expectedColQualifiersForNamespace1Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(0));
-    expectedColQualifiersForNamespace1Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(1));
-    expectedColQualifiersForNamespace1Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(2));
+    expectedColQualifiersForNamespace1Table1Cf1.add(COLQUALIFIER01);
+    expectedColQualifiersForNamespace1Table1Cf1.add(COLQUALIFIER02);
+    expectedColQualifiersForNamespace1Table1Cf1.add(COLQUALIFIER03);
   }
   private static final Set<byte[]> expectedColQualifiersForNamespace1Table1Cf2
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
   static {
-    expectedColQualifiersForNamespace1Table1Cf2.add(TEST_COLUMN_QUALIFIER_LIST.get(3));
+    expectedColQualifiersForNamespace1Table1Cf2.add(COLQUALIFIER04);
   }
   private static final Set<byte[]> expectedColQualifiersForNamespace3Table1Cf1
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
   static {
-    expectedColQualifiersForNamespace3Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(0));
-    expectedColQualifiersForNamespace3Table1Cf1.add(TEST_COLUMN_QUALIFIER_LIST.get(2));
+    expectedColQualifiersForNamespace3Table1Cf1.add(COLQUALIFIER01);
+    expectedColQualifiersForNamespace3Table1Cf1.add(COLQUALIFIER03);
   }
   private static final Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf1 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace1Table1Cf1.add(
-            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(0)).setMaxValueLengthFound(82));
+            new ColumnAuditor(COLQUALIFIER01).setMaxValueLengthFound(82));
     expectedColAuditorsForNamespace1Table1Cf1.add(
-            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(1)).setMaxValueLengthFound(5));
+            new ColumnAuditor(COLQUALIFIER02).setMaxValueLengthFound(5));
     expectedColAuditorsForNamespace1Table1Cf1.add(
-            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(2)).setMaxValueLengthFound(9));
+            new ColumnAuditor(COLQUALIFIER03).setMaxValueLengthFound(9));
   }
   private static final Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf2 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace1Table1Cf2.add(
-            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(3)).setMaxValueLengthFound(82));
+            new ColumnAuditor(COLQUALIFIER04).setMaxValueLengthFound(82));
   }
   private static final Set<ColumnAuditor> expectedColAuditorsForNamespace3Table1Cf1 = new TreeSet<>();
   static {
     expectedColAuditorsForNamespace3Table1Cf1.add(
-            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(0)).setMaxValueLengthFound(9));
+            new ColumnAuditor(COLQUALIFIER01).setMaxValueLengthFound(9));
     expectedColAuditorsForNamespace3Table1Cf1.add(
-            new ColumnAuditor(TEST_COLUMN_QUALIFIER_LIST.get(2)).setMaxValueLengthFound(82));
+            new ColumnAuditor(COLQUALIFIER03).setMaxValueLengthFound(82));
   }
   private static final String ALTERNATE_USERNAME = "testAlternateUserName";
 
@@ -167,6 +178,14 @@ public class TestRepositoryAdmin {
           = COLUMN_AUDIT_FAILURE + "#getColumnQualifiers method returned unexpected results";
   private static final String GET_COL_AUDITORS_FAILURE
           = COLUMN_AUDIT_FAILURE + "#getColumnAuditors method returned unexpected results";
+  private static final String COLUMN_ENFORCE_FAILURE
+          = "FAILURE IN Column Enforce PROCESSING!! ==>> ";
+  private static final String COL_QUALIFIER_ENFORCE_FAILURE
+          = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Qualifier";
+  private static final String COL_LENGTH_ENFORCE_FAILURE
+          = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Length";
+  private static final String COL_VALUE_ENFORCE_FAILURE
+          = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Value (regex)";
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
   private Map<TableName, HTableDescriptor> testTableNamesAndDescriptors;
@@ -393,8 +412,7 @@ public class TestRepositoryAdmin {
       testNamespacesAndDescriptors.put(namespace, NamespaceDescriptor.create(namespace).build());
       for (String tableNameString : TEST_TABLE_NAME_LIST) {
         TableName tableName = TableName.valueOf(namespace, tableNameString);
-        testTableNamesAndDescriptors.
-                put(tableName, new HTableDescriptor(tableName));
+        testTableNamesAndDescriptors.put(tableName, new HTableDescriptor(tableName));
       }
     }
     for (byte[] columnFamily : TEST_COLUMN_FAMILY_LIST) {
@@ -457,17 +475,12 @@ public class TestRepositoryAdmin {
       try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01)) {
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_01).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
-                        VALUE_2_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(1),
-                        VALUE_5_BYTES_LONG));
+                addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
         putList.add(new Put(ROW_ID_02).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
-                        VALUE_82_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(2),
-                        VALUE_9_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), TEST_COLUMN_QUALIFIER_LIST.get(3),
-                        VALUE_82_BYTES_LONG));
+                addColumn(CF01, COLQUALIFIER01, VALUE_82_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER03, VALUE_9_BYTES_LONG).
+                addColumn(CF02, COLQUALIFIER04, VALUE_82_BYTES_LONG));
         table01InNamespace01.put(putList);
       }
 
@@ -475,10 +488,8 @@ public class TestRepositoryAdmin {
 
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_04).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(2),
-                        VALUE_82_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), TEST_COLUMN_QUALIFIER_LIST.get(0),
-                        VALUE_9_BYTES_LONG));
+                addColumn(CF01, COLQUALIFIER03, VALUE_82_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER01, VALUE_9_BYTES_LONG));
         table01InNamespace03.put(putList);
       }
 
@@ -487,15 +498,11 @@ public class TestRepositoryAdmin {
 
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_01).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_2_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_82_BYTES_LONG));
+                addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG).
+                addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
         putList.add(new Put(ROW_ID_02).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_9_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_82_BYTES_LONG));
+                addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
+                addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
         table01InNamespace02.put(putList);
       }
 
@@ -504,10 +511,8 @@ public class TestRepositoryAdmin {
 
         List<Put> putList = new ArrayList<>();
         putList.add(new Put(ROW_ID_03).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(0), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_9_BYTES_LONG).
-                addColumn(TEST_COLUMN_FAMILY_LIST.get(1), QUALIFIER_IN_EXCLUDED_TABLE,
-                        VALUE_5_BYTES_LONG));
+                addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
+                addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_5_BYTES_LONG));
         table02InNamespace03.put(putList);
       }
     }
@@ -516,7 +521,7 @@ public class TestRepositoryAdmin {
   private void doColumnDiscovery(Configuration configuration) throws IOException {
     try (RepositoryAdmin repositoryAdmin
             = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
-      repositoryAdmin.discoverMetadata();
+      repositoryAdmin.discoverSchema();
     }
   }
 
@@ -529,8 +534,7 @@ public class TestRepositoryAdmin {
       Set<byte[]> returnedColQualifiersForNamespace1Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace1Table1Cf1.equals(
                       returnedColQualifiersForNamespace1Table1Cf1));
@@ -538,8 +542,7 @@ public class TestRepositoryAdmin {
       Set<byte[]> returnedColQualifiersForNamespace1Table1Cf2
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF02)));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace1Table1Cf2.equals(
                       returnedColQualifiersForNamespace1Table1Cf2));
@@ -547,15 +550,13 @@ public class TestRepositoryAdmin {
       Set<byte[]> returnedColQualifiersForNamespace2Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
 
       Set<byte[]> returnedColQualifiersForNamespace3Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE03_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace3Table1Cf1.equals(
                       returnedColQualifiersForNamespace3Table1Cf1));
@@ -563,41 +564,35 @@ public class TestRepositoryAdmin {
       Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace3Table2Cf1 == null);
 
       // Test #getColumnQualifiers with alternate signature
       returnedColQualifiersForNamespace1Table1Cf1
-              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01,
-                      TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01, CF01);
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace1Table1Cf1.equals(
                       returnedColQualifiersForNamespace1Table1Cf1));
 
       returnedColQualifiersForNamespace1Table1Cf2
-              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01,
-                      TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX));
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01, CF02);
       assertTrue(GET_COL_QUALIFIERS_FAILURE,
               expectedColQualifiersForNamespace1Table1Cf2.equals(
                       returnedColQualifiersForNamespace1Table1Cf2));
 
       returnedColQualifiersForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnQualifiers(NAMESPACE02_TABLE01,
-                      TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE02_TABLE01, CF01);
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
 
       returnedColQualifiersForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02,
-                      TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02, CF01);
       assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace3Table2Cf1 == null);
 
       // Test #getColumnAuditors
       Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf1
               = repositoryAdmin.getColumnAuditors(
                       testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace1Table1Cf1.equals(
                       returnedColAuditorsForNamespace1Table1Cf1));
@@ -605,8 +600,7 @@ public class TestRepositoryAdmin {
       Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf2
               = repositoryAdmin.getColumnAuditors(
                       testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF02)));
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace1Table1Cf2.equals(
                       returnedColAuditorsForNamespace1Table1Cf2));
@@ -614,15 +608,13 @@ public class TestRepositoryAdmin {
       Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
               = repositoryAdmin.getColumnAuditors(
                       testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
 
       Set<ColumnAuditor> returnedColAuditorsForNamespace3Table1Cf1
               = repositoryAdmin.getColumnAuditors(
                       testTableNamesAndDescriptors.get(NAMESPACE03_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace3Table1Cf1.equals(
                       returnedColAuditorsForNamespace3Table1Cf1));
@@ -630,53 +622,123 @@ public class TestRepositoryAdmin {
       Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
               = repositoryAdmin.getColumnAuditors(
                       testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
-                      testColumnFamilyNamesAndDescriptors.get(
-                              Bytes.toString(TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX))));
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace3Table2Cf1 == null);
 
       // Test #getColumnAuditors with alternate signature
       returnedColAuditorsForNamespace1Table1Cf1
-              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01,
-                      TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
+              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01, CF01);
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace1Table1Cf1.equals(
                       returnedColAuditorsForNamespace1Table1Cf1));
 
       returnedColAuditorsForNamespace1Table1Cf2
-              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01,
-                      TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX));
+              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01, CF02);
       assertTrue(GET_COL_AUDITORS_FAILURE,
               expectedColAuditorsForNamespace1Table1Cf2.equals(
                       returnedColAuditorsForNamespace1Table1Cf2));
 
       returnedColAuditorsForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01,
-                      TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
+              = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01, CF01);
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
 
       returnedColAuditorsForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02,
-                      TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX));
+              = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02, CF01);
       assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace3Table2Cf1 == null);
     }
     clearTestingEnvironment();
   }
 
   private void createAndEnforceColumnDefinitions(Configuration configuration) throws IOException {
-    ColumnDefinition col01Definition
-            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(0));
-    ColumnDefinition col02Definition
-            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(1)).setColumnLength(20L);
+    ColumnDefinition col01Definition = new ColumnDefinition(COLQUALIFIER01);
+    ColumnDefinition col02Definition = new ColumnDefinition(COLQUALIFIER02).setColumnLength(20L);
     ColumnDefinition col03Definition
-            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(2)).
-                    setColumnValidationRegex("http.*");
+            = new ColumnDefinition(COLQUALIFIER03).setColumnValidationRegex("https?://.*");
     ColumnDefinition col04Definition
-            = new ColumnDefinition(TEST_COLUMN_QUALIFIER_LIST.get(3)).setColumnLength(8L);
+            = new ColumnDefinition(COLQUALIFIER04).setColumnLength(8L);
 
-    try (Connection mConnection = MConnectionFactory.createConnection(configuration);
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection)) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration);
+            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection)) {
+      repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF01, col01Definition);
+      repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF01, col02Definition);
+      repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF02, col03Definition);
+      // next def not enforced, since namespace02 tables not included for CM processing!
+      repositoryAdmin.addColumnDefinition(NAMESPACE02_TABLE03, CF01, col04Definition);
 
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF02);
+       // next def not enforced, since namespace02 tables not included for CM processing!
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
+
+      try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01);
+              Table table03InNamespace02 = connection.getTable(NAMESPACE02_TABLE03)) {
+        // put a row with valid columns
+        table01InNamespace01.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
+        // put a row with invalid column qualifier
+        try {
+          table01InNamespace01.put(new Put(ROW_ID_01).
+                  addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG));
+          fail(COL_QUALIFIER_ENFORCE_FAILURE);
+        } catch (ColumnDefinitionNotFoundException e) {
+        }
+        // put same row to unenforced namespace/table
+        table03InNamespace02.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG));
+        // put a row with invalid column length
+        try {
+          table01InNamespace01.put(new Put(ROW_ID_01).
+                  addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
+          fail(COL_LENGTH_ENFORCE_FAILURE);
+        } catch (InvalidColumnValueException e) {
+        }
+        // put same row to unenforced namespace/table
+        table03InNamespace02.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
+        // put a row with valid column value to regex-restricted column
+        table01InNamespace01.put(new Put(ROW_ID_01).
+                addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("http://google.com")));
+        // put a row with invalid column value
+        try {
+          table01InNamespace01.put(new Put(ROW_ID_01).
+                  addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
+          fail(COL_VALUE_ENFORCE_FAILURE);
+        } catch (InvalidColumnValueException e) {
+        }
+        // put same row to unenforced namespace/table
+        table03InNamespace02.put(new Put(ROW_ID_01).
+                addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
+      }
     }
+  }
+
+  @Rule
+  public TemporaryFolder tempTestFolder = new TemporaryFolder();
+
+  @Test
+  public void testExportImport() throws IOException, JAXBException {
+    File exportFile;
+    try {
+      exportFile = tempTestFolder.newFile("temp.export.hsa.xml");
+    } catch (IllegalStateException e) {
+      exportFile = new File("target/temp.export.hsa.xml");
+    }
+    System.out.println("Exporting to: " + exportFile.getAbsolutePath());
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+    loadColumnData(configuration, false);
+
+    try (RepositoryAdmin repositoryAdmin = new RepositoryAdmin(
+            MConnectionFactory.createConnection(configuration))) {
+      repositoryAdmin.exportRepository(exportFile, true);
+    }
+    clearTestingEnvironment();
   }
 
   public static void main(String[] args) throws Exception {
@@ -684,6 +746,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
-    new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
+    // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
+    new TestRepositoryAdmin().testExportImport();
   }
 }

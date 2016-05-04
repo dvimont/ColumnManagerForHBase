@@ -375,13 +375,13 @@
  * <li><a name="export-import"></a>HBase schema export/import tools
  * <BLOCKQUOTE>
  * The {@code RepositoryAdmin}
- * <a href="RepositoryAdmin.html#exportNamespaceMetadata-java.lang.String-java.lang.String-java.lang.String-boolean-">
+ * <a href="RepositoryAdmin.html#exportRepository-java.io.File-boolean-">
  * export methods</a> provide for creation of an external HBaseSchemaArchive (HSA) file (in XML
  * format*) containing the complete metadata contents (i.e., all <i>Namespace</i>, <i>Table</i>,
  * <i>Column Family</i>, <i>ColumnAuditor</i>, and  <i>ColumnDefinition</i> metadata) of either the
  * entire repository or the user-specified <i>Namespace</i> or <i>Table</i>. Conversely, the
  * {@code RepositoryAdmin}
- * <a href="RepositoryAdmin.html#importMetadata-boolean-java.lang.String-java.lang.String-">
+ * <a href="RepositoryAdmin.html#importSchema-boolean-java.io.File-">
  * import methods</a> provide for deserialization of a designated HSA file and importation of its
  * components into HBase (creating any Namespaces or Tables not already found in HBase).<br><br>
  * *An HSA file adheres to the XML Schema layout in

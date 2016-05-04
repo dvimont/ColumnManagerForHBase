@@ -168,24 +168,24 @@ public class MetaRepTest {
                         (auditTrail.getAllChangeEvents(), TARGET_PATH, "changeEvents.csv");
                 ChangeEventMonitor.exportChangeEventListToCsvFile
                         (auditTrail.getChangeEventsForEntity
-                            (EntityType.TABLE, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+                            (SchemaEntityType.TABLE, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
                                     null, null), TARGET_PATH, "changeEventsForEntityTable.csv");
                 ChangeEventMonitor.exportChangeEventListToCsvFile
                         (auditTrail.getChangeEventsForEntity
-                            (EntityType.NAMESPACE, Bytes.toBytes(MY_NAMESPACE_NAME), null,
+                            (SchemaEntityType.NAMESPACE, Bytes.toBytes(MY_NAMESPACE_NAME), null,
                                     null, null), TARGET_PATH, "changeEventsForEntityNamespace.csv");
                 ChangeEventMonitor.exportChangeEventListToCsvFile
                         (auditTrail.getChangeEventsForEntity
-                            (EntityType.COLUMN_FAMILY, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+                            (SchemaEntityType.COLUMN_FAMILY, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
                                     MY_COLUMN_FAMILY_NAME, null), TARGET_PATH, "changeEventsForEntityColFamily.csv");
                 ChangeEventMonitor.exportChangeEventListToCsvFile
                         (auditTrail.getChangeEventsForEntity
-                            (EntityType.COLUMN_AUDITOR, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+                            (SchemaEntityType.COLUMN_AUDITOR, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
                                     MY_COLUMN_FAMILY_NAME, MY_FIRST_COLUMN_QUALIFIER),
                                     TARGET_PATH, "changeEventsForEntityColAuditor.csv");
                 ChangeEventMonitor.exportChangeEventListToCsvFile
                         (auditTrail.getChangeEventsForEntity
-                            (EntityType.COLUMN_DEFINITION, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+                            (SchemaEntityType.COLUMN_DEFINITION, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
                                     MY_COLUMN_FAMILY_NAME, MY_FIRST_COLUMN_QUALIFIER),
                                     TARGET_PATH, "changeEventsForEntityColDefinition.csv");
 
@@ -356,15 +356,15 @@ public class MetaRepTest {
 
 
            // MSuperAdmin superAdmin = ((MConnection)mConnection).getSuperAdmin();
-            repositoryAdmin.exportRepository
-                    (TARGET_PATH, "testExportAll.xml", false);
-            repositoryAdmin.exportNamespaceMetadata
-                    (MY_NAMESPACE_NAME, TARGET_PATH, "testExportNamespace.xml", false);
-            repositoryAdmin.exportTableMetadata
-                    (TableName.valueOf(MY_NAMESPACE_NAME,"myTable"), TARGET_PATH, "testExportTable.xml", false);
+//            repositoryAdmin.exportRepository
+//                    (TARGET_PATH, "testExportAll.xml", false);
+//            repositoryAdmin.exportNamespaceSchema
+//                    (MY_NAMESPACE_NAME, TARGET_PATH, "testExportNamespace.xml", false);
+//            repositoryAdmin.exportTableSchema
+//                    (TableName.valueOf(MY_NAMESPACE_NAME,"myTable"), TARGET_PATH, "testExportTable.xml", false);
 
-            System.out.println
-                (repositoryAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));
+//            System.out.println
+//                (repositoryAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));
 
 //            System.out.println("Testing get of MNamespace descriptor from Repository");
 //            MNamespaceDescriptor testMnd
@@ -394,8 +394,8 @@ public class MetaRepTest {
                 )
         {
             // NOW restore namespace & table from external archive (choose 1 of the 2 below)
-//            repositoryAdmin.importMetadata(true, TARGET_PATH, "testExportAll.xml");
-            repositoryAdmin.importTableMetadata(true, MY_TABLE_NAME, TARGET_PATH, "testExportAll.xml");
+//            repositoryAdmin.importSchema(true, TARGET_PATH, "testExportAll.xml");
+//            repositoryAdmin.importTableSchema(true, MY_TABLE_NAME, TARGET_PATH, "testExportAll.xml");
 
 
             System.out.println("DUMPING REPOSITORY *AFTER* restore from ARCHIVE of user namespace & table");

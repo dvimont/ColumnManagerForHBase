@@ -28,18 +28,18 @@ import org.apache.hadoop.hbase.util.Bytes;
  *
  * @author Daniel Vimont
  */
-class MNamespaceDescriptor extends MetadataEntity {
+class MNamespaceDescriptor extends SchemaEntity {
 
   public MNamespaceDescriptor(byte[] namespaceName) {
-    super(EntityType.NAMESPACE.getRecordType(), namespaceName);
+    super(SchemaEntityType.NAMESPACE.getRecordType(), namespaceName);
   }
 
   public MNamespaceDescriptor(String namespaceName) {
-    super(EntityType.NAMESPACE.getRecordType(), namespaceName);
+    super(SchemaEntityType.NAMESPACE.getRecordType(), namespaceName);
   }
 
   public MNamespaceDescriptor(NamespaceDescriptor nd) {
-    super(EntityType.NAMESPACE.getRecordType(), nd.getName());
+    super(SchemaEntityType.NAMESPACE.getRecordType(), nd.getName());
     for (Map.Entry<String, String> configEntry : nd.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());
     }
@@ -47,12 +47,12 @@ class MNamespaceDescriptor extends MetadataEntity {
 
   /**
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
-   * metadata components from Repository or from external archive).
+   * schema components from Repository or from external archive).
    *
    * @param mEntity
    */
-  MNamespaceDescriptor(MetadataEntity mEntity) {
-    super(EntityType.NAMESPACE.getRecordType(), mEntity.getName());
+  MNamespaceDescriptor(SchemaEntity mEntity) {
+    super(SchemaEntityType.NAMESPACE.getRecordType(), mEntity.getName());
     this.setForeignKey(mEntity.getForeignKey());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mEntity.getValues().entrySet()) {

@@ -31,7 +31,8 @@ import org.apache.hadoop.hbase.security.User;
  * {@code Admin}, {@code Table}, and {@code BufferedMutator} objects which, in addition to providing
  * all standard HBase API functionality, also: (a) transparently interface with the ColumnManager
  * repository for tracking of <i>Namespace</i>,
- * <i>Table</i>, <i>Column Family</i>, and <i>{@link ColumnAuditor}</i> metadata, and (b) {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+ * <i>Table</i>, <i>Column Family</i>, and <i>{@link ColumnAuditor}</i> metadata, and (b)
+ * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
  * optionally enforce} administrator-specified {@link ColumnDefinition}s when <i>Columns</i> are
  * submitted in a {@code put} (i.e., insert/update) via the standard {@code Table},
  * {@code BufferedMutator}, and

@@ -31,7 +31,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
  * <a href="package-summary.html#config">ColumnManager-included</a> <i>Table</i>.
  * <br><br> **{@code ColumnAuditor} metadata may also be gathered for already-existing
  * <i>Column</i>s via the {@link RepositoryAdmin} method
- * {@link RepositoryAdmin#discoverMetadata() discoverMetadata}.
+ * {@link RepositoryAdmin#discoverSchema() discoverSchema}.
  */
 public class ColumnAuditor extends Column {
 
@@ -44,24 +44,24 @@ public class ColumnAuditor extends Column {
    * @param columnQualifier Column Qualifier
    */
   ColumnAuditor(byte[] columnQualifier) {
-    super(EntityType.COLUMN_AUDITOR.getRecordType(), columnQualifier);
+    super(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), columnQualifier);
   }
 
   /**
    * @param columnQualifier Column Qualifier
    */
   ColumnAuditor(String columnQualifier) {
-    super(EntityType.COLUMN_AUDITOR.getRecordType(), columnQualifier);
+    super(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), columnQualifier);
   }
 
   /**
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
-   * metadata components from Repository or from external archive).
+   * schema components from Repository or from external archive).
    *
-   * @param mEntity MetadataEntity to be deserialized into a Column
+   * @param mEntity SchemaEntity to be deserialized into a Column
    */
-  ColumnAuditor(MetadataEntity mEntity) {
-    super(EntityType.COLUMN_AUDITOR.getRecordType(), mEntity.getName());
+  ColumnAuditor(SchemaEntity mEntity) {
+    super(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), mEntity.getName());
     this.setForeignKey(mEntity.getForeignKey());
     for (Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mEntity.getValues().entrySet()) {
@@ -133,7 +133,7 @@ public class ColumnAuditor extends Column {
    * MaxValueLengthFound for a given column is incremented upward only when a value longer than that
    * of any previously submitted/discovered value is found (either in the context of real-time
    * metadata capture from a submitted Table {@code Mutation}, or in the process of
-   * {@link RepositoryAdmin#discoverMetadata() metadata discovery}). MaxValueLengthFound is never
+   * {@link RepositoryAdmin#discoverSchema() schema discovery}). MaxValueLengthFound is never
    * decremented, even when the longest value for the column is deleted from HBase, so the
    * MaxValueLengthFound actually represents the maximum length EVER recorded for the value of a
    * specific column, not necessarily the longest value CURRENTLY stored in HBase for the column.

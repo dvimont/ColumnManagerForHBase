@@ -120,7 +120,7 @@ class MAdmin implements Admin {
   public void deleteTable(TableName tn) throws IOException {
     wrappedHbaseAdmin.deleteTable(tn);
     if (repository.isActivated()) {
-      repository.deleteTableMetadata(tn);
+      repository.deleteTableSchemaEntity(tn);
     }
   }
 
@@ -164,7 +164,7 @@ class MAdmin implements Admin {
   public void truncateTable(TableName tn, boolean bln) throws IOException {
     wrappedHbaseAdmin.truncateTable(tn, bln);
     if (repository.isActivated()) {
-      repository.truncateTableColumnMetadata(tn);
+      repository.truncateTableColumns(tn);
     }
   }
 
@@ -267,7 +267,7 @@ class MAdmin implements Admin {
   public void deleteNamespace(String string) throws IOException {
     wrappedHbaseAdmin.deleteNamespace(string);
     if (repository.isActivated()) {
-      repository.deleteNamespaceMetadata(string);
+      repository.deleteNamespaceSchemaEntity(string);
     }
   }
 

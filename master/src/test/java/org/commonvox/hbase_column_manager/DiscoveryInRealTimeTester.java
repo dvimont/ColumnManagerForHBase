@@ -220,9 +220,9 @@ public class DiscoveryInRealTimeTester {
 //                System.out.println("          " + configEntry.getKey() + " : " + configEntry.getValue());
 //            }
       //MSuperAdmin superAdmin = ((MConnection)mConnection).getSuperAdmin();
-      repositoryAdmin.exportRepository(TARGET_PATH, "testExportAll.xml", false);
-      repositoryAdmin.exportNamespaceMetadata(MY_NAMESPACE_NAME, TARGET_PATH, "testExportNamespace.xml", false);
-      repositoryAdmin.exportTableMetadata(TableName.valueOf(MY_NAMESPACE_NAME, "myTable"), TARGET_PATH, "testExportTable.xml", false);
+//      repositoryAdmin.exportRepository(TARGET_PATH, "testExportAll.xml", false);
+//      repositoryAdmin.exportNamespaceSchema(MY_NAMESPACE_NAME, TARGET_PATH, "testExportNamespace.xml", false);
+//      repositoryAdmin.exportTableSchema(TableName.valueOf(MY_NAMESPACE_NAME, "myTable"), TARGET_PATH, "testExportTable.xml", false);
 
 //            System.out.println
 //                (superAdmin.generateHsaFileSummary(TARGET_PATH, "testExportAll.xml"));
@@ -248,9 +248,9 @@ public class DiscoveryInRealTimeTester {
             Admin admin = connection.getAdmin();
             RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection)) {
       // NOW restore namespace & table from external archive (choose 1 of the 3 below)
-//            superAdmin.importMetadata(true, TARGET_PATH, "testExportAll.xml");
-//            superAdmin.importNamespaceMetadata(true, MY_NAMESPACE_NAME, TARGET_PATH, "testExportAll.xml");
-      repositoryAdmin.importTableMetadata(true, MY_TABLE_NAME, TARGET_PATH, "testExportAll.xml");
+//            superAdmin.importSchema(true, TARGET_PATH, "testExportAll.xml");
+//            superAdmin.importNamespaceSchema(true, MY_NAMESPACE_NAME, TARGET_PATH, "testExportAll.xml");
+//      repositoryAdmin.importTableSchema(true, MY_TABLE_NAME, TARGET_PATH, "testExportAll.xml");
 
       System.out.println("DUMPING REPOSITORY *AFTER* restore from ARCHIVE of user namespace & table");
       repositoryAdmin.dumpRepositoryTable();

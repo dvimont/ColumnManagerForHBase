@@ -167,7 +167,7 @@ public class ChangeEventMonitor {
 
   /**
    * Get the {@link ChangeEvent}s pertaining to a specified Entity (e.g., a specific <i>Table</i>),
-   * in timestamp order. Note that some parameters will not apply to some {@link EntityType}s (e.g.
+   * in timestamp order. Note that some parameters will not apply to some {@link SchemaEntityType}s (e.g.
    * columnFamily does not apply when entityType is {@code TABLE}), in which case {@code null}s may
    * be submitted for inapplicable parameters.
    *
@@ -178,7 +178,7 @@ public class ChangeEventMonitor {
    * @param columnQualifier <i>Column Qualifier</i> which pertains to the Entity (if applicable)
    * @return list of ChangeEvents pertaining to the specified Entity, in timestamp order
    */
-  public List<ChangeEvent> getChangeEventsForEntity(EntityType entityType,
+  public List<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
           byte[] namespaceName, byte[] tableName,
           byte[] columnFamily, byte[] columnQualifier) {
     Set<Object> entityList = entityIndex.keyComponentSet(entityComponent);
@@ -186,16 +186,14 @@ public class ChangeEventMonitor {
 
     int namespaceIndex
             = Arrays.binarySearch(entityListArray,
-                    ChangeEvent.createEntityObject(
-                            EntityType.NAMESPACE.getRecordType(),
+                    ChangeEvent.createEntityObject(SchemaEntityType.NAMESPACE.getRecordType(),
                             Repository.NAMESPACE_PARENT_FOREIGN_KEY,
                             namespaceName));
     if (namespaceIndex < 0) {
       return null;
     }
-    if (entityType.equals(EntityType.NAMESPACE)) {
-      return entityIndex.values(ChangeEvent.createEntityObject(
-              EntityType.NAMESPACE.getRecordType(),
+    if (entityType.equals(SchemaEntityType.NAMESPACE)) {
+      return entityIndex.values(ChangeEvent.createEntityObject(SchemaEntityType.NAMESPACE.getRecordType(),
               Repository.NAMESPACE_PARENT_FOREIGN_KEY, namespaceName));
     }
 
@@ -203,30 +201,24 @@ public class ChangeEventMonitor {
             = ((ChangeEvent.Entity) entityListArray[namespaceIndex]).getEntityForeignKey().getBytes();
     int tableIndex
             = Arrays.binarySearch(entityListArray,
-                    ChangeEvent.createEntityObject(
-                            EntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
+                    ChangeEvent.createEntityObject(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
     if (tableIndex < 0) {
       return null;
     }
-    if (entityType.equals(EntityType.TABLE)) {
-      return entityIndex.values(
-              ChangeEvent.createEntityObject(
-                      EntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
+    if (entityType.equals(SchemaEntityType.TABLE)) {
+      return entityIndex.values(ChangeEvent.createEntityObject(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
     }
 
     byte[] tableForeignKey
             = ((ChangeEvent.Entity) entityListArray[tableIndex]).getEntityForeignKey().getBytes();
     int colFamilyIndex
             = Arrays.binarySearch(entityListArray,
-                    ChangeEvent.createEntityObject(
-                            EntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
+                    ChangeEvent.createEntityObject(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
     if (colFamilyIndex < 0) {
       return null;
     }
-    if (entityType.equals(EntityType.COLUMN_FAMILY)) {
-      return entityIndex.values(
-              ChangeEvent.createEntityObject(
-                      EntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
+    if (entityType.equals(SchemaEntityType.COLUMN_FAMILY)) {
+      return entityIndex.values(ChangeEvent.createEntityObject(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
     }
     byte[] colFamilyForeignKey
             = ((ChangeEvent.Entity) entityListArray[colFamilyIndex]).getEntityForeignKey().getBytes();
@@ -237,7 +229,7 @@ public class ChangeEventMonitor {
     if (colQualifierIndex < 0) {
       return null;
     }
-    if (entityType.equals(EntityType.COLUMN_AUDITOR) || entityType.equals(EntityType.COLUMN_DEFINITION)) {
+    if (entityType.equals(SchemaEntityType.COLUMN_AUDITOR) || entityType.equals(SchemaEntityType.COLUMN_DEFINITION)) {
       return entityIndex.values(
               ChangeEvent.createEntityObject(
                       entityType.getRecordType(), colFamilyForeignKey, columnQualifier));

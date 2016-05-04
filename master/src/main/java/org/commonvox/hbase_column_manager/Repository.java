@@ -16,6 +16,7 @@
  */
 package org.commonvox.hbase_column_manager;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -57,7 +58,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
 
 /**
- * Center of all CRUD operations for maintenance and retrieval of HBase metadata stored in the
+ * Center of all CRUD operations for maintenance and retrieval of HBase schema stored in the
  * ColumnManager Repository table, including metadata pertaining to all
  * <i>Columns</i> actively stored in each <i>Column Family</i> for each included <i>Table</i>.
  *
@@ -103,7 +104,7 @@ class Repository {
   static final TableName REPOSITORY_TABLENAME
           = TableName.valueOf(REPOSITORY_NAMESPACE_DESCRIPTOR.getName(),
                   "column_manager_repository_table");
-  private static final byte[] REPOSITORY_COLFAMILY = Bytes.toBytes("md"); // ("md" == "metadata")
+  private static final byte[] REPOSITORY_COLFAMILY = Bytes.toBytes("se"); // ("se"="SchemaEntities")
   static final int REPOSITORY_DEFAULT_MAX_VERSIONS = 50; // should this be set higher?
 
   static final byte[] NAMESPACE_PARENT_FOREIGN_KEY = {'-'};
@@ -401,7 +402,7 @@ class Repository {
   /**
    *
    * @param nd
-   * @return foreign key value of repository row that holds namespace metadata
+   * @return foreign key value of repository row that holds namespace SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
   byte[] putNamespace(NamespaceDescriptor nd)
@@ -410,17 +411,17 @@ class Repository {
       return null;
     }
     byte[] namespaceRowId
-            = buildRowId(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
+            = buildRowId(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
                     Bytes.toBytes(nd.getName()));
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(EMPTY_VALUES, nd.getConfiguration());
-    return putMetadataEntityChanges(namespaceRowId, entityAttributeMap, false);
+    return putSchemaEntityChanges(namespaceRowId, entityAttributeMap, false);
   }
 
   /**
    *
    * @param htd
-   * @return foreign key value of repository row that holds table metadata
+   * @return foreign key value of repository row that holds table SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
   byte[] putTable(HTableDescriptor htd) throws IOException {
@@ -430,11 +431,11 @@ class Repository {
     byte[] namespaceForeignKey
             = getNamespaceForeignKey(htd.getTableName().getNamespace());
     byte[] tableRowId
-            = buildRowId(EntityType.TABLE.getRecordType(), namespaceForeignKey, htd.getTableName().getName());
+            = buildRowId(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, htd.getTableName().getName());
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(htd.getValues(), htd.getConfiguration());
     byte[] tableForeignKey
-            = putMetadataEntityChanges(tableRowId, entityAttributeMap, false);
+            = putSchemaEntityChanges(tableRowId, entityAttributeMap, false);
 //        if (MTableDescriptor.class.isAssignableFrom(htd.getClass())) {
 //            setColumnDefinitionsEnforced
 //                (((MTableDescriptor)htd).columnDefinitionsEnforced(),
@@ -478,7 +479,7 @@ class Repository {
    *
    * @param tableForeignKey
    * @param hcd
-   * @return foreign key value of repository row that holds Column Family metadata
+   * @return foreign key value of repository row that holds Column Family SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
   private byte[] putColumnFamily(byte[] tableForeignKey, HColumnDescriptor hcd, TableName tableName)
@@ -487,12 +488,12 @@ class Repository {
             = buildEntityAttributeMap(hcd.getValues(), hcd.getConfiguration());
 
     byte[] colFamilyForeignKey
-            = putMetadataEntityChanges(buildRowId(EntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName()),
+            = putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName()),
                     entityAttributeMap, false);
 
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
       setColumnDefinitionsEnforced(((MColumnDescriptor) hcd).columnDefinitionsEnforced(),
-              EntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName());
+              SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName());
     }
 
     return colFamilyForeignKey;
@@ -500,7 +501,7 @@ class Repository {
 
   /**
    * Invoked during serialization process, when fully-formed MTableDescriptor is submitted for
-   * persistence (e.g., during importation of metadata from external source).
+   * persistence (e.g., during importation of schema from external source).
    *
    * @param mtd MTableDescriptor
    * @return true if all serializations complete successfully
@@ -513,7 +514,7 @@ class Repository {
     byte[] tableForeignKey = getTableForeignKey(mtd);
     boolean serializationCompleted = true;
     for (MColumnDescriptor mcd : mtd.getMColumnDescriptorArray()) {
-      byte[] colDescForeignKey = getForeignKey(EntityType.COLUMN_FAMILY.getRecordType(),
+      byte[] colDescForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
               tableForeignKey, mcd.getName());
       if (colDescForeignKey == null) {
         serializationCompleted = false;
@@ -534,7 +535,7 @@ class Repository {
    *
    * @param colFamilyForeignKey
    * @param columnAuditor
-   * @return foreign key value of repository row that holds {@link ColumnAuditor} metadata
+   * @return foreign key value of repository row that holds {@link ColumnAuditor} SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
   private byte[] putColumnAuditor(byte[] colFamilyForeignKey, ColumnAuditor columnAuditor)
@@ -542,7 +543,7 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(columnAuditor.getValues(), columnAuditor.getConfiguration());
 
-    return putMetadataEntityChanges(buildRowId(EntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey, columnAuditor.getName()),
+    return putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey, columnAuditor.getName()),
             entityAttributeMap, false);
   }
 
@@ -584,11 +585,11 @@ class Repository {
   }
 
   /**
-   * Invoked at application runtime to persist {@link ColumnAuditor} metadata in the Repository
+   * Invoked at application runtime to persist {@link ColumnAuditor} SchemaEntity in the Repository
    * (invoked after user application successfully invokes a {@code Mutation} to a table).
    *
    * @param mtd ColumnManager TableDescriptor -- deserialized from Repository
-   * @param mutation object from which column metadata is extracted
+   * @param mutation object from which column SchemaEntity is extracted
    * @throws IOException if a remote or network exception occurs
    */
   void putColumnAuditors(MTableDescriptor mtd, Mutation mutation) throws IOException {
@@ -614,9 +615,11 @@ class Repository {
         }
         boolean suppressUserName = (oldColAuditor == null) ? false : true;
         Map<byte[], byte[]> entityAttributeMap
-                = buildEntityAttributeMap(newColAuditor.getValues(), newColAuditor.getConfiguration());
-        putMetadataEntityChanges(buildRowId(EntityType.COLUMN_AUDITOR.getRecordType(), mcd.getForeignKey(), newColAuditor.getName()),
-                entityAttributeMap, suppressUserName);
+                = buildEntityAttributeMap(newColAuditor.getValues(),
+                        newColAuditor.getConfiguration());
+        putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                mcd.getForeignKey(), newColAuditor.getName()), entityAttributeMap,
+                suppressUserName);
       }
     }
   }
@@ -625,7 +628,7 @@ class Repository {
    * Invoked as part of discovery process.
    *
    * @param mtd table descriptor for parent table of columns found in row
-   * @param row Result object from which {@link ColumnAuditor} metadata is extracted
+   * @param row Result object from which {@link ColumnAuditor} SchemaEntity is extracted
    * @throws IOException if a remote or network exception occurs
    */
   private void putColumnAuditors(MTableDescriptor mtd, Result row, boolean keyOnlyFilterUsed) throws IOException {
@@ -658,7 +661,7 @@ class Repository {
         }
         Map<byte[], byte[]> entityAttributeMap
                 = buildEntityAttributeMap(newColAuditor.getValues(), newColAuditor.getConfiguration());
-        putMetadataEntityChanges(buildRowId(EntityType.COLUMN_AUDITOR.getRecordType(),
+        putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
                 mcd.getForeignKey(), colQualifier),
                 entityAttributeMap, suppressUserName);
       }
@@ -695,9 +698,10 @@ class Repository {
         if (colValidationRegex != null && colValidationRegex.length() > 0) {
           byte[] colValue = Bytes.getBytes(CellUtil.getValueBufferShallowCopy(cell));
           if (!Bytes.toString(colValue).matches(colValidationRegex)) {
-            throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(), colQualifier, colValue,
-                    "Value does not match the regular expression defined for column: "
-                    + colValidationRegex);
+            throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(),
+                    colQualifier, colValue,
+                    "Value does not match the regular expression defined for column: <"
+                    + colValidationRegex + ">");
           }
         }
       }
@@ -749,7 +753,7 @@ class Repository {
 
   /**
    * Invoked during serialization process, when fully-formed MTableDescriptor is submitted for
-   * persistence (e.g., during importation of metadata from external source).
+   * persistence (e.g., during importation of schema from external source).
    *
    * @param mtd MTableDescriptor
    * @return true if all serializations complete successfully
@@ -762,7 +766,7 @@ class Repository {
     byte[] tableForeignKey = getTableForeignKey(mtd);
     boolean serializationCompleted = true;
     for (MColumnDescriptor mcd : mtd.getMColumnDescriptorArray()) {
-      byte[] colDescForeignKey = getForeignKey(EntityType.COLUMN_FAMILY.getRecordType(),
+      byte[] colDescForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
               tableForeignKey, mcd.getName());
       if (colDescForeignKey == null) {
         serializationCompleted = false;
@@ -792,7 +796,7 @@ class Repository {
   boolean putColumnDefinitions(TableName tableName, byte[] colFamily, List<ColumnDefinition> colDefinitions)
           throws IOException {
     boolean allPutsCompleted = false;
-    byte[] colFamilyForeignKey = getForeignKey(EntityType.COLUMN_FAMILY.getRecordType(),
+    byte[] colFamilyForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName),
             colFamily);
     if (colFamilyForeignKey != null) {
@@ -813,7 +817,7 @@ class Repository {
    *
    * @param colFamilyForeignKey
    * @param colDef
-   * @return foreign key value of repository row that holds {@link ColumnDefinition} metadata
+   * @return foreign key value of repository row that holds {@link ColumnDefinition} SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
   private byte[] putColumnDefinition(byte[] colFamilyForeignKey, ColumnDefinition colDef)
@@ -821,9 +825,8 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(colDef.getValues(), colDef.getConfiguration());
 
-    return putMetadataEntityChanges(buildRowId(EntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey,
-            colDef.getName()),
-            entityAttributeMap, false);
+    return putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
+            colFamilyForeignKey, colDef.getName()), entityAttributeMap, false);
   }
 
   private Map<byte[], byte[]> buildEntityAttributeMap(Map<ImmutableBytesWritable, ImmutableBytesWritable> values,
@@ -846,7 +849,7 @@ class Repository {
     return entityAttributeMap;
   }
 
-  private byte[] putMetadataEntityChanges(byte[] rowId,
+  private byte[] putSchemaEntityChanges(byte[] rowId,
           Map<byte[], byte[]> entityAttributeMap, boolean suppressUserName)
           throws IOException {
     Result oldRow = repositoryTable.get(new Get(rowId));
@@ -861,7 +864,7 @@ class Repository {
       newRow.addColumn(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN, foreignKey);
       newRow.addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
     } else {
-      MetadataEntity mEntity = deserializeMetadataEntity(oldRow);
+      SchemaEntity mEntity = deserializeSchemaEntity(oldRow);
       oldEntityAttributeMap
               = buildEntityAttributeMap(mEntity.getValues(), mEntity.getConfiguration());
       foreignKey = oldRow.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN);
@@ -908,13 +911,10 @@ class Repository {
       }
     }
 
-    // PUT newRow to metadata Repository
+    // PUT newRow to Repository
     if (!newRow.isEmpty()) {
       if (!suppressUserName) {
         newRow.addColumn(REPOSITORY_COLFAMILY, JAVA_USERNAME_PROPERTY_KEY, javaUsername);
-        // FOLLOWING FOR TESTING ONLY!! (Remove and uncomment preceding line.)
-        //Bytes.toBytes (System.getProperty(Bytes.toString (JAVA_USERNAME_PROPERTY_KEY))));
-        // END OF TEMP TESTING LOGIC!!
       }
       repositoryTable.put(newRow);
     }
@@ -923,46 +923,46 @@ class Repository {
 
   MNamespaceDescriptor getMNamespaceDescriptor(String namespaceName)
           throws IOException {
-    Result row = getActiveRow(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
+    Result row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
     if (row == null || row.isEmpty()) {
       // Note that ColumnManager can be installed atop an already-existing HBase
-      //  installation, so namespace metadata might not yet have been captured in repository,
+      //  installation, so namespace SchemaEntity might not yet have been captured in repository,
       //  or namespaceName may not represent active namespace (and so not stored in repository).
       //return new MNamespaceDescriptor(hbaseAdmin.getNamespaceDescriptor(namespaceName));
       if (isIncludedNamespace(namespaceName)) {
         putNamespace(hbaseAdmin.getNamespaceDescriptor(namespaceName));
-        row = getActiveRow(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
+        row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
       } else {
         return null;
       }
     }
-    MNamespaceDescriptor nd = new MNamespaceDescriptor(deserializeMetadataEntity(row));
+    MNamespaceDescriptor nd = new MNamespaceDescriptor(deserializeSchemaEntity(row));
     return nd;
   }
 
   Set<MNamespaceDescriptor> getMNamespaceDescriptors() throws IOException {
     Set<MNamespaceDescriptor> mNamespaceDescriptors = new TreeSet<>();
-    for (Result row : getActiveRows(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY)) {
-      mNamespaceDescriptors.add(new MNamespaceDescriptor(deserializeMetadataEntity(row)));
+    for (Result row : getActiveRows(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY)) {
+      mNamespaceDescriptors.add(new MNamespaceDescriptor(deserializeSchemaEntity(row)));
     }
     return mNamespaceDescriptors;
   }
 
   MTableDescriptor getMTableDescriptor(TableName tn) throws IOException {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tn.getNamespace());
-    Result row = getActiveRow(EntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
+    Result row = getActiveRow(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
     if (row == null || row.isEmpty()) {
       // Note that ColumnManager can be installed atop an already-existing HBase
-      //  installation, so table metadata might not yet have been captured in repository,
+      //  installation, so table SchemaEntity might not yet have been captured in repository,
       //  or TableName may not represent included Table (and so not stored in repository).
       if (isIncludedTable(tn)) {
         putTable(hbaseAdmin.getTableDescriptor(tn));
-        row = getActiveRow(EntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
+        row = getActiveRow(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
       } else {
         return null;
       }
     }
-    MTableDescriptor mtd = new MTableDescriptor(deserializeMetadataEntity(row));
+    MTableDescriptor mtd = new MTableDescriptor(deserializeSchemaEntity(row));
     for (MColumnDescriptor mcd : getMColumnDescriptors(mtd.getForeignKey())) {
       mtd.addFamily(mcd);
     }
@@ -972,8 +972,8 @@ class Repository {
   private Set<MTableDescriptor> getMTableDescriptors(byte[] namespaceForeignKey)
           throws IOException {
     Set<MTableDescriptor> mTableDescriptors = new TreeSet<>();
-    for (Result row : getActiveRows(EntityType.TABLE.getRecordType(), namespaceForeignKey)) {
-      MTableDescriptor mtd = new MTableDescriptor(deserializeMetadataEntity(row));
+    for (Result row : getActiveRows(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey)) {
+      MTableDescriptor mtd = new MTableDescriptor(deserializeSchemaEntity(row));
       for (MColumnDescriptor mcd : getMColumnDescriptors(mtd.getForeignKey())) {
         mtd.addFamily(mcd);
       }
@@ -985,8 +985,8 @@ class Repository {
   private Set<MColumnDescriptor> getMColumnDescriptors(byte[] tableForeignKey)
           throws IOException {
     Set<MColumnDescriptor> mColumnDescriptors = new TreeSet<>();
-    for (Result row : getActiveRows(EntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey)) {
-      MColumnDescriptor mcd = new MColumnDescriptor(deserializeMetadataEntity(row));
+    for (Result row : getActiveRows(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey)) {
+      MColumnDescriptor mcd = new MColumnDescriptor(deserializeSchemaEntity(row));
       mColumnDescriptors.add(mcd.addColumnAuditors(getColumnAuditors(mcd.getForeignKey()))
               .addColumnDefinitions(getColumnDefinitions(mcd.getForeignKey())));
     }
@@ -996,17 +996,17 @@ class Repository {
   Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
     byte[] colFamilyForeignKey
-            = getForeignKey(EntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
+            = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
     return (colFamilyForeignKey == null) ? null : getColumnAuditors(colFamilyForeignKey);
   }
 
   private Set<ColumnAuditor> getColumnAuditors(byte[] colFamilyForeignKey)
           throws IOException {
     Set<ColumnAuditor> columnAuditors = new TreeSet<>();
-    Result[] colAuditorRows = getActiveRows(EntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey);
+    Result[] colAuditorRows = getActiveRows(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey);
     if (colAuditorRows != null) {
       for (Result row : colAuditorRows) {
-        columnAuditors.add(new ColumnAuditor(deserializeMetadataEntity(row)));
+        columnAuditors.add(new ColumnAuditor(deserializeSchemaEntity(row)));
       }
     }
     return columnAuditors;
@@ -1014,39 +1014,39 @@ class Repository {
 
   private ColumnAuditor getColumnAuditor(byte[] colFamilyForeignKey, byte[] colQualifier)
           throws IOException {
-    Result row = getActiveRow(EntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey, colQualifier, null);
-    return (row == null) ? null : new ColumnAuditor(deserializeMetadataEntity(row));
+    Result row = getActiveRow(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey, colQualifier, null);
+    return (row == null) ? null : new ColumnAuditor(deserializeSchemaEntity(row));
   }
 
   Set<ColumnDefinition> getColumnDefinitions(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
     byte[] colFamilyForeignKey
-            = getForeignKey(EntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
+            = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
     return getColumnDefinitions(colFamilyForeignKey);
   }
 
   private Set<ColumnDefinition> getColumnDefinitions(byte[] colFamilyForeignKey) throws IOException {
     Set<ColumnDefinition> columnDefinitions = new TreeSet<>();
-    for (Result row : getActiveRows(EntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey)) {
-      columnDefinitions.add(new ColumnDefinition(deserializeMetadataEntity(row)));
+    for (Result row : getActiveRows(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey)) {
+      columnDefinitions.add(new ColumnDefinition(deserializeSchemaEntity(row)));
     }
     return columnDefinitions;
   }
 
   private ColumnDefinition getColumnDefinition(byte[] colFamilyForeignKey, byte[] colQualifier)
           throws IOException {
-    Result row = getActiveRow(EntityType.COLUMN_DEFINITION.getRecordType(),
+    Result row = getActiveRow(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
             colFamilyForeignKey, colQualifier, null);
-    return (row == null) ? null : new ColumnDefinition(deserializeMetadataEntity(row));
+    return (row == null) ? null : new ColumnDefinition(deserializeSchemaEntity(row));
   }
 
-  private MetadataEntity deserializeMetadataEntity(Result row) {
+  private SchemaEntity deserializeSchemaEntity(Result row) {
     if (row == null || row.isEmpty()) {
       return null;
     }
     byte[] rowId = row.getRow();
-    MetadataEntity mEntity
-            = new MetadataEntity(rowId[0], extractNameFromRowId(rowId));
+    SchemaEntity mEntity
+            = new SchemaEntity(rowId[0], extractNameFromRowId(rowId));
     for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_COLFAMILY).entrySet()) {
       byte[] key = colEntry.getKey();
       byte[] value = colEntry.getValue();
@@ -1189,10 +1189,10 @@ class Repository {
 
   private byte[] getNamespaceForeignKey(byte[] namespace) throws IOException {
     byte[] namespaceForeignKey
-            = getForeignKey(EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
+            = getForeignKey(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
                     namespace);
     // Note that ColumnManager could be installed atop an already-existing HBase
-    //  installation, so namespace metadata might not be in repository the first
+    //  installation, so namespace SchemaEntity might not be in repository the first
     //  time its foreign key is accessed or one of its descendents is modified.
     if (namespaceForeignKey == null) {
       namespaceForeignKey = putNamespace(hbaseAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
@@ -1210,9 +1210,9 @@ class Repository {
   byte[] getTableForeignKey(TableName tableName) throws IOException {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tableName.getNamespace());
     byte[] tableForeignKey
-            = getForeignKey(EntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
+            = getForeignKey(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
     // Note that ColumnManager could be installed atop an already-existing HBase
-    //  installation, so table metadata might not be in repository the first
+    //  installation, so table SchemaEntity might not be in repository the first
     //  time its foreign key is accessed or one of its descendents is modified.
     if (tableForeignKey == null) {
       tableForeignKey = putTable(hbaseAdmin.getTableDescriptor(tableName));
@@ -1244,12 +1244,12 @@ class Repository {
 
 //  boolean columnDefinitionsEnforced(TableName tableName)
 //          throws IOException {
-//    return columnDefinitionsEnforced(EntityType.TABLE.getRecordType(),
+//    return columnDefinitionsEnforced(SchemaEntityType.TABLE.getRecordType(),
 //            getNamespaceForeignKey(tableName.getNamespace()), tableName.getName());
 //  }
   boolean columnDefinitionsEnforced(TableName tableName, byte[] colFamily)
           throws IOException {
-    return columnDefinitionsEnforced(EntityType.COLUMN_FAMILY.getRecordType(),
+    return columnDefinitionsEnforced(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
   }
 
@@ -1274,7 +1274,10 @@ class Repository {
 //
   void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException {
-    setColumnDefinitionsEnforced(enabled, EntityType.COLUMN_FAMILY.getRecordType(),
+    if (!isIncludedTable(tableName)) {
+      return; // should an Exception be thrown?
+    }
+    setColumnDefinitionsEnforced(enabled, SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
   }
 
@@ -1293,7 +1296,7 @@ class Repository {
       return null;
     }
     int position;
-    switch (EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(rowId[0])) {
+    switch (SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(rowId[0])) {
       case NAMESPACE:
         position = 2;
         break;
@@ -1317,7 +1320,7 @@ class Repository {
     if (rowId.length < 2) {
       return null;
     }
-    if (rowId[0] == EntityType.NAMESPACE.getRecordType()) {
+    if (rowId[0] == SchemaEntityType.NAMESPACE.getRecordType()) {
       return NAMESPACE_PARENT_FOREIGN_KEY;
     } else {
       return Bytes.copy(rowId, 1, UNIQUE_FOREIGN_KEY_LENGTH);
@@ -1337,38 +1340,39 @@ class Repository {
     return stringBuilder.toString();
   }
 
-  void purgeNamespaceMetadata(String name) throws IOException {
-    deleteNamespaceMetadata(true, name);
+  void purgeNamespaceShemaEntity(String name) throws IOException {
+    Repository.this.deleteNamespaceSchemaEntity(true, name);
   }
 
-  void deleteNamespaceMetadata(String name) throws IOException {
-    deleteNamespaceMetadata(false, name);
+  void deleteNamespaceSchemaEntity(String name) throws IOException {
+    Repository.this.deleteNamespaceSchemaEntity(false, name);
   }
 
-  private void deleteNamespaceMetadata(boolean purge, String name) throws IOException {
-    deleteEntityMetadata(purge, false, EntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(name));
+  private void deleteNamespaceSchemaEntity(boolean purge, String name) throws IOException {
+    deleteSchemaEntity(purge, false, SchemaEntityType.NAMESPACE.getRecordType(),
+            NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(name));
   }
 
-  void purgeTableMetadata(TableName tableName) throws IOException {
-    deleteTableMetadata(true, false, tableName);
+  void purgeTableSchemaEntity(TableName tableName) throws IOException {
+    Repository.this.deleteTableSchemaEntity(true, false, tableName);
   }
 
-  void truncateTableColumnMetadata(TableName tableName) throws IOException {
-    deleteTableMetadata(false, true, tableName);
+  void truncateTableColumns(TableName tableName) throws IOException {
+    Repository.this.deleteTableSchemaEntity(false, true, tableName);
   }
 
-  void deleteTableMetadata(TableName tableName) throws IOException {
-    deleteTableMetadata(false, false, tableName);
+  void deleteTableSchemaEntity(TableName tableName) throws IOException {
+    Repository.this.deleteTableSchemaEntity(false, false, tableName);
   }
 
-  private void deleteTableMetadata(boolean purge, boolean truncateColumns,
+  private void deleteTableSchemaEntity(boolean purge, boolean truncateColumns,
           TableName tableName) throws IOException {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tableName.getNamespace());
-    deleteEntityMetadata(purge, truncateColumns, EntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
+    deleteSchemaEntity(purge, truncateColumns, SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
   }
 
   void deleteColumnFamily(TableName tableName, byte[] name) throws IOException {
-    deleteEntityMetadata(false, false, EntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(tableName), name);
+    deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(tableName), name);
   }
 
   /**
@@ -1381,7 +1385,7 @@ class Repository {
    */
   void deleteColumnDefinition(TableName tableName, byte[] colFamily, byte[] colQualifier)
           throws IOException {
-    byte[] colFamilyForeignKey = getForeignKey(EntityType.COLUMN_FAMILY.getRecordType(),
+    byte[] colFamilyForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName),
             colFamily);
     if (colFamilyForeignKey == null) {
@@ -1389,17 +1393,17 @@ class Repository {
     }
     // TO DO: before (or as part of) conceptual deletion, reset ColumnDefinition's validation-related attributes
 
-    deleteEntityMetadata(false, false, EntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey, colQualifier);
+    deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey, colQualifier);
   }
 
-  private void deleteEntityMetadata(boolean purge, boolean truncateColumns, byte recordType,
+  private void deleteSchemaEntity(boolean purge, boolean truncateColumns, byte recordType,
           byte[] parentForeignKey, byte[] entityName)
           throws IOException {
     if (parentForeignKey == null) {
       return;
     }
     for (Result row : getRows(true, recordType, parentForeignKey, entityName, null)) {
-      if (!truncateColumns || (truncateColumns && recordType == EntityType.COLUMN_AUDITOR.getRecordType())) {
+      if (!truncateColumns || (truncateColumns && recordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType())) {
         if (purge) {
           repositoryTable.delete(new Delete(row.getRow()));
         } else {
@@ -1412,29 +1416,32 @@ class Repository {
 
       // cascade to child entities
       byte childRecordType;
-      switch (EntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(recordType)) {
+      switch (SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(recordType)) {
         case NAMESPACE:
-          childRecordType = EntityType.TABLE.getRecordType();
+          childRecordType = SchemaEntityType.TABLE.getRecordType();
           break;
         case TABLE:
-          childRecordType = EntityType.COLUMN_FAMILY.getRecordType();
+          childRecordType = SchemaEntityType.COLUMN_FAMILY.getRecordType();
           break;
         case COLUMN_FAMILY:
-          childRecordType = EntityType.COLUMN_AUDITOR.getRecordType();
+          childRecordType = SchemaEntityType.COLUMN_AUDITOR.getRecordType();
           break;
         case COLUMN_AUDITOR: // ColumnAuditors and ColumnDefinitions have no children!!
         case COLUMN_DEFINITION:
         default:
           continue;
       }
-      deleteEntityMetadata(purge, truncateColumns, childRecordType, row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN), null);
-      if (childRecordType == EntityType.COLUMN_AUDITOR.getRecordType()) {
-        deleteEntityMetadata(purge, truncateColumns, EntityType.COLUMN_DEFINITION.getRecordType(), row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN), null);
+      deleteSchemaEntity(purge, truncateColumns, childRecordType,
+              row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN), null);
+      if (childRecordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
+        deleteSchemaEntity(purge, truncateColumns,
+                SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
+                row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN), null);
       }
     }
   }
 
-  void discoverMetadata(TableName tableName, boolean includeColumnQualifiers)
+  void discoverSchema(TableName tableName, boolean includeColumnQualifiers)
           throws IOException {
     if (!isIncludedTable(tableName)) {
       return;
@@ -1445,7 +1452,7 @@ class Repository {
     }
   }
 
-  void discoverMetadata(boolean includeColumnQualifiers) throws IOException {
+  void discoverSchema(boolean includeColumnQualifiers) throws IOException {
     for (NamespaceDescriptor nd : hbaseAdmin.listNamespaceDescriptors()) {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
@@ -1496,66 +1503,65 @@ class Repository {
     }
   }
 
-  void exportMetadata(String sourceNamespace, TableName sourceTableName,
-          String targetPathString, String targetFileNameString, boolean formatted)
+  void exportSchema(String sourceNamespace, TableName sourceTableName,
+          File targetFile, boolean formatted)
           throws IOException, JAXBException {
     String allLiteral = "";
     if ((sourceNamespace == null || sourceNamespace.isEmpty())
             && (sourceTableName == null || sourceTableName.getNameAsString().isEmpty())) {
       allLiteral = "ALL ";
     }
-    logger.info("EXPORT of " + allLiteral + "ColumnManager repository metadata to external XML file has been requested.");
+    logger.info("EXPORT of " + allLiteral
+            + "ColumnManager repository schema to external XML file has been requested.");
     if (sourceNamespace != null && !sourceNamespace.isEmpty()) {
       logger.info("EXPORT source NAMESPACE: " + sourceNamespace);
     }
     if (sourceTableName != null && !sourceTableName.getNameAsString().isEmpty()) {
       logger.info("EXPORT source TABLE: " + sourceTableName.getNameAsString());
     }
-    logger.info("EXPORT target PATH / FILE NAME: " + targetPathString
-            + " / " + targetFileNameString);
+    logger.info("EXPORT target FILE NAME: " + targetFile.getAbsolutePath());
 
-    // Convert each object to MetadataEntity and add to schemaArchiveMgr
+    // Convert each object to SchemaEntity and add to schemaArchiveMgr
     HBaseSchemaArchiveManager schemaArchiveMgr = new HBaseSchemaArchiveManager();
     for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
       if (sourceNamespace != null && !sourceNamespace.equals(Bytes.toString(mnd.getName()))) {
         continue;
       }
-      MetadataEntity namespaceMEntity
-              = schemaArchiveMgr.addMetadataEntity(new MetadataEntity(mnd));
+      SchemaEntity namespaceMEntity
+              = schemaArchiveMgr.addSchemaEntity(new SchemaEntity(mnd));
       for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
         if (sourceTableName != null
                 && !sourceTableName.getNameAsString().equals(mtd.getNameAsString())) {
           continue;
         }
-        MetadataEntity tableMEntity = new MetadataEntity(mtd);
+        SchemaEntity tableMEntity = new SchemaEntity(mtd);
         namespaceMEntity.addChild(tableMEntity);
         for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
-          MetadataEntity colFamilyMEntity = new MetadataEntity(mcd);
+          SchemaEntity colFamilyMEntity = new SchemaEntity(mcd);
           tableMEntity.addChild(colFamilyMEntity);
           for (ColumnAuditor colAuditor : mcd.getColumnAuditors()) {
-            colFamilyMEntity.addChild(new MetadataEntity(colAuditor));
+            colFamilyMEntity.addChild(new SchemaEntity(colAuditor));
           }
           for (ColumnDefinition colDef : mcd.getColumnDefinitions()) {
-            colFamilyMEntity.addChild(new MetadataEntity(colDef));
+            colFamilyMEntity.addChild(new SchemaEntity(colDef));
           }
         }
       }
     }
-    schemaArchiveMgr.exportToXmlFile(targetPathString, targetFileNameString, formatted);
-    logger.info("EXPORT of ColumnManager repository metadata has been completed.");
+    schemaArchiveMgr.exportToXmlFile(targetFile, formatted);
+    logger.info("EXPORT of ColumnManager repository schema has been completed.");
   }
 
   Set<Object> deserializeHBaseSchemaArchive(boolean includeColumnAuditors,
-          String namespace, TableName tableName,
-          String sourcePathString, String sourceFileNameString)
+          String namespace, TableName tableName, File sourceFile)
           throws JAXBException {
 
     HBaseSchemaArchiveManager schemaArchiveMgr
-            = HBaseSchemaArchiveManager.deserializeXmlFile(sourcePathString, sourceFileNameString);
-    Set<MetadataEntity> deserializedObjects = schemaArchiveMgr.getMetadataEntities();
+            = HBaseSchemaArchiveManager.deserializeXmlFile(sourceFile);
+    Set<SchemaEntity> deserializedObjects = schemaArchiveMgr.getSchemaEntities();
     Set<Object> returnedObjects = new LinkedHashSet<>();
-    for (MetadataEntity mEntity : deserializedObjects) {
-      returnedObjects.addAll(convertMetadataEntityToDescriptorSet(mEntity, includeColumnAuditors, namespace, tableName));
+    for (SchemaEntity mEntity : deserializedObjects) {
+      returnedObjects.addAll(convertSchemaEntityToDescriptorSet(mEntity, includeColumnAuditors, namespace, tableName));
     }
     return returnedObjects;
   }
@@ -1563,46 +1569,48 @@ class Repository {
   /**
    * Used exclusively in the deserialization of an HBaseSchemaArchive
    */
-  private Set<Object> convertMetadataEntityToDescriptorSet(MetadataEntity mEntity,
-          boolean includeColumnAuditors,
+  private Set<Object> convertSchemaEntityToDescriptorSet(
+          SchemaEntity mEntity, boolean includeColumnAuditors,
           String namespace, TableName tableName) {
     Set<Object> convertedObjects = new LinkedHashSet<>();
-    if (mEntity.getEntityRecordType() == EntityType.NAMESPACE.getRecordType()) {
+    if (mEntity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
       if (namespace != null && !namespace.equals(mEntity.getNameAsString())) {
         return convertedObjects; // empty set
       }
       convertedObjects.add(new MNamespaceDescriptor(mEntity));
-      for (MetadataEntity childMEntity : mEntity.getChildren()) {
-        convertedObjects.addAll(convertMetadataEntityToDescriptorSet(childMEntity, includeColumnAuditors, namespace, tableName));
+      for (SchemaEntity childMEntity : mEntity.getChildren()) {
+        convertedObjects.addAll(convertSchemaEntityToDescriptorSet(
+                childMEntity, includeColumnAuditors, namespace, tableName));
       }
-    } else if (mEntity.getEntityRecordType() == EntityType.TABLE.getRecordType()) {
+    } else if (mEntity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
       if (tableName != null && !tableName.getNameAsString().equals(mEntity.getNameAsString())) {
         return convertedObjects; // empty set
       }
       MTableDescriptor mtd = new MTableDescriptor(mEntity);
       if (mEntity.getChildren() != null) {
-        for (MetadataEntity childMEntity : mEntity.getChildren()) {
-          if (childMEntity.getEntityRecordType() != EntityType.COLUMN_FAMILY.getRecordType()) {
+        for (SchemaEntity childMEntity : mEntity.getChildren()) {
+          if (childMEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
             continue;
           }
           Set<Object> returnedMcdSet
-                  = convertMetadataEntityToDescriptorSet(childMEntity, includeColumnAuditors, namespace, tableName);
+                  = convertSchemaEntityToDescriptorSet(
+                          childMEntity, includeColumnAuditors, namespace, tableName);
           for (Object returnedMcd : returnedMcdSet) {
             mtd.addFamily((MColumnDescriptor) returnedMcd);
           }
         }
       }
       convertedObjects.add(mtd);
-    } else if (mEntity.getEntityRecordType() == EntityType.COLUMN_FAMILY.getRecordType()) {
+    } else if (mEntity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
       MColumnDescriptor mcd = new MColumnDescriptor(mEntity);
       if (mEntity.getChildren() != null) {
-        for (MetadataEntity childMEntity : mEntity.getChildren()) {
-          if (childMEntity.getEntityRecordType() == EntityType.COLUMN_AUDITOR.getRecordType()) {
+        for (SchemaEntity childMEntity : mEntity.getChildren()) {
+          if (childMEntity.getEntityRecordType() == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
             if (includeColumnAuditors) {
               mcd.addColumnAuditor(new ColumnAuditor(childMEntity));
             }
           } else if (childMEntity.getEntityRecordType()
-                  == EntityType.COLUMN_DEFINITION.getRecordType()) {
+                  == SchemaEntityType.COLUMN_DEFINITION.getRecordType()) {
             mcd.addColumnDefinition(new ColumnDefinition(childMEntity));
           }
         }
@@ -1612,31 +1620,31 @@ class Repository {
     return convertedObjects;
   }
 
-  String getHBaseSchemaArchiveSummary(String sourcePathString, String sourceFileNameString)
+  String getHBaseSchemaArchiveSummary(File sourceFile)
           throws JAXBException {
     HBaseSchemaArchiveManager schemaArchiveMgr
-            = HBaseSchemaArchiveManager.deserializeXmlFile(sourcePathString, sourceFileNameString);
+            = HBaseSchemaArchiveManager.deserializeXmlFile(sourceFile);
     StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append("SUMMARY OF external HBase Metadata Archive file*\n")
-            .append(BLANKS, 0, TAB).append("FILE PATH: ").append(sourcePathString).append("\n")
-            .append(BLANKS, 0, TAB).append("FILE NAME: ").append(sourceFileNameString).append("\n")
+    stringBuilder.append("SUMMARY OF external HBase Schema Archive file*\n")
+            .append(BLANKS, 0, TAB).append("SOURCE FILE: ")
+            .append(sourceFile.getAbsolutePath()).append("\n")
             .append(BLANKS, 0, TAB).append("FILE TIMESTAMP: ")
             .append(schemaArchiveMgr.getArchiveFileTimestampString()).append("\n")
             .append(BLANKS, 0, TAB).append("FILE CONTENTS:\n");
-    for (MetadataEntity mEntity : schemaArchiveMgr.getMetadataEntities()) {
-      stringBuilder.append(appendMetadataEntityDescription(mEntity, TAB + TAB));
+    for (SchemaEntity mEntity : schemaArchiveMgr.getSchemaEntities()) {
+      stringBuilder.append(appendSchemaEntityDescription(mEntity, TAB + TAB));
     }
     stringBuilder.append("\n").append(BLANKS, 0, TAB).append("*To examine the XML-formatted"
-            + " HBase Metadata Archive file in detail, simply open it in a browser or XML editor.");
+            + " HBase Schema Archive file in detail, simply open it in a browser or XML editor.");
     return stringBuilder.toString();
   }
 
-  private StringBuilder appendMetadataEntityDescription(MetadataEntity mEntity, int indentSpaces) {
+  private StringBuilder appendSchemaEntityDescription(SchemaEntity mEntity, int indentSpaces) {
     StringBuilder stringBuilder = new StringBuilder();
     stringBuilder.append(BLANKS, 0, indentSpaces).append(mEntity).append("\n");
     if (mEntity.getChildren() != null) {
-      for (MetadataEntity childMEntity : mEntity.getChildren()) {
-        stringBuilder.append(appendMetadataEntityDescription(childMEntity, indentSpaces + TAB));
+      for (SchemaEntity childMEntity : mEntity.getChildren()) {
+        stringBuilder.append(appendSchemaEntityDescription(childMEntity, indentSpaces + TAB));
       }
     }
     return stringBuilder;
