@@ -3,16 +3,16 @@
 
   <xs:element name="hbaseSchemaArchive" type="hBaseSchemaArchive"/>
 
-  <xs:element name="hbaseSchemaObject" type="metadataEntity"/>
+  <xs:element name="hbaseSchemaEntity" type="schemaEntity"/>
 
   <xs:complexType name="hBaseSchemaArchive">
     <xs:sequence>
-      <xs:element name="hBaseSchemaObject" type="metadataEntity" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="hBaseSchemaEntity" type="schemaEntity" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="fileTimestamp" type="xs:string"/>
   </xs:complexType>
 
-  <xs:complexType name="metadataEntity">
+  <xs:complexType name="schemaEntity">
     <xs:sequence>
       <xs:element name="values">
         <xs:complexType>
@@ -45,12 +45,12 @@
       <xs:element name="children" minOccurs="0">
         <xs:complexType>
           <xs:sequence>
-            <xs:element ref="hbaseSchemaObject" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element ref="hbaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
           </xs:sequence>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
-    <xs:attribute name="entityType" type="xs:string"/>
+    <xs:attribute name="schemaEntityType" type="xs:string"/>
     <xs:attribute name="name" type="xs:string"/>
     <xs:attribute name="columnDefinitionsEnforced" type="xs:string"/>
   </xs:complexType>
