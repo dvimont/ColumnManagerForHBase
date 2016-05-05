@@ -78,7 +78,7 @@ class Repository {
   private final Set<String> excludedEntireNamespaces;
   private final Set<TableName> excludedTables;
   private final Connection hbaseConnection;
-  private final Admin hbaseAdmin;
+  private final Admin standardAdmin;
   private final Table repositoryTable;
 
   static final String PRODUCT_NAME = "ColumnManagerAPI";
@@ -141,7 +141,7 @@ class Repository {
     javaUsername
             = Bytes.toBytes(System.getProperty(Bytes.toString(JAVA_USERNAME_PROPERTY_KEY)));
     this.hbaseConnection = hBaseConnection;
-    this.hbaseAdmin = getNewAdmin(this.hbaseConnection);
+    this.standardAdmin = getNewAdmin(this.hbaseConnection);
     Configuration conf = hbaseConnection.getConfiguration();
     // Configuration.dumpConfiguration(conf, new PrintWriter(System.out));
     String columnManagerActivatedStatus
@@ -240,8 +240,8 @@ class Repository {
   }
 
   private Table getRepositoryTable() throws IOException {
-    createRepositoryNamespace(hbaseAdmin);
-    return createRepositoryTable(hbaseAdmin);
+    createRepositoryNamespace(standardAdmin);
+    return createRepositoryTable(standardAdmin);
   }
 
   /**
@@ -339,7 +339,7 @@ class Repository {
   }
 
   Admin getAdmin() {
-    return this.hbaseAdmin;
+    return this.standardAdmin;
   }
 
   private static Admin getNewAdmin(Connection hbaseConnection) throws IOException {
@@ -356,6 +356,12 @@ class Repository {
       return false;
     }
     return true;
+  }
+
+  private static boolean namespaceExists(Admin hbaseAdmin, byte[] namespace)
+          throws IOException {
+    return namespaceExists(hbaseAdmin,
+            NamespaceDescriptor.create(Bytes.toString(namespace)).build());
   }
 
   private boolean isIncludedNamespace(String namespaceName) {
@@ -431,16 +437,12 @@ class Repository {
     byte[] namespaceForeignKey
             = getNamespaceForeignKey(htd.getTableName().getNamespace());
     byte[] tableRowId
-            = buildRowId(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, htd.getTableName().getName());
+            = buildRowId(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey,
+                    htd.getTableName().getName());
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(htd.getValues(), htd.getConfiguration());
     byte[] tableForeignKey
             = putSchemaEntityChanges(tableRowId, entityAttributeMap, false);
-//        if (MTableDescriptor.class.isAssignableFrom(htd.getClass())) {
-//            setColumnDefinitionsEnforced
-//                (((MTableDescriptor)htd).columnDefinitionsEnforced(),
-//                        TABLE_RECORD_TYPE, namespaceForeignKey, htd.getTableName().getName());
-//        }
 
     // Account for potentially deleted ColumnFamilies
     Set<byte[]> oldMcdNames = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
@@ -470,7 +472,7 @@ class Repository {
     // Note that ColumnManager can be installed atop an already-existing HBase
     //  installation, so table metadata might not yet have been captured in repository.
     if (tableForeignKey == null) {
-      tableForeignKey = putTable(hbaseAdmin.getTableDescriptor(tn));
+      tableForeignKey = putTable(standardAdmin.getTableDescriptor(tn));
     }
     return putColumnFamily(tableForeignKey, hcd, tn);
   }
@@ -928,9 +930,9 @@ class Repository {
       // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so namespace SchemaEntity might not yet have been captured in repository,
       //  or namespaceName may not represent active namespace (and so not stored in repository).
-      //return new MNamespaceDescriptor(hbaseAdmin.getNamespaceDescriptor(namespaceName));
+      //return new MNamespaceDescriptor(standardAdmin.getNamespaceDescriptor(namespaceName));
       if (isIncludedNamespace(namespaceName)) {
-        putNamespace(hbaseAdmin.getNamespaceDescriptor(namespaceName));
+        putNamespace(standardAdmin.getNamespaceDescriptor(namespaceName));
         row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
       } else {
         return null;
@@ -956,7 +958,7 @@ class Repository {
       //  installation, so table SchemaEntity might not yet have been captured in repository,
       //  or TableName may not represent included Table (and so not stored in repository).
       if (isIncludedTable(tn)) {
-        putTable(hbaseAdmin.getTableDescriptor(tn));
+        putTable(standardAdmin.getTableDescriptor(tn));
         row = getActiveRow(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
       } else {
         return null;
@@ -996,7 +998,8 @@ class Repository {
   Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
     byte[] colFamilyForeignKey
-            = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
+            = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+                    getTableForeignKey(htd), hcd.getName());
     return (colFamilyForeignKey == null) ? null : getColumnAuditors(colFamilyForeignKey);
   }
 
@@ -1189,13 +1192,16 @@ class Repository {
 
   private byte[] getNamespaceForeignKey(byte[] namespace) throws IOException {
     byte[] namespaceForeignKey
-            = getForeignKey(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
-                    namespace);
+            = getForeignKey(SchemaEntityType.NAMESPACE.getRecordType(),
+                    NAMESPACE_PARENT_FOREIGN_KEY, namespace);
     // Note that ColumnManager could be installed atop an already-existing HBase
     //  installation, so namespace SchemaEntity might not be in repository the first
     //  time its foreign key is accessed or one of its descendents is modified.
     if (namespaceForeignKey == null) {
-      namespaceForeignKey = putNamespace(hbaseAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
+      if (namespaceExists(standardAdmin, namespace)) {
+        namespaceForeignKey
+                = putNamespace(standardAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
+      }
     }
     return namespaceForeignKey;
   }
@@ -1207,7 +1213,7 @@ class Repository {
    * @return Table's foreign key value
    * @throws IOException if a remote or network exception occurs
    */
-  byte[] getTableForeignKey(TableName tableName) throws IOException {
+  private byte[] getTableForeignKey(TableName tableName) throws IOException {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tableName.getNamespace());
     byte[] tableForeignKey
             = getForeignKey(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
@@ -1215,7 +1221,9 @@ class Repository {
     //  installation, so table SchemaEntity might not be in repository the first
     //  time its foreign key is accessed or one of its descendents is modified.
     if (tableForeignKey == null) {
-      tableForeignKey = putTable(hbaseAdmin.getTableDescriptor(tableName));
+      if (standardAdmin.tableExists(tableName)) {
+        tableForeignKey = putTable(standardAdmin.getTableDescriptor(tableName));
+      }
     }
     return tableForeignKey;
   }
@@ -1227,7 +1235,7 @@ class Repository {
    * @return Table's foreign key value
    * @throws IOException if a remote or network exception occurs
    */
-  byte[] getTableForeignKey(Table table) throws IOException {
+  private byte[] getTableForeignKey(Table table) throws IOException {
     return getTableForeignKey(table.getName());
   }
 
@@ -1242,11 +1250,6 @@ class Repository {
     return getTableForeignKey(htd.getTableName());
   }
 
-//  boolean columnDefinitionsEnforced(TableName tableName)
-//          throws IOException {
-//    return columnDefinitionsEnforced(SchemaEntityType.TABLE.getRecordType(),
-//            getNamespaceForeignKey(tableName.getNamespace()), tableName.getName());
-//  }
   boolean columnDefinitionsEnforced(TableName tableName, byte[] colFamily)
           throws IOException {
     return columnDefinitionsEnforced(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
@@ -1446,19 +1449,19 @@ class Repository {
     if (!isIncludedTable(tableName)) {
       return;
     }
-    putTable(hbaseAdmin.getTableDescriptor(tableName));
+    putTable(standardAdmin.getTableDescriptor(tableName));
     if (includeColumnQualifiers) {
       discoverColumnMetadata(tableName);
     }
   }
 
   void discoverSchema(boolean includeColumnQualifiers) throws IOException {
-    for (NamespaceDescriptor nd : hbaseAdmin.listNamespaceDescriptors()) {
+    for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
       }
       putNamespace(nd);
-      for (HTableDescriptor htd : hbaseAdmin.listTableDescriptorsByNamespace(nd.getName())) {
+      for (HTableDescriptor htd : standardAdmin.listTableDescriptorsByNamespace(nd.getName())) {
         if (!isIncludedTable(htd.getTableName())) {
           continue;
         }

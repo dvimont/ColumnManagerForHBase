@@ -734,11 +734,18 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false);
     loadColumnData(configuration, false);
 
-    try (RepositoryAdmin repositoryAdmin = new RepositoryAdmin(
-            MConnectionFactory.createConnection(configuration))) {
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
       repositoryAdmin.exportRepository(exportFile, true);
     }
     clearTestingEnvironment();
+
+    // NOW restore schema from external HSA file
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      repositoryAdmin.importSchema(true, exportFile);
+    }
+    verifyColumnAuditing(configuration);
   }
 
   public static void main(String[] args) throws Exception {
