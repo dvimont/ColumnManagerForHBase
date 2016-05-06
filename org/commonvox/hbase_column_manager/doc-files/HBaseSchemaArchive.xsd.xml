@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <xs:schema version="1.0" xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-  <xs:element name="hbaseSchemaArchive" type="hBaseSchemaArchive"/>
+  <xs:element name="hBaseSchemaArchive" type="hBaseSchemaArchive"/>
 
-  <xs:element name="hbaseSchemaEntity" type="schemaEntity"/>
+  <xs:element name="hBaseSchemaEntity" type="schemaEntity"/>
 
   <xs:complexType name="hBaseSchemaArchive">
     <xs:sequence>
-      <xs:element name="hBaseSchemaEntity" type="schemaEntity" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element ref="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="fileTimestamp" type="xs:string"/>
   </xs:complexType>
@@ -45,7 +45,7 @@
       <xs:element name="children" minOccurs="0">
         <xs:complexType>
           <xs:sequence>
-            <xs:element ref="hbaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element ref="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
           </xs:sequence>
         </xs:complexType>
       </xs:element>
