@@ -35,12 +35,14 @@ class XmlSchemaGenerator {
   static final String DEFAULT_OUTPUT_FILE_NAME = "HBaseSchemaArchive.xsd.xml";
   static final String DEFAULT_JAVADOCS_OUTPUT_PATH
           = "src/main/java/org/commonvox/hbase_column_manager/doc-files/";
+  static final String DEFAULT_TEST_RESOURCE_OUTPUT_PATH = "src/test/resources";
   static File outputDirectory;
   final String outputFile;
 
   public static void main(String[] args) throws Exception {
     if (args == null || args.length == 0) {
       outputToFile(DEFAULT_JAVADOCS_OUTPUT_PATH);
+      outputToFile(DEFAULT_TEST_RESOURCE_OUTPUT_PATH);
     } else {
       outputToFile(args[0]);
     }

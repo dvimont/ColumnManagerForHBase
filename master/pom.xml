@@ -45,7 +45,24 @@
          <version>1.4.0</version>
          <executions>
           <execution>
-              <id>generate-xml-schema-for-docFiles</id>
+           <id>generate-xml-schema-for-testResources</id>
+           <phase>generate-test-resources</phase>
+           <goals>
+             <goal>java</goal>
+           </goals>
+           <configuration>
+             <!-- XmlSchemaGenerator outputs XSD file to testResourcesDirectory -->
+             <mainClass>org.commonvox.hbase_column_manager.XmlSchemaGenerator</mainClass>
+             <arguments>
+                 <!-- NOTE: When standalone 'mvn install' is done, the docFilesDirectory
+                      parameter should be overridden as follows:
+                mvn clean install -DdocFilesDirectory=src/main/java/org/commonvox/hbase_column_manager/doc-files/                 -->
+                <argument>${testResourcesDirectory}</argument>
+             </arguments>
+           </configuration>
+          </execution>
+          <execution>
+           <id>generate-xml-schema-for-docFiles</id>
            <phase>prepare-package</phase>
            <goals>
              <goal>java</goal>

@@ -866,9 +866,9 @@ class Repository {
       newRow.addColumn(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN, foreignKey);
       newRow.addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
     } else {
-      SchemaEntity mEntity = deserializeSchemaEntity(oldRow);
+      SchemaEntity entity = deserializeSchemaEntity(oldRow);
       oldEntityAttributeMap
-              = buildEntityAttributeMap(mEntity.getValues(), mEntity.getConfiguration());
+              = buildEntityAttributeMap(entity.getValues(), entity.getConfiguration());
       foreignKey = oldRow.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN);
       if (!Bytes.equals(oldRow.getValue(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN), ACTIVE_STATUS)) {
         newRow.addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
@@ -1048,27 +1048,27 @@ class Repository {
       return null;
     }
     byte[] rowId = row.getRow();
-    SchemaEntity mEntity
+    SchemaEntity entity
             = new SchemaEntity(rowId[0], extractNameFromRowId(rowId));
     for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_COLFAMILY).entrySet()) {
       byte[] key = colEntry.getKey();
       byte[] value = colEntry.getValue();
       if (Bytes.equals(key, FOREIGN_KEY_COLUMN)) {
-        mEntity.setForeignKey(colEntry.getValue());
+        entity.setForeignKey(colEntry.getValue());
       } else if (Bytes.equals(key, COL_DEFINITIONS_ENFORCED_COLUMN)) {
-        mEntity.setColumnDefinitionsEnforced(Bytes.toBoolean(colEntry.getValue()));
+        entity.setColumnDefinitionsEnforced(Bytes.toBoolean(colEntry.getValue()));
       } else if (key.length > VALUE_COLUMN_PREFIX_BYTES.length
               && Bytes.startsWith(key, VALUE_COLUMN_PREFIX_BYTES)) {
-        mEntity.setValue(Bytes.tail(key, key.length - VALUE_COLUMN_PREFIX_BYTES.length),
+        entity.setValue(Bytes.tail(key, key.length - VALUE_COLUMN_PREFIX_BYTES.length),
                 value);
       } else if (key.length > CONFIG_COLUMN_PREFIX_BYTES.length
               && Bytes.startsWith(key, CONFIG_COLUMN_PREFIX_BYTES)) {
-        mEntity.setConfiguration(
+        entity.setConfiguration(
                 Bytes.toString(Bytes.tail(key, key.length - CONFIG_COLUMN_PREFIX_BYTES.length)),
                 Bytes.toString(colEntry.getValue()));
       }
     }
-    return mEntity;
+    return entity;
   }
 
   private static byte[] buildRowId(byte recordType, byte[] parentForeignKey,
@@ -1524,34 +1524,33 @@ class Repository {
     }
     logger.info("EXPORT target FILE NAME: " + targetFile.getAbsolutePath());
 
-    // Convert each object to SchemaEntity and add to schemaArchiveMgr
-    HBaseSchemaArchiveManager schemaArchiveMgr = new HBaseSchemaArchiveManager();
+    // Convert each object to SchemaEntity and add to schemaArchive
+    HBaseSchemaArchive schemaArchive = new HBaseSchemaArchive();
     for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
       if (sourceNamespace != null && !sourceNamespace.equals(Bytes.toString(mnd.getName()))) {
         continue;
       }
-      SchemaEntity namespaceMEntity
-              = schemaArchiveMgr.addSchemaEntity(new SchemaEntity(mnd));
+      SchemaEntity namespaceEntity = schemaArchive.addSchemaEntity(new SchemaEntity(mnd));
       for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
         if (sourceTableName != null
                 && !sourceTableName.getNameAsString().equals(mtd.getNameAsString())) {
           continue;
         }
-        SchemaEntity tableMEntity = new SchemaEntity(mtd);
-        namespaceMEntity.addChild(tableMEntity);
+        SchemaEntity tableEntity = new SchemaEntity(mtd);
+        namespaceEntity.addChild(tableEntity);
         for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
-          SchemaEntity colFamilyMEntity = new SchemaEntity(mcd);
-          tableMEntity.addChild(colFamilyMEntity);
+          SchemaEntity colFamilyEntity = new SchemaEntity(mcd);
+          tableEntity.addChild(colFamilyEntity);
           for (ColumnAuditor colAuditor : mcd.getColumnAuditors()) {
-            colFamilyMEntity.addChild(new SchemaEntity(colAuditor));
+            colFamilyEntity.addChild(new SchemaEntity(colAuditor));
           }
           for (ColumnDefinition colDef : mcd.getColumnDefinitions()) {
-            colFamilyMEntity.addChild(new SchemaEntity(colDef));
+            colFamilyEntity.addChild(new SchemaEntity(colDef));
           }
         }
       }
     }
-    schemaArchiveMgr.exportToXmlFile(targetFile, formatted);
+    HBaseSchemaArchive.exportToXmlFile(schemaArchive, targetFile, formatted);
     logger.info("EXPORT of ColumnManager repository schema has been completed.");
   }
 
@@ -1559,12 +1558,12 @@ class Repository {
           String namespace, TableName tableName, File sourceFile)
           throws JAXBException {
 
-    HBaseSchemaArchiveManager schemaArchiveMgr
-            = HBaseSchemaArchiveManager.deserializeXmlFile(sourceFile);
-    Set<SchemaEntity> deserializedObjects = schemaArchiveMgr.getSchemaEntities();
+    Set<SchemaEntity> deserializedObjects
+            = HBaseSchemaArchive.deserializeXmlFile(sourceFile).getSchemaEntities();
     Set<Object> returnedObjects = new LinkedHashSet<>();
-    for (SchemaEntity mEntity : deserializedObjects) {
-      returnedObjects.addAll(convertSchemaEntityToDescriptorSet(mEntity, includeColumnAuditors, namespace, tableName));
+    for (SchemaEntity entity : deserializedObjects) {
+      returnedObjects.addAll(convertSchemaEntityToDescriptorSet(
+              entity, includeColumnAuditors, namespace, tableName));
     }
     return returnedObjects;
   }
@@ -1573,48 +1572,47 @@ class Repository {
    * Used exclusively in the deserialization of an HBaseSchemaArchive
    */
   private Set<Object> convertSchemaEntityToDescriptorSet(
-          SchemaEntity mEntity, boolean includeColumnAuditors,
+          SchemaEntity entity, boolean includeColumnAuditors,
           String namespace, TableName tableName) {
     Set<Object> convertedObjects = new LinkedHashSet<>();
-    if (mEntity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
-      if (namespace != null && !namespace.equals(mEntity.getNameAsString())) {
+    if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
+      if (namespace != null && !namespace.equals(entity.getNameAsString())) {
         return convertedObjects; // empty set
       }
-      convertedObjects.add(new MNamespaceDescriptor(mEntity));
-      for (SchemaEntity childMEntity : mEntity.getChildren()) {
+      convertedObjects.add(new MNamespaceDescriptor(entity));
+      for (SchemaEntity childEntity : entity.getChildren()) {
         convertedObjects.addAll(convertSchemaEntityToDescriptorSet(
-                childMEntity, includeColumnAuditors, namespace, tableName));
+                childEntity, includeColumnAuditors, namespace, tableName));
       }
-    } else if (mEntity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
-      if (tableName != null && !tableName.getNameAsString().equals(mEntity.getNameAsString())) {
+    } else if (entity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
+      if (tableName != null && !tableName.getNameAsString().equals(entity.getNameAsString())) {
         return convertedObjects; // empty set
       }
-      MTableDescriptor mtd = new MTableDescriptor(mEntity);
-      if (mEntity.getChildren() != null) {
-        for (SchemaEntity childMEntity : mEntity.getChildren()) {
-          if (childMEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+      MTableDescriptor mtd = new MTableDescriptor(entity);
+      if (entity.getChildren() != null) {
+        for (SchemaEntity childEntity : entity.getChildren()) {
+          if (childEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
             continue;
           }
           Set<Object> returnedMcdSet
-                  = convertSchemaEntityToDescriptorSet(
-                          childMEntity, includeColumnAuditors, namespace, tableName);
+                  = convertSchemaEntityToDescriptorSet(childEntity, includeColumnAuditors, namespace, tableName);
           for (Object returnedMcd : returnedMcdSet) {
             mtd.addFamily((MColumnDescriptor) returnedMcd);
           }
         }
       }
       convertedObjects.add(mtd);
-    } else if (mEntity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
-      MColumnDescriptor mcd = new MColumnDescriptor(mEntity);
-      if (mEntity.getChildren() != null) {
-        for (SchemaEntity childMEntity : mEntity.getChildren()) {
-          if (childMEntity.getEntityRecordType() == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
+    } else if (entity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+      MColumnDescriptor mcd = new MColumnDescriptor(entity);
+      if (entity.getChildren() != null) {
+        for (SchemaEntity childEntity : entity.getChildren()) {
+          if (childEntity.getEntityRecordType() == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
             if (includeColumnAuditors) {
-              mcd.addColumnAuditor(new ColumnAuditor(childMEntity));
+              mcd.addColumnAuditor(new ColumnAuditor(childEntity));
             }
-          } else if (childMEntity.getEntityRecordType()
+          } else if (childEntity.getEntityRecordType()
                   == SchemaEntityType.COLUMN_DEFINITION.getRecordType()) {
-            mcd.addColumnDefinition(new ColumnDefinition(childMEntity));
+            mcd.addColumnDefinition(new ColumnDefinition(childEntity));
           }
         }
       }
@@ -1625,29 +1623,28 @@ class Repository {
 
   String getHBaseSchemaArchiveSummary(File sourceFile)
           throws JAXBException {
-    HBaseSchemaArchiveManager schemaArchiveMgr
-            = HBaseSchemaArchiveManager.deserializeXmlFile(sourceFile);
+    HBaseSchemaArchive schemaArchive = HBaseSchemaArchive.deserializeXmlFile(sourceFile);
     StringBuilder stringBuilder = new StringBuilder();
     stringBuilder.append("SUMMARY OF external HBase Schema Archive file*\n")
             .append(BLANKS, 0, TAB).append("SOURCE FILE: ")
             .append(sourceFile.getAbsolutePath()).append("\n")
             .append(BLANKS, 0, TAB).append("FILE TIMESTAMP: ")
-            .append(schemaArchiveMgr.getArchiveFileTimestampString()).append("\n")
+            .append(schemaArchive.getArchiveFileTimestampString()).append("\n")
             .append(BLANKS, 0, TAB).append("FILE CONTENTS:\n");
-    for (SchemaEntity mEntity : schemaArchiveMgr.getSchemaEntities()) {
-      stringBuilder.append(appendSchemaEntityDescription(mEntity, TAB + TAB));
+    for (SchemaEntity entity : schemaArchive.getSchemaEntities()) {
+      stringBuilder.append(appendSchemaEntityDescription(entity, TAB + TAB));
     }
     stringBuilder.append("\n").append(BLANKS, 0, TAB).append("*To examine the XML-formatted"
             + " HBase Schema Archive file in detail, simply open it in a browser or XML editor.");
     return stringBuilder.toString();
   }
 
-  private StringBuilder appendSchemaEntityDescription(SchemaEntity mEntity, int indentSpaces) {
+  private StringBuilder appendSchemaEntityDescription(SchemaEntity entity, int indentSpaces) {
     StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(BLANKS, 0, indentSpaces).append(mEntity).append("\n");
-    if (mEntity.getChildren() != null) {
-      for (SchemaEntity childMEntity : mEntity.getChildren()) {
-        stringBuilder.append(appendSchemaEntityDescription(childMEntity, indentSpaces + TAB));
+    stringBuilder.append(BLANKS, 0, indentSpaces).append(entity).append("\n");
+    if (entity.getChildren() != null) {
+      for (SchemaEntity childEntity : entity.getChildren()) {
+        stringBuilder.append(appendSchemaEntityDescription(childEntity, indentSpaces + TAB));
       }
     }
     return stringBuilder;

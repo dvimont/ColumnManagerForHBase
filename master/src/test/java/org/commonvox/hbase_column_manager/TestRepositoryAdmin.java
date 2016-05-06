@@ -17,6 +17,8 @@ package org.commonvox.hbase_column_manager;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +26,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBException;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -44,6 +52,8 @@ import static org.junit.Assert.fail;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
 
 /**
  * Running of these methods requires that an up-and-running instance of HBase be accessible. (The
@@ -171,6 +181,8 @@ public class TestRepositoryAdmin {
   }
   private static final String ALTERNATE_USERNAME = "testAlternateUserName";
 
+  private static final String TEST_ENVIRONMENT_SETUP_PROBLEM
+          = "TEST ENVIRONMENT SETUP PROBLEM!! ==>> ";
   private static final String REPOSITORY_ADMIN_FAILURE
           = "FAILURE IN " + RepositoryAdmin.class.getSimpleName() + " PROCESSING!! ==>> ";
   private static final String COLUMN_AUDIT_FAILURE = "FAILURE IN Column Audit PROCESSING!! ==>> ";
@@ -186,6 +198,8 @@ public class TestRepositoryAdmin {
           = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Length";
   private static final String COL_VALUE_ENFORCE_FAILURE
           = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Value (regex)";
+  private static final String HSA_FAILURE = "FAILURE IN HBase Schema Archive PROCESSING!! ==>> ";
+
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
   private Map<TableName, HTableDescriptor> testTableNamesAndDescriptors;
@@ -705,6 +719,7 @@ public class TestRepositoryAdmin {
                   addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
           fail(COL_VALUE_ENFORCE_FAILURE);
         } catch (InvalidColumnValueException e) {
+          // this Exception SHOULD be thrown!
         }
         // put same row to unenforced namespace/table
         table03InNamespace02.put(new Put(ROW_ID_01).
@@ -718,34 +733,111 @@ public class TestRepositoryAdmin {
 
   @Test
   public void testExportImport() throws IOException, JAXBException {
-    File exportFile;
+    // file setup
+    final String TARGET_DIRECTORY = "target/";
+    final String TARGET_EXPORT_ALL_FILE = "temp.export.repository.hsa.xml";
+    final String TARGET_EXPORT_NAMESPACE_FILE = "temp.export.namespace.hsa.xml";
+    final String TARGET_EXPORT_TABLE_FILE = "temp.export.table.hsa.xml";
+    File exportAllFile;
+    File exportNamespaceFile;
+    File exportTableFile;
     try {
-      exportFile = tempTestFolder.newFile("temp.export.hsa.xml");
+      exportAllFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_FILE);
+      exportNamespaceFile = tempTestFolder.newFile(TARGET_EXPORT_NAMESPACE_FILE);
+      exportTableFile = tempTestFolder.newFile(TARGET_EXPORT_TABLE_FILE);
     } catch (IllegalStateException e) {
-      exportFile = new File("target/temp.export.hsa.xml");
+      exportAllFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_FILE);
+      exportNamespaceFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_NAMESPACE_FILE);
+      exportTableFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_TABLE_FILE);
     }
-    System.out.println("Exporting to: " + exportFile.getAbsolutePath());
-
+    // environment cleanup before testing
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
 
+    // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
     createSchemaStructuresInHBase(configuration, false);
     loadColumnData(configuration, false);
 
+    // extract schema into external HBase Schema Archive files
     try (RepositoryAdmin repositoryAdmin
             = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
-      repositoryAdmin.exportRepository(exportFile, true);
+      repositoryAdmin.exportRepository(exportAllFile, true);
+      repositoryAdmin.exportNamespaceSchema(
+              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX), exportNamespaceFile, true);
+      repositoryAdmin.exportTableSchema(NAMESPACE01_TABLE01, exportTableFile, true);
     }
     clearTestingEnvironment();
 
-    // NOW restore schema from external HSA file
+    // NOW restore full schema from external HSA file and verify that all structures restored
     try (RepositoryAdmin repositoryAdmin
             = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
-      repositoryAdmin.importSchema(true, exportFile);
+      repositoryAdmin.importSchema(true, exportAllFile);
     }
     verifyColumnAuditing(configuration);
+
+    validateXmlAgainstXsd(exportAllFile);
+    validateXmlAgainstXsd(exportNamespaceFile);
+    validateXmlAgainstXsd(exportTableFile);
+
+    // assure appropriate content in Namespace and Table archive files!!
+    HBaseSchemaArchive repositoryArchive = HBaseSchemaArchive.deserializeXmlFile(exportAllFile);
+    HBaseSchemaArchive namespaceArchive
+            = HBaseSchemaArchive.deserializeXmlFile(exportNamespaceFile);
+    HBaseSchemaArchive tableArchive = HBaseSchemaArchive.deserializeXmlFile(exportTableFile);
+    for (SchemaEntity entity : repositoryArchive.getSchemaEntities()) {
+      if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()
+              && entity.getNameAsString().equals(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX))) {
+        assertEquals(HSA_FAILURE + "Namespace SchemaEntity inconsistencies between full archive "
+                + "and namespace-only archive.",
+                entity, namespaceArchive.getSchemaEntities().iterator().next());
+        for (SchemaEntity childEntity : entity.getChildren()) {
+          if (childEntity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()
+                  && childEntity.getNameAsString().equals(NAMESPACE01_TABLE01.getNameAsString())) {
+            System.out.println("Testing TABLE SchemaEntity!");
+            SchemaEntity namespaceEntityInTableArchive
+                    = tableArchive.getSchemaEntities().iterator().next();
+            assertEquals(HSA_FAILURE + "Namespace ShemaEntity in Table Archive has unexpected "
+                    + "size of children Set.",
+                    1, namespaceEntityInTableArchive.getChildren().size());
+            assertEquals(HSA_FAILURE + "Table SchemaEntity inconsistencies between full archive "
+                    + "and table-only archive.",
+                    childEntity, namespaceEntityInTableArchive.getChildren().iterator().next());
+          }
+        }
+      }
+    }
+  }
+
+  private void validateXmlAgainstXsd(File xmlFile) throws IOException {
+    Document hsaDocument = null;
+    Schema hsaSchema = null;
+    try {
+      hsaDocument = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(xmlFile);
+    } catch (ParserConfigurationException pce) {
+      fail(TEST_ENVIRONMENT_SETUP_PROBLEM + " parser config exception thrown: " + pce.getMessage());
+    } catch (SAXException se) {
+      fail(REPOSITORY_ADMIN_FAILURE + " SAX exception thrown while loading test document: "
+              + se.getMessage());
+    }
+    try {
+      hsaSchema = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).newSchema(
+              Paths.get(ClassLoader.getSystemResource(
+                      XmlSchemaGenerator.DEFAULT_OUTPUT_FILE_NAME).toURI()).toFile());
+    } catch (URISyntaxException ue) {
+      fail(TEST_ENVIRONMENT_SETUP_PROBLEM + " URI syntax exception thrown: " + ue.getMessage());
+    } catch (SAXException se) {
+      fail(REPOSITORY_ADMIN_FAILURE + " SAX exception thrown while loading XML-schema: "
+              + se.getMessage());
+    }
+    // validate against XSD
+    try {
+      hsaSchema.newValidator().validate(new DOMSource(hsaDocument));
+    } catch (SAXException se) {
+      fail(REPOSITORY_ADMIN_FAILURE + " exported HSA file is invalid with respect to "
+              + "XML schema: " + se.getMessage());
+    }
   }
 
   public static void main(String[] args) throws Exception {

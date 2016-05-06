@@ -89,17 +89,17 @@ class MColumnDescriptor extends HColumnDescriptor {
  from repository table and deserialized into a SchemaEntity object, which is then passed to
  this constructor to complete the deserialization into an MColumnDescriptor object).
    *
-   * @param mEntity
+   * @param entity
    */
-  MColumnDescriptor(SchemaEntity mEntity) {
-    super(mEntity.getName());
-    this.setForeignKey(mEntity.getForeignKey());
-    this.columnDefinitionsEnforced = mEntity.getColumnDefinitionsEnforced();
+  MColumnDescriptor(SchemaEntity entity) {
+    super(entity.getName());
+    this.setForeignKey(entity.getForeignKey());
+    this.columnDefinitionsEnforced = entity.getColumnDefinitionsEnforced();
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
-            : mEntity.getValues().entrySet()) {
+            : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey().copyBytes(), valueEntry.getValue().copyBytes());
     }
-    for (Map.Entry<String, String> configEntry : mEntity.getConfiguration().entrySet()) {
+    for (Map.Entry<String, String> configEntry : entity.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());
     }
   }

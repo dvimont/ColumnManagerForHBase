@@ -89,6 +89,7 @@
     <junit.version>4.12</junit.version>
     <developmentDirectory>../master/</developmentDirectory>
     <docFilesDirectory>master/src/main/java/org/commonvox/hbase_column_manager/doc-files/</docFilesDirectory>
+    <testResourcesDirectory>master/src/test/resources/</testResourcesDirectory>
   </properties>
 
   <build>

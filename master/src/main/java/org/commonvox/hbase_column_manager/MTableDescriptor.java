@@ -110,17 +110,17 @@ class MTableDescriptor extends HTableDescriptor {
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
    * schema components from Repository or from external archive).
    *
-   * @param mEntity
+   * @param entity
    */
-  MTableDescriptor(SchemaEntity mEntity) {
-    super(mEntity.getName());
-    this.setForeignKey(mEntity.getForeignKey());
-//        this.columnDefinitionsEnforced = mEntity.getColumnDefinitionsEnforced();
+  MTableDescriptor(SchemaEntity entity) {
+    super(entity.getName());
+    this.setForeignKey(entity.getForeignKey());
+//        this.columnDefinitionsEnforced = entity.getColumnDefinitionsEnforced();
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
-            : mEntity.getValues().entrySet()) {
+            : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey(), valueEntry.getValue());
     }
-    for (Map.Entry<String, String> configEntry : mEntity.getConfiguration().entrySet()) {
+    for (Map.Entry<String, String> configEntry : entity.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());
     }
   }

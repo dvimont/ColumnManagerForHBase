@@ -58,16 +58,16 @@ public class ColumnAuditor extends Column {
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
    * schema components from Repository or from external archive).
    *
-   * @param mEntity SchemaEntity to be deserialized into a Column
+   * @param entity SchemaEntity to be deserialized into a Column
    */
-  ColumnAuditor(SchemaEntity mEntity) {
-    super(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), mEntity.getName());
-    this.setForeignKey(mEntity.getForeignKey());
+  ColumnAuditor(SchemaEntity entity) {
+    super(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), entity.getName());
+    this.setForeignKey(entity.getForeignKey());
     for (Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
-            : mEntity.getValues().entrySet()) {
+            : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey(), valueEntry.getValue());
     }
-    for (Entry<String, String> configEntry : mEntity.getConfiguration().entrySet()) {
+    for (Entry<String, String> configEntry : entity.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());
     }
   }

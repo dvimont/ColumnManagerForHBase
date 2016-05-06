@@ -16,9 +16,13 @@
  */
 package org.commonvox.hbase_column_manager;
 
+import java.io.File;
 import java.sql.Timestamp;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -33,7 +37,7 @@ import javax.xml.bind.annotation.XmlTransient;
  * @author Daniel Vimont
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "hbaseSchemaArchive")
+@XmlRootElement(name = "hBaseSchemaArchive")
 class HBaseSchemaArchive {
 
   @XmlAttribute
@@ -41,17 +45,18 @@ class HBaseSchemaArchive {
   @XmlElement(name = "hBaseSchemaEntity")
   private final Set<SchemaEntity> hBaseSchemaEntities = new LinkedHashSet<>();
   @XmlTransient
-  private final String ROOT_ELEMENT = "hbaseSchemaArchive";
+  private final String ROOT_ELEMENT = "hBaseSchemaArchive";
 
   HBaseSchemaArchive() {
     this.fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
   }
 
-  void addSchemaEntity(SchemaEntity mEntity) {
-    if (mEntity == null) {
-      return;
+  SchemaEntity addSchemaEntity(SchemaEntity entity) {
+    if (entity == null) {
+      return null;
     }
-    hBaseSchemaEntities.add(mEntity);
+    hBaseSchemaEntities.add(entity);
+    return entity;
   }
 
   Set<SchemaEntity> getSchemaEntities() {
@@ -60,5 +65,21 @@ class HBaseSchemaArchive {
 
   String getArchiveFileTimestampString() {
     return fileTimestamp;
+  }
+
+  static void exportToXmlFile(HBaseSchemaArchive archiveSet, File targetFile, boolean formatted)
+          throws JAXBException {
+    Marshaller marshaller
+            = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
+    if (formatted) {
+      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+    }
+    marshaller.marshal(archiveSet, targetFile);
+  }
+
+  static HBaseSchemaArchive deserializeXmlFile(File sourceFile)
+          throws JAXBException {
+    return (HBaseSchemaArchive)JAXBContext.newInstance(HBaseSchemaArchive.class)
+                    .createUnmarshaller().unmarshal(sourceFile);
   }
 }

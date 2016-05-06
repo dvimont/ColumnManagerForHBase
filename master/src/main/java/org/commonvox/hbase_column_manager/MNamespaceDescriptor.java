@@ -49,16 +49,16 @@ class MNamespaceDescriptor extends SchemaEntity {
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
    * schema components from Repository or from external archive).
    *
-   * @param mEntity
+   * @param entity
    */
-  MNamespaceDescriptor(SchemaEntity mEntity) {
-    super(SchemaEntityType.NAMESPACE.getRecordType(), mEntity.getName());
-    this.setForeignKey(mEntity.getForeignKey());
+  MNamespaceDescriptor(SchemaEntity entity) {
+    super(SchemaEntityType.NAMESPACE.getRecordType(), entity.getName());
+    this.setForeignKey(entity.getForeignKey());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
-            : mEntity.getValues().entrySet()) {
+            : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey(), valueEntry.getValue());
     }
-    for (Map.Entry<String, String> configEntry : mEntity.getConfiguration().entrySet()) {
+    for (Map.Entry<String, String> configEntry : entity.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());
     }
   }

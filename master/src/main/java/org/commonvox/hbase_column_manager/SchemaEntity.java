@@ -17,10 +17,11 @@
 package org.commonvox.hbase_column_manager;
 
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -36,23 +37,23 @@ import org.apache.hadoop.hbase.util.Bytes;
  * @author Daniel Vimont
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "hbaseSchemaEntity")
+@XmlRootElement(name = "hBaseSchemaEntity")
 class SchemaEntity implements Comparable<SchemaEntity> {
 
   // all simple fields are non-final Strings to facilitate straightforward JAXB marshal/unmarshal
 
   @XmlAttribute
-  private String schemaEntityType;
+  private String schemaEntityType; // full String used for explicit JAXB marshalling
   @XmlAttribute
   private String name;
   @XmlAttribute
-  private String columnDefinitionsEnforced; // String instead of boolean so can be nullified for JAXB!
+  private String columnDefinitionsEnforced; // String (not boolean) so can be nullified for JAXB!
 
   private final Map<String, String> values = new HashMap<>(); // String entries for JAXB!
   private final Map<String, String> configurations = new HashMap<>();
   @XmlElementWrapper(name = "children")
-  @XmlElement(name = "hbaseSchemaEntity")
-  private Set<SchemaEntity> children = null;
+  @XmlElement(name = "hBaseSchemaEntity")
+  private TreeSet<SchemaEntity> children = null; // TreeSet stipulated for ordered unmarshalling!!
   @XmlTransient
   private byte[] foreignKeyValue;
 
@@ -79,14 +80,14 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     shallowClone(metadataEntity);
   }
 
-  private void shallowClone(SchemaEntity mEntity) {
-    for (Map.Entry<String, String> valueEntry : mEntity.values.entrySet()) {
+  private void shallowClone(SchemaEntity entity) {
+    for (Map.Entry<String, String> valueEntry : entity.values.entrySet()) {
       this.values.put(valueEntry.getKey(), valueEntry.getValue());
     }
-    for (Map.Entry<String, String> configEntry : mEntity.configurations.entrySet()) {
+    for (Map.Entry<String, String> configEntry : entity.configurations.entrySet()) {
       this.configurations.put(configEntry.getKey(), configEntry.getValue());
     }
-    this.columnDefinitionsEnforced = mEntity.columnDefinitionsEnforced;
+    this.columnDefinitionsEnforced = entity.columnDefinitionsEnforced;
   }
 
   SchemaEntity(MTableDescriptor mtd) {
@@ -269,7 +270,7 @@ class SchemaEntity implements Comparable<SchemaEntity> {
 
   void addChild(SchemaEntity child) {
     if (children == null) {
-      children = new LinkedHashSet<>();
+      children = new TreeSet<>();
     }
     children.add(child);
   }
@@ -280,7 +281,24 @@ class SchemaEntity implements Comparable<SchemaEntity> {
 
   @Override
   public int compareTo(SchemaEntity other) {
-    int result = this.name.compareTo(other.name);
+    int result = this.schemaEntityType.compareTo(other.schemaEntityType);
+    if (result == 0) {
+      result = this.name.compareTo(other.name);
+    }
+    if (result == 0) {
+      int childrenSize = (children == null) ? 0 : children.size();
+      int otherChildrenSize = (other.children == null) ? 0 : other.children.size();
+      result = childrenSize - otherChildrenSize;
+    }
+    if (result == 0 && children != null && other.children != null) {
+      for (Iterator<SchemaEntity> it = children.iterator(), it2 = other.children.iterator();
+              it.hasNext(); ) {
+        result = it.next().compareTo(it2.next());
+        if (result != 0) {
+          break;
+        }
+      }
+    }
     if (result == 0) {
       result = this.values.hashCode() - other.values.hashCode();
       if (result < 0) {
@@ -298,6 +316,20 @@ class SchemaEntity implements Comparable<SchemaEntity> {
       }
     }
     return result;
+  }
+
+  @Override
+  public boolean equals (Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null) {
+      return false;
+    }
+    if (!(obj instanceof SchemaEntity)) {
+      return false;
+    }
+    return compareTo((SchemaEntity)obj) == 0;
   }
 
   /**

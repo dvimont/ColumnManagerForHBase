@@ -69,16 +69,16 @@ public class ColumnDefinition extends Column {
    * This constructor accessed during deserialization process (i.e., building of objects by pulling
    * schema components from Repository or from external archive).
    *
-   * @param mEntity SchemaEntity to be deserialized into a ColumnDefinition
+   * @param entity SchemaEntity to be deserialized into a ColumnDefinition
    */
-  ColumnDefinition(SchemaEntity mEntity) {
-    super(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), mEntity.getName());
-    this.setForeignKey(mEntity.getForeignKey());
+  ColumnDefinition(SchemaEntity entity) {
+    super(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), entity.getName());
+    this.setForeignKey(entity.getForeignKey());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
-            : mEntity.getValues().entrySet()) {
+            : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey(), valueEntry.getValue());
     }
-    for (Map.Entry<String, String> configEntry : mEntity.getConfiguration().entrySet()) {
+    for (Map.Entry<String, String> configEntry : entity.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());
     }
   }
