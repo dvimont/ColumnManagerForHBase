@@ -76,7 +76,7 @@ class MAdmin implements Admin {
   public void createTable(HTableDescriptor htd) throws IOException {
     wrappedHbaseAdmin.createTable(htd);
     if (repository.isActivated()) {
-      repository.putTable(htd);
+      repository.putTableSchemaEntity(htd);
     }
   }
 
@@ -84,7 +84,7 @@ class MAdmin implements Admin {
   public void createTable(HTableDescriptor htd, byte[] bytes, byte[] bytes1, int i) throws IOException {
     wrappedHbaseAdmin.createTable(htd, bytes, bytes1, i);
     if (repository.isActivated()) {
-      repository.putTable(htd);
+      repository.putTableSchemaEntity(htd);
     }
   }
 
@@ -92,7 +92,7 @@ class MAdmin implements Admin {
   public void createTable(HTableDescriptor htd, byte[][] bytes) throws IOException {
     wrappedHbaseAdmin.createTable(htd, bytes);
     if (repository.isActivated()) {
-      repository.putTable(htd);
+      repository.putTableSchemaEntity(htd);
     }
   }
 
@@ -180,7 +180,7 @@ class MAdmin implements Admin {
   public void addColumn(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.addColumn(tn, hcd);
     if (repository.isActivated()) {
-      repository.putColumnFamily(tn, hcd);
+      repository.putColumnFamilySchemaEntity(tn, hcd);
     }
   }
 
@@ -188,7 +188,7 @@ class MAdmin implements Admin {
   public void addColumnFamily(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.addColumn(tn, hcd); // with future HBase version should be changed to "addColumnFamily"
     if (repository.isActivated()) {
-      repository.putColumnFamily(tn, hcd);
+      repository.putColumnFamilySchemaEntity(tn, hcd);
     }
   }
 
@@ -197,7 +197,7 @@ class MAdmin implements Admin {
   public void modifyColumn(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.modifyColumn(tn, hcd);
     if (repository.isActivated()) {
-      repository.putColumnFamily(tn, hcd);
+      repository.putColumnFamilySchemaEntity(tn, hcd);
     }
   }
 
@@ -205,7 +205,7 @@ class MAdmin implements Admin {
   public void modifyColumnFamily(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.modifyColumn(tn, hcd);
     if (repository.isActivated()) {
-      repository.putColumnFamily(tn, hcd);
+      repository.putColumnFamilySchemaEntity(tn, hcd);
     }
   }
 
@@ -243,7 +243,7 @@ class MAdmin implements Admin {
   public void modifyTable(TableName tn, HTableDescriptor htd) throws IOException {
     wrappedHbaseAdmin.modifyTable(tn, htd);
     if (repository.isActivated()) {
-      repository.putTable(htd);
+      repository.putTableSchemaEntity(htd);
     }
   }
 
@@ -251,7 +251,7 @@ class MAdmin implements Admin {
   public void createNamespace(NamespaceDescriptor nd) throws IOException {
     wrappedHbaseAdmin.createNamespace(nd);
     if (repository.isActivated()) {
-      repository.putNamespace(nd);
+      repository.putNamespaceSchemaEntity(nd);
     }
   }
 
@@ -259,7 +259,7 @@ class MAdmin implements Admin {
   public void modifyNamespace(NamespaceDescriptor nd) throws IOException {
     wrappedHbaseAdmin.modifyNamespace(nd);
     if (repository.isActivated()) {
-      repository.putNamespace(nd);
+      repository.putNamespaceSchemaEntity(nd);
     }
   }
 

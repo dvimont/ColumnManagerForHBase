@@ -65,7 +65,7 @@ class MBufferedMutator implements BufferedMutator {
     wrappedBufferedMutator.mutate(mtn);
     // ColumnManager auditing
     if (repository.isActivated()) {
-      repository.putColumnAuditors(mTableDescriptor, mtn);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, mtn);
     }
   }
 
@@ -80,7 +80,7 @@ class MBufferedMutator implements BufferedMutator {
     wrappedBufferedMutator.mutate(list);
     // ColumnManager auditing
     if (repository.isActivated()) {
-      repository.putColumnAuditors(mTableDescriptor, list);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, list);
     }
   }
 

@@ -249,7 +249,7 @@ public class RepositoryAdmin implements Closeable {
                 add(colDefinition);
               }
             };
-    repository.putColumnDefinitions(tableName, colFamily, colDefinitions);
+    repository.putColumnDefinitionSchemaEntities(tableName, colFamily, colDefinitions);
   }
 
   /**
@@ -280,7 +280,7 @@ public class RepositoryAdmin implements Closeable {
   public void addColumnDefinitions(TableName tableName, byte[] colFamily,
           List<ColumnDefinition> colDefinitions)
           throws IOException {
-    repository.putColumnDefinitions(tableName, colFamily, colDefinitions);
+    repository.putColumnDefinitionSchemaEntities(tableName, colFamily, colDefinitions);
   }
 
   /**
@@ -296,7 +296,7 @@ public class RepositoryAdmin implements Closeable {
   public void addColumnDefinitions(HTableDescriptor htd, HColumnDescriptor hcd,
           List<ColumnDefinition> colDefinitions)
           throws IOException {
-    repository.putColumnDefinitions(htd.getTableName(), hcd.getName(), colDefinitions);
+    repository.putColumnDefinitionSchemaEntities(htd.getTableName(), hcd.getName(), colDefinitions);
   }
 
   /**
@@ -404,7 +404,7 @@ public class RepositoryAdmin implements Closeable {
   }
 
   /**
-   * Get an {@link ChangeEventMonitor} object
+   * Get a {@link ChangeEventMonitor} object
    *
    * @return {@link ChangeEventMonitor} object
    * @throws IOException if a remote or network exception occurs
@@ -673,17 +673,17 @@ public class RepositoryAdmin implements Closeable {
                 = ((MNamespaceDescriptor) descriptor).getNamespaceDescriptor();
         if (!namespaceExists(nd)) {
           repository.getAdmin().createNamespace(nd);
-          repository.putNamespace(nd);
+          repository.putNamespaceSchemaEntity(nd);
           logger.info("IMPORT COMPLETED FOR NAMESPACE: " + nd.getName());
         }
       } else if (MTableDescriptor.class.isAssignableFrom(descriptor.getClass())) {
         MTableDescriptor mtd = (MTableDescriptor) descriptor;
         if (!repository.getAdmin().tableExists(mtd.getTableName())) {
           repository.getAdmin().createTable(mtd); // includes creation of Column Families
-          repository.putTable(mtd);
-          repository.putColumnDefinitions(mtd);
+          repository.putTableSchemaEntity(mtd);
+          repository.putColumnDefinitionSchemaEntities(mtd);
           if (includeColumnAuditors) {
-            repository.putColumnAuditors(mtd);
+            repository.putColumnAuditorSchemaEntities(mtd);
           }
           logger.info("IMPORT COMPLETED FOR TABLE: " + mtd.getNameAsString()
                   + (includeColumnAuditors ? " <INCLUDING COLUMN AUDITOR METADATA>" : ""));

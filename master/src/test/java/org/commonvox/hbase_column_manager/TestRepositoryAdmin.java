@@ -204,6 +204,7 @@ public class TestRepositoryAdmin {
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
   private Map<TableName, HTableDescriptor> testTableNamesAndDescriptors;
   private Map<String, HColumnDescriptor> testColumnFamilyNamesAndDescriptors;
+  private boolean usernameSuffix;
 
   @Test
   public void testStaticMethods() throws IOException {
@@ -455,11 +456,7 @@ public class TestRepositoryAdmin {
         htd.setMemStoreFlushSize(memStoreFlushSize++);
         htd.setDurability(Durability.SKIP_WAL);
         for (HColumnDescriptor hcd : testColumnFamilyNamesAndDescriptors.values()) {
-          if (alternateBooleanAttribute) {
-            alternateBooleanAttribute = false;
-          } else {
-            alternateBooleanAttribute = true;
-          }
+          alternateBooleanAttribute = !alternateBooleanAttribute;
           hcd.setInMemory(alternateBooleanAttribute);
           hcd.setMaxVersions(maxVersions++);
           htd.addFamily(hcd);
@@ -733,8 +730,9 @@ public class TestRepositoryAdmin {
 
   @Test
   public void testExportImport() throws IOException, JAXBException {
+    System.out.println("#testExportImport has been invoked.");
     // file setup
-    final String TARGET_DIRECTORY = "target/";
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
     final String TARGET_EXPORT_ALL_FILE = "temp.export.repository.hsa.xml";
     final String TARGET_EXPORT_NAMESPACE_FILE = "temp.export.namespace.hsa.xml";
     final String TARGET_EXPORT_TABLE_FILE = "temp.export.table.hsa.xml";
@@ -745,7 +743,7 @@ public class TestRepositoryAdmin {
       exportAllFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_FILE);
       exportNamespaceFile = tempTestFolder.newFile(TARGET_EXPORT_NAMESPACE_FILE);
       exportTableFile = tempTestFolder.newFile(TARGET_EXPORT_TABLE_FILE);
-    } catch (IllegalStateException e) {
+    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
       exportAllFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_FILE);
       exportNamespaceFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_NAMESPACE_FILE);
       exportTableFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_TABLE_FILE);
@@ -777,6 +775,7 @@ public class TestRepositoryAdmin {
     }
     verifyColumnAuditing(configuration);
 
+    // validate all export files against the XML-schema
     validateXmlAgainstXsd(exportAllFile);
     validateXmlAgainstXsd(exportNamespaceFile);
     validateXmlAgainstXsd(exportTableFile);
@@ -795,7 +794,6 @@ public class TestRepositoryAdmin {
         for (SchemaEntity childEntity : entity.getChildren()) {
           if (childEntity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()
                   && childEntity.getNameAsString().equals(NAMESPACE01_TABLE01.getNameAsString())) {
-            System.out.println("Testing TABLE SchemaEntity!");
             SchemaEntity namespaceEntityInTableArchive
                     = tableArchive.getSchemaEntities().iterator().next();
             assertEquals(HSA_FAILURE + "Namespace ShemaEntity in Table Archive has unexpected "
@@ -808,6 +806,7 @@ public class TestRepositoryAdmin {
         }
       }
     }
+    System.out.println("#testExportImport has run to completeion.");
   }
 
   private void validateXmlAgainstXsd(File xmlFile) throws IOException {
@@ -840,12 +839,84 @@ public class TestRepositoryAdmin {
     }
   }
 
+  @Test
+  public void testChangeEventMonitor() throws IOException {
+    System.out.println("#testChangeEventMonitor has been invoked.");
+    // file setup
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
+    final String TARGET_EXPORT_ALL_BY_TIMESTAMP_FILE = "temp.changeEvents.timestampOrder.csv";
+    final String TARGET_EXPORT_ALL_BY_USERNAME_FILE = "temp.changeEvents.userNameOrder.csv";
+    final String TARGET_EXPORT_FOR_USER_FILE = "temp.changeEvents.forUser.csv";
+    final String TARGET_EXPORT_FOR_TABLE_FILE = "temp.changeEvents.forTable.csv";
+    File exportAllByTimestampFile;
+    File exportAllByUsernameFile;
+    File exportForUserFile;
+    File exportForTableFile;
+    try {
+      exportAllByTimestampFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_BY_TIMESTAMP_FILE);
+      exportAllByUsernameFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_BY_USERNAME_FILE);
+      exportForUserFile = tempTestFolder.newFile(TARGET_EXPORT_FOR_USER_FILE);
+      exportForTableFile = tempTestFolder.newFile(TARGET_EXPORT_FOR_TABLE_FILE);
+    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
+      exportAllByTimestampFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_BY_TIMESTAMP_FILE);
+      exportAllByUsernameFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_BY_USERNAME_FILE);
+      exportForUserFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_FOR_USER_FILE);
+      exportForTableFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_FOR_TABLE_FILE);
+    }
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    changeJavaUsername();
+    createSchemaStructuresInHBase(configuration, false);
+    changeJavaUsername();
+    createAndEnforceColumnDefinitions(configuration);
+    deleteTableInHBase(configuration);
+
+    // create and test ChangeEventMonitor
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      ChangeEventMonitor monitor = repositoryAdmin.getChangeEventMonitor();
+
+      List<ChangeEvent> allChangeEvents = monitor.getAllChangeEvents();
+      ChangeEventMonitor.exportChangeEventListToCsvFile(allChangeEvents, exportAllByTimestampFile);
+
+      List<ChangeEvent> allChangeEventsByUsername = monitor.getAllChangeEventsByUserName();
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              allChangeEventsByUsername, exportAllByUsernameFile);
+
+      List<ChangeEvent> allChangeEventsOfSpecificUser
+              = monitor.getChangeEventsForUserName("userfalse");
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              allChangeEventsOfSpecificUser, exportForUserFile);
+
+    }
+    clearTestingEnvironment();
+    System.out.println("#testChangeEventMonitor has run to completion.");
+  }
+
+  private void changeJavaUsername() {
+    usernameSuffix = !usernameSuffix;
+    System.setProperty("user.name", "user" + usernameSuffix);
+  }
+
+  private void deleteTableInHBase(Configuration configuration) throws IOException {
+    try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin()) {
+      mAdmin.disableTable(NAMESPACE01_TABLE01);
+      mAdmin.deleteTable(NAMESPACE01_TABLE01);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
-    new TestRepositoryAdmin().testExportImport();
+    // new TestRepositoryAdmin().testExportImport();
+    new TestRepositoryAdmin().testChangeEventMonitor();
   }
 }

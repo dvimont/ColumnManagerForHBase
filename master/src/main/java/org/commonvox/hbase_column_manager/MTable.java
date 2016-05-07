@@ -121,7 +121,7 @@ class MTable implements Table {
         if (actionSucceeded != null) {
           Row action = list.get(rowCount);
           if (Mutation.class.isAssignableFrom(action.getClass())) {
-            repository.putColumnAuditors(mTableDescriptor, (Mutation) action);
+            repository.putColumnAuditorSchemaEntities(mTableDescriptor, (Mutation) action);
           }
         }
         rowCount++;
@@ -151,7 +151,7 @@ class MTable implements Table {
         if (actionSucceeded != null) {
           Row action = list.get(rowCount);
           if (Mutation.class.isAssignableFrom(action.getClass())) {
-            repository.putColumnAuditors(mTableDescriptor, (Mutation) action);
+            repository.putColumnAuditorSchemaEntities(mTableDescriptor, (Mutation) action);
           }
         }
         rowCount++;
@@ -181,7 +181,7 @@ class MTable implements Table {
         if (actionSucceeded != null) {
           Row action = list.get(rowCount);
           if (Mutation.class.isAssignableFrom(action.getClass())) {
-            repository.putColumnAuditors(mTableDescriptor, (Mutation) action);
+            repository.putColumnAuditorSchemaEntities(mTableDescriptor, (Mutation) action);
           }
         }
         rowCount++;
@@ -211,7 +211,7 @@ class MTable implements Table {
         if (actionSucceeded != null) {
           Row action = list.get(rowCount);
           if (Mutation.class.isAssignableFrom(action.getClass())) {
-            repository.putColumnAuditors(mTableDescriptor, (Mutation) action);
+            repository.putColumnAuditorSchemaEntities(mTableDescriptor, (Mutation) action);
           }
         }
         rowCount++;
@@ -257,7 +257,7 @@ class MTable implements Table {
     wrappedTable.put(put);
     // ColumnManager auditing
     if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, put);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, put);
     }
   }
 
@@ -280,7 +280,7 @@ class MTable implements Table {
     boolean putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, bytes3, put);
     // ColumnManager auditing
     if (putPerformed && repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, put);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, put);
     }
     return putPerformed;
   }
@@ -297,7 +297,7 @@ class MTable implements Table {
     boolean putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, co, bytes3, put);
     // ColumnManager auditing
     if (putPerformed && repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, put);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, put);
     }
     return putPerformed;
   }
@@ -340,7 +340,7 @@ class MTable implements Table {
     wrappedTable.mutateRow(rm);
     // ColumnManager auditing
     if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, rm);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, rm);
     }
   }
 
@@ -356,7 +356,7 @@ class MTable implements Table {
     Result result = wrappedTable.append(append);
     // ColumnManager auditing
     if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, append);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, append);
     }
     return result;
   }
@@ -373,7 +373,7 @@ class MTable implements Table {
     Result result = wrappedTable.increment(i);
     // ColumnManager auditing
     if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, i);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, i);
     }
     return result;
   }
@@ -392,7 +392,7 @@ class MTable implements Table {
     long returnedLong = wrappedTable.incrementColumnValue(bytes, bytes1, bytes2, l);
     // ColumnManager auditing
     if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, increment);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, increment);
     }
     return returnedLong;
   }
@@ -411,7 +411,7 @@ class MTable implements Table {
     long returnedLong = wrappedTable.incrementColumnValue(bytes, bytes1, bytes2, l, drblt);
     // ColumnManager auditing
     if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, increment);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, increment);
     }
     return returnedLong;
   }
@@ -470,7 +470,7 @@ class MTable implements Table {
     boolean mutationsPerformed = wrappedTable.checkAndMutate(bytes, bytes1, bytes2, co, bytes3, rm);
     // ColumnManager auditing
     if (mutationsPerformed && repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditors(mTableDescriptor, rm);
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, rm);
     }
     return mutationsPerformed;
   }

@@ -391,9 +391,9 @@
  * <li>Set "maxVersions" for ColumnManager repository
  * <BLOCKQUOTE>
  * By default, the Audit Trail subsystem (as outlined in the section
- * <a href="#auditing">"Get audit trail metadata"</a> above) is able to track and report on only the
- * most recent 50 {@code ChangeEvent}s of each entity-attribute that it tracks (for example, the
- * most recent 50 changes to the "durability" setting of a given
+ * <a href="#auditing">"Get audit trail metadata"</a> above) is configured to track and report on
+ * only the most recent 50 {@code ChangeEvent}s of each entity-attribute that it tracks (for
+ * example, the most recent 50 changes to the "durability" setting of a given
  * <i>Table</i>). This limitation relates directly to the default "maxVersions" setting of the
  * <i>Column Family</i> of the repository <i>Table</i>. This setting may be changed through
  * invocation of the static {@code RepositoryAdmin} method

@@ -104,7 +104,7 @@ class Repository {
   static final TableName REPOSITORY_TABLENAME
           = TableName.valueOf(REPOSITORY_NAMESPACE_DESCRIPTOR.getName(),
                   "column_manager_repository_table");
-  private static final byte[] REPOSITORY_COLFAMILY = Bytes.toBytes("se"); // ("se"="SchemaEntities")
+  private static final byte[] REPOSITORY_CF = Bytes.toBytes("se"); // ("se"="SchemaEntities")
   static final int REPOSITORY_DEFAULT_MAX_VERSIONS = 50; // should this be set higher?
 
   static final byte[] NAMESPACE_PARENT_FOREIGN_KEY = {'-'};
@@ -285,7 +285,7 @@ class Repository {
 
     // Create new repositoryTable, since it doesn't already exist
     standardAdmin.createTable(new HTableDescriptor(REPOSITORY_TABLENAME).
-            addFamily(new HColumnDescriptor(REPOSITORY_COLFAMILY).
+            addFamily(new HColumnDescriptor(REPOSITORY_CF).
                     setMaxVersions(REPOSITORY_DEFAULT_MAX_VERSIONS).
                     setInMemory(true)));
     try (Table newRepositoryTable
@@ -300,7 +300,7 @@ class Repository {
           throws IOException {
     HColumnDescriptor repositoryHcd
             = getStandardAdmin(hbaseAdmin).getTableDescriptor(REPOSITORY_TABLENAME)
-            .getFamily(REPOSITORY_COLFAMILY);
+            .getFamily(REPOSITORY_CF);
     int oldMaxVersions = repositoryHcd.getMaxVersions();
     if (oldMaxVersions != maxVersions) {
       repositoryHcd.setMaxVersions(maxVersions);
@@ -314,7 +314,7 @@ class Repository {
           throws IOException {
     HColumnDescriptor repositoryHcd
             = getStandardAdmin(hbaseAdmin).getTableDescriptor(REPOSITORY_TABLENAME)
-            .getFamily(REPOSITORY_COLFAMILY);
+            .getFamily(REPOSITORY_CF);
     return repositoryHcd.getMaxVersions();
   }
 
@@ -411,7 +411,7 @@ class Repository {
    * @return foreign key value of repository row that holds namespace SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
-  byte[] putNamespace(NamespaceDescriptor nd)
+  byte[] putNamespaceSchemaEntity(NamespaceDescriptor nd)
           throws IOException {
     if (!isIncludedNamespace(nd.getName())) {
       return null;
@@ -421,7 +421,7 @@ class Repository {
                     Bytes.toBytes(nd.getName()));
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(EMPTY_VALUES, nd.getConfiguration());
-    return putSchemaEntityChanges(namespaceRowId, entityAttributeMap, false);
+    return putSchemaEntity(namespaceRowId, entityAttributeMap, false);
   }
 
   /**
@@ -430,7 +430,7 @@ class Repository {
    * @return foreign key value of repository row that holds table SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
-  byte[] putTable(HTableDescriptor htd) throws IOException {
+  byte[] putTableSchemaEntity(HTableDescriptor htd) throws IOException {
     if (!isIncludedTable(htd.getTableName())) {
       return null;
     }
@@ -442,7 +442,7 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(htd.getValues(), htd.getConfiguration());
     byte[] tableForeignKey
-            = putSchemaEntityChanges(tableRowId, entityAttributeMap, false);
+            = putSchemaEntity(tableRowId, entityAttributeMap, false);
 
     // Account for potentially deleted ColumnFamilies
     Set<byte[]> oldMcdNames = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
@@ -458,12 +458,12 @@ class Repository {
 
     // Account for added/modified ColumnFamilies
     for (HColumnDescriptor hcd : htd.getColumnFamilies()) {
-      putColumnFamily(tableForeignKey, hcd, htd.getTableName());
+      putColumnFamilySchemaEntity(tableForeignKey, hcd, htd.getTableName());
     }
     return tableForeignKey;
   }
 
-  byte[] putColumnFamily(TableName tn, HColumnDescriptor hcd)
+  byte[] putColumnFamilySchemaEntity(TableName tn, HColumnDescriptor hcd)
           throws IOException {
     if (!isIncludedTable(tn)) {
       return null;
@@ -472,9 +472,9 @@ class Repository {
     // Note that ColumnManager can be installed atop an already-existing HBase
     //  installation, so table metadata might not yet have been captured in repository.
     if (tableForeignKey == null) {
-      tableForeignKey = putTable(standardAdmin.getTableDescriptor(tn));
+      tableForeignKey = putTableSchemaEntity(standardAdmin.getTableDescriptor(tn));
     }
-    return putColumnFamily(tableForeignKey, hcd, tn);
+    return putColumnFamilySchemaEntity(tableForeignKey, hcd, tn);
   }
 
   /**
@@ -484,20 +484,20 @@ class Repository {
    * @return foreign key value of repository row that holds Column Family SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
-  private byte[] putColumnFamily(byte[] tableForeignKey, HColumnDescriptor hcd, TableName tableName)
+  private byte[] putColumnFamilySchemaEntity(
+          byte[] tableForeignKey, HColumnDescriptor hcd, TableName tableName)
           throws IOException {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(hcd.getValues(), hcd.getConfiguration());
 
     byte[] colFamilyForeignKey
-            = putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName()),
-                    entityAttributeMap, false);
+            = putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+                    tableForeignKey, hcd.getName()), entityAttributeMap, false);
 
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
       setColumnDefinitionsEnforced(((MColumnDescriptor) hcd).columnDefinitionsEnforced(),
               SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName());
     }
-
     return colFamilyForeignKey;
   }
 
@@ -509,7 +509,7 @@ class Repository {
    * @return true if all serializations complete successfully
    * @throws IOException if a remote or network exception occurs
    */
-  boolean putColumnAuditors(MTableDescriptor mtd) throws IOException {
+  boolean putColumnAuditorSchemaEntities(MTableDescriptor mtd) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return false;
     }
@@ -523,7 +523,7 @@ class Repository {
         continue;
       }
       for (ColumnAuditor columnAuditor : mcd.getColumnAuditors()) {
-        byte[] colForeignKey = putColumnAuditor(colDescForeignKey, columnAuditor);
+        byte[] colForeignKey = putColumnAuditorSchemaEntity(colDescForeignKey, columnAuditor);
         if (colForeignKey == null) {
           serializationCompleted = false;
         }
@@ -540,49 +540,51 @@ class Repository {
    * @return foreign key value of repository row that holds {@link ColumnAuditor} SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
-  private byte[] putColumnAuditor(byte[] colFamilyForeignKey, ColumnAuditor columnAuditor)
+  private byte[] putColumnAuditorSchemaEntity(
+          byte[] colFamilyForeignKey, ColumnAuditor columnAuditor)
           throws IOException {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(columnAuditor.getValues(), columnAuditor.getConfiguration());
 
-    return putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey, columnAuditor.getName()),
+    return putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+            colFamilyForeignKey, columnAuditor.getName()),
             entityAttributeMap, false);
   }
 
-  void putColumnAuditors(TableName tableName, List<? extends Mutation> mutations)
+  void putColumnAuditorSchemaEntities(TableName tableName, List<? extends Mutation> mutations)
           throws IOException {
     if (!isIncludedTable(tableName)) {
       return;
     }
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     for (Mutation mutation : mutations) {
-      putColumnAuditors(mtd, mutation);
+      Repository.this.putColumnAuditorSchemaEntities(mtd, mutation);
     }
   }
 
-  void putColumnAuditors(TableName tableName, Mutation mutation)
+  void putColumnAuditorSchemaEntities(TableName tableName, Mutation mutation)
           throws IOException {
     if (!isIncludedTable(tableName)) {
       return;
     }
-    putColumnAuditors(getMTableDescriptor(tableName), mutation);
+    Repository.this.putColumnAuditorSchemaEntities(getMTableDescriptor(tableName), mutation);
   }
 
-  void putColumnAuditors(MTableDescriptor mtd, RowMutations mutations) throws IOException {
+  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, RowMutations mutations) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
     for (Mutation mutation : mutations.getMutations()) {
-      putColumnAuditors(mtd, mutation);
+      Repository.this.putColumnAuditorSchemaEntities(mtd, mutation);
     }
   }
 
-  void putColumnAuditors(MTableDescriptor mtd, List<? extends Mutation> mutations) throws IOException {
+  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, List<? extends Mutation> mutations) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
     for (Mutation mutation : mutations) {
-      putColumnAuditors(mtd, mutation);
+      Repository.this.putColumnAuditorSchemaEntities(mtd, mutation);
     }
   }
 
@@ -594,7 +596,7 @@ class Repository {
    * @param mutation object from which column SchemaEntity is extracted
    * @throws IOException if a remote or network exception occurs
    */
-  void putColumnAuditors(MTableDescriptor mtd, Mutation mutation) throws IOException {
+  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, Mutation mutation) throws IOException {
     if (!isIncludedTable(mtd.getTableName())
             // column-cell deletes do not affect Repository
             || Delete.class.isAssignableFrom(mutation.getClass())) {
@@ -619,7 +621,7 @@ class Repository {
         Map<byte[], byte[]> entityAttributeMap
                 = buildEntityAttributeMap(newColAuditor.getValues(),
                         newColAuditor.getConfiguration());
-        putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+        putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
                 mcd.getForeignKey(), newColAuditor.getName()), entityAttributeMap,
                 suppressUserName);
       }
@@ -633,7 +635,8 @@ class Repository {
    * @param row Result object from which {@link ColumnAuditor} SchemaEntity is extracted
    * @throws IOException if a remote or network exception occurs
    */
-  private void putColumnAuditors(MTableDescriptor mtd, Result row, boolean keyOnlyFilterUsed) throws IOException {
+  private void putColumnAuditorSchemaEntities(
+          MTableDescriptor mtd, Result row, boolean keyOnlyFilterUsed) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
@@ -663,7 +666,7 @@ class Repository {
         }
         Map<byte[], byte[]> entityAttributeMap
                 = buildEntityAttributeMap(newColAuditor.getValues(), newColAuditor.getConfiguration());
-        putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+        putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
                 mcd.getForeignKey(), colQualifier),
                 entityAttributeMap, suppressUserName);
       }
@@ -761,7 +764,7 @@ class Repository {
    * @return true if all serializations complete successfully
    * @throws IOException if a remote or network exception occurs
    */
-  boolean putColumnDefinitions(MTableDescriptor mtd) throws IOException {
+  boolean putColumnDefinitionSchemaEntities(MTableDescriptor mtd) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return false;
     }
@@ -776,7 +779,7 @@ class Repository {
       }
       for (ColumnDefinition colDef : mcd.getColumnDefinitions()) {
         byte[] colDefinitionForeignKey
-                = putColumnDefinition(colDescForeignKey, colDef);
+                = putColumnDefinitionSchemaEntity(colDescForeignKey, colDef);
         if (colDefinitionForeignKey == null) {
           serializationCompleted = false;
         }
@@ -795,7 +798,8 @@ class Repository {
    * @return true if all puts complete successfully
    * @throws IOException if a remote or network exception occurs
    */
-  boolean putColumnDefinitions(TableName tableName, byte[] colFamily, List<ColumnDefinition> colDefinitions)
+  boolean putColumnDefinitionSchemaEntities(
+          TableName tableName, byte[] colFamily, List<ColumnDefinition> colDefinitions)
           throws IOException {
     boolean allPutsCompleted = false;
     byte[] colFamilyForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
@@ -805,7 +809,7 @@ class Repository {
       allPutsCompleted = true;
       for (ColumnDefinition colDefinition : colDefinitions) {
         byte[] columnForeignKey
-                = putColumnDefinition(colFamilyForeignKey, colDefinition);
+                = putColumnDefinitionSchemaEntity(colFamilyForeignKey, colDefinition);
         if (columnForeignKey == null) {
           allPutsCompleted = false;
         }
@@ -822,16 +826,18 @@ class Repository {
    * @return foreign key value of repository row that holds {@link ColumnDefinition} SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
-  private byte[] putColumnDefinition(byte[] colFamilyForeignKey, ColumnDefinition colDef)
+  private byte[] putColumnDefinitionSchemaEntity(
+          byte[] colFamilyForeignKey, ColumnDefinition colDef)
           throws IOException {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(colDef.getValues(), colDef.getConfiguration());
 
-    return putSchemaEntityChanges(buildRowId(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
+    return putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
             colFamilyForeignKey, colDef.getName()), entityAttributeMap, false);
   }
 
-  private Map<byte[], byte[]> buildEntityAttributeMap(Map<ImmutableBytesWritable, ImmutableBytesWritable> values,
+  private Map<byte[], byte[]> buildEntityAttributeMap(
+          Map<ImmutableBytesWritable, ImmutableBytesWritable> values,
           Map<String, String> configuration) {
     Map<byte[], byte[]> entityAttributeMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
     for (Entry<ImmutableBytesWritable, ImmutableBytesWritable> tableValueEntry
@@ -851,8 +857,8 @@ class Repository {
     return entityAttributeMap;
   }
 
-  private byte[] putSchemaEntityChanges(byte[] rowId,
-          Map<byte[], byte[]> entityAttributeMap, boolean suppressUserName)
+  private byte[] putSchemaEntity(
+          byte[] rowId, Map<byte[], byte[]> entityAttributeMap, boolean suppressUserName)
           throws IOException {
     Result oldRow = repositoryTable.get(new Get(rowId));
     Put newRow = new Put(rowId);
@@ -863,15 +869,15 @@ class Repository {
     if (oldRow.isEmpty()) {
       oldEntityAttributeMap = null;
       foreignKey = generateUniqueForeignKey();
-      newRow.addColumn(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN, foreignKey);
-      newRow.addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
+      newRow.addColumn(REPOSITORY_CF, FOREIGN_KEY_COLUMN, foreignKey);
+      newRow.addColumn(REPOSITORY_CF, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
     } else {
       SchemaEntity entity = deserializeSchemaEntity(oldRow);
       oldEntityAttributeMap
               = buildEntityAttributeMap(entity.getValues(), entity.getConfiguration());
-      foreignKey = oldRow.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN);
-      if (!Bytes.equals(oldRow.getValue(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN), ACTIVE_STATUS)) {
-        newRow.addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
+      foreignKey = oldRow.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
+      if (!Bytes.equals(oldRow.getValue(REPOSITORY_CF, ENTITY_STATUS_COLUMN), ACTIVE_STATUS)) {
+        newRow.addColumn(REPOSITORY_CF, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
       }
     }
 
@@ -897,9 +903,9 @@ class Repository {
       }
       if (attributeValueChanged) {
         if (newAttributeValue == null) {
-          newRow.addColumn(REPOSITORY_COLFAMILY, newAttributeKey, null);
+          newRow.addColumn(REPOSITORY_CF, newAttributeKey, null);
         } else {
-          newRow.addColumn(REPOSITORY_COLFAMILY, newAttributeKey, newAttributeValue);
+          newRow.addColumn(REPOSITORY_CF, newAttributeKey, newAttributeValue);
         }
       }
     }
@@ -908,7 +914,7 @@ class Repository {
     if (oldEntityAttributeMap != null) {
       for (byte[] oldAttributeKey : oldEntityAttributeMap.keySet()) {
         if (!entityAttributeMap.containsKey(oldAttributeKey)) {
-          newRow.addColumn(REPOSITORY_COLFAMILY, oldAttributeKey, null);
+          newRow.addColumn(REPOSITORY_CF, oldAttributeKey, null);
         }
       }
     }
@@ -916,7 +922,7 @@ class Repository {
     // PUT newRow to Repository
     if (!newRow.isEmpty()) {
       if (!suppressUserName) {
-        newRow.addColumn(REPOSITORY_COLFAMILY, JAVA_USERNAME_PROPERTY_KEY, javaUsername);
+        newRow.addColumn(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY, javaUsername);
       }
       repositoryTable.put(newRow);
     }
@@ -932,7 +938,7 @@ class Repository {
       //  or namespaceName may not represent active namespace (and so not stored in repository).
       //return new MNamespaceDescriptor(standardAdmin.getNamespaceDescriptor(namespaceName));
       if (isIncludedNamespace(namespaceName)) {
-        putNamespace(standardAdmin.getNamespaceDescriptor(namespaceName));
+        putNamespaceSchemaEntity(standardAdmin.getNamespaceDescriptor(namespaceName));
         row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
       } else {
         return null;
@@ -958,7 +964,7 @@ class Repository {
       //  installation, so table SchemaEntity might not yet have been captured in repository,
       //  or TableName may not represent included Table (and so not stored in repository).
       if (isIncludedTable(tn)) {
-        putTable(standardAdmin.getTableDescriptor(tn));
+        putTableSchemaEntity(standardAdmin.getTableDescriptor(tn));
         row = getActiveRow(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
       } else {
         return null;
@@ -1050,7 +1056,7 @@ class Repository {
     byte[] rowId = row.getRow();
     SchemaEntity entity
             = new SchemaEntity(rowId[0], extractNameFromRowId(rowId));
-    for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_COLFAMILY).entrySet()) {
+    for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_CF).entrySet()) {
       byte[] key = colEntry.getKey();
       byte[] value = colEntry.getValue();
       if (Bytes.equals(key, FOREIGN_KEY_COLUMN)) {
@@ -1130,7 +1136,7 @@ class Repository {
     }
     Set<Result> activeRows = new HashSet<>();
     for (Result row : allRows) {
-      if (Bytes.equals(row.getValue(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN), ACTIVE_STATUS)) {
+      if (Bytes.equals(row.getValue(REPOSITORY_CF, ENTITY_STATUS_COLUMN), ACTIVE_STATUS)) {
         activeRows.add(row);
       }
     }
@@ -1153,10 +1159,10 @@ class Repository {
     byte[] stopRow = buildStopRow(startRow, entityName);
     Scan scanParms = new Scan(startRow, stopRow);
     if (getRowIdAndStatusOnly || columnToGet != null) {
-      scanParms.addColumn(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN);
-      scanParms.addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN);
+      scanParms.addColumn(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
+      scanParms.addColumn(REPOSITORY_CF, ENTITY_STATUS_COLUMN);
       if (columnToGet != null) {
-        scanParms.addColumn(REPOSITORY_COLFAMILY, columnToGet);
+        scanParms.addColumn(REPOSITORY_CF, columnToGet);
       }
     }
     List<Result> rows = new ArrayList<>();
@@ -1187,7 +1193,7 @@ class Repository {
     if (row.isEmpty()) {
       return null;
     }
-    return row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN);
+    return row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
   }
 
   private byte[] getNamespaceForeignKey(byte[] namespace) throws IOException {
@@ -1200,7 +1206,7 @@ class Repository {
     if (namespaceForeignKey == null) {
       if (namespaceExists(standardAdmin, namespace)) {
         namespaceForeignKey
-                = putNamespace(standardAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
+                = putNamespaceSchemaEntity(standardAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
       }
     }
     return namespaceForeignKey;
@@ -1222,7 +1228,7 @@ class Repository {
     //  time its foreign key is accessed or one of its descendents is modified.
     if (tableForeignKey == null) {
       if (standardAdmin.tableExists(tableName)) {
-        tableForeignKey = putTable(standardAdmin.getTableDescriptor(tableName));
+        tableForeignKey = putTableSchemaEntity(standardAdmin.getTableDescriptor(tableName));
       }
     }
     return tableForeignKey;
@@ -1262,7 +1268,7 @@ class Repository {
     if (row == null || row.isEmpty()) {
       return false;
     }
-    byte[] colValue = row.getValue(REPOSITORY_COLFAMILY, COL_DEFINITIONS_ENFORCED_COLUMN);
+    byte[] colValue = row.getValue(REPOSITORY_CF, COL_DEFINITIONS_ENFORCED_COLUMN);
     if (colValue == null || colValue.length == 0) {
       return false;
     }
@@ -1289,8 +1295,8 @@ class Repository {
           throws IOException {
     if (columnDefinitionsEnforced(recordType, parentForeignKey, entityName) != enabled) {
       repositoryTable.put(new Put(buildRowId(recordType, parentForeignKey, entityName))
-              .addColumn(REPOSITORY_COLFAMILY, COL_DEFINITIONS_ENFORCED_COLUMN, Bytes.toBytes(enabled))
-              .addColumn(REPOSITORY_COLFAMILY, JAVA_USERNAME_PROPERTY_KEY, javaUsername));
+              .addColumn(REPOSITORY_CF, COL_DEFINITIONS_ENFORCED_COLUMN, Bytes.toBytes(enabled))
+              .addColumn(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY, javaUsername));
     }
   }
 
@@ -1344,11 +1350,11 @@ class Repository {
   }
 
   void purgeNamespaceShemaEntity(String name) throws IOException {
-    Repository.this.deleteNamespaceSchemaEntity(true, name);
+    deleteNamespaceSchemaEntity(true, name);
   }
 
   void deleteNamespaceSchemaEntity(String name) throws IOException {
-    Repository.this.deleteNamespaceSchemaEntity(false, name);
+    deleteNamespaceSchemaEntity(false, name);
   }
 
   private void deleteNamespaceSchemaEntity(boolean purge, String name) throws IOException {
@@ -1357,25 +1363,27 @@ class Repository {
   }
 
   void purgeTableSchemaEntity(TableName tableName) throws IOException {
-    Repository.this.deleteTableSchemaEntity(true, false, tableName);
+    deleteTableSchemaEntity(true, false, tableName);
   }
 
   void truncateTableColumns(TableName tableName) throws IOException {
-    Repository.this.deleteTableSchemaEntity(false, true, tableName);
+    deleteTableSchemaEntity(false, true, tableName);
   }
 
   void deleteTableSchemaEntity(TableName tableName) throws IOException {
-    Repository.this.deleteTableSchemaEntity(false, false, tableName);
+    deleteTableSchemaEntity(false, false, tableName);
   }
 
   private void deleteTableSchemaEntity(boolean purge, boolean truncateColumns,
           TableName tableName) throws IOException {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tableName.getNamespace());
-    deleteSchemaEntity(purge, truncateColumns, SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName.getName());
+    deleteSchemaEntity(purge, truncateColumns, SchemaEntityType.TABLE.getRecordType(),
+            namespaceForeignKey, tableName.getName());
   }
 
   void deleteColumnFamily(TableName tableName, byte[] name) throws IOException {
-    deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(tableName), name);
+    deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+            getTableForeignKey(tableName), name);
   }
 
   /**
@@ -1394,9 +1402,10 @@ class Repository {
     if (colFamilyForeignKey == null) {
       return;
     }
-    // TO DO: before (or as part of) conceptual deletion, reset ColumnDefinition's validation-related attributes
+    // TO DO?: before (or as part of) conceptual deletion, reset ColumnDefinition's validation-related attributes
 
-    deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey, colQualifier);
+    deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
+            colFamilyForeignKey, colQualifier);
   }
 
   private void deleteSchemaEntity(boolean purge, boolean truncateColumns, byte recordType,
@@ -1406,13 +1415,15 @@ class Repository {
       return;
     }
     for (Result row : getRows(true, recordType, parentForeignKey, entityName, null)) {
-      if (!truncateColumns || (truncateColumns && recordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType())) {
+      if (!truncateColumns || (truncateColumns &&
+              recordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType())) {
         if (purge) {
           repositoryTable.delete(new Delete(row.getRow()));
         } else {
-          if (!Bytes.equals(row.getValue(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN), DELETED_STATUS)) {
+          if (!Bytes.equals(row.getValue(REPOSITORY_CF, ENTITY_STATUS_COLUMN), DELETED_STATUS)) {
             repositoryTable.put(new Put(row.getRow())
-                    .addColumn(REPOSITORY_COLFAMILY, ENTITY_STATUS_COLUMN, DELETED_STATUS));
+                    .addColumn(REPOSITORY_CF, ENTITY_STATUS_COLUMN, DELETED_STATUS)
+                    .addColumn(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY, javaUsername));
           }
         }
       }
@@ -1435,11 +1446,11 @@ class Repository {
           continue;
       }
       deleteSchemaEntity(purge, truncateColumns, childRecordType,
-              row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN), null);
+              row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN), null);
       if (childRecordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
         deleteSchemaEntity(purge, truncateColumns,
                 SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
-                row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN), null);
+                row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN), null);
       }
     }
   }
@@ -1449,7 +1460,7 @@ class Repository {
     if (!isIncludedTable(tableName)) {
       return;
     }
-    putTable(standardAdmin.getTableDescriptor(tableName));
+    putTableSchemaEntity(standardAdmin.getTableDescriptor(tableName));
     if (includeColumnQualifiers) {
       discoverColumnMetadata(tableName);
     }
@@ -1460,12 +1471,12 @@ class Repository {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
       }
-      putNamespace(nd);
+      putNamespaceSchemaEntity(nd);
       for (HTableDescriptor htd : standardAdmin.listTableDescriptorsByNamespace(nd.getName())) {
         if (!isIncludedTable(htd.getTableName())) {
           continue;
         }
-        putTable(htd);
+        putTableSchemaEntity(htd);
       }
     }
     if (includeColumnQualifiers) {
@@ -1483,7 +1494,7 @@ class Repository {
     try (ResultScanner rows
             = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
       for (Result row : rows) {
-        putColumnAuditors(mtd, row, true);
+        putColumnAuditorSchemaEntities(mtd, row, true);
       }
     }
   }
@@ -1499,7 +1510,7 @@ class Repository {
         try (ResultScanner rows
                 = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
           for (Result row : rows) {
-            putColumnAuditors(mtd, row, true);
+            putColumnAuditorSchemaEntities(mtd, row, true);
           }
         }
       }
@@ -1690,9 +1701,9 @@ class Repository {
         byte entityType = rowId[0];
         byte[] entityName = extractNameFromRowId(rowId);
         byte[] parentForeignKey = extractParentForeignKeyFromRowId(rowId);
-        byte[] entityForeignKey = row.getValue(REPOSITORY_COLFAMILY, FOREIGN_KEY_COLUMN);
+        byte[] entityForeignKey = row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
         Map<Long, byte[]> userNameKeyedByTimestampMap = new HashMap<>();
-        for (Cell userNameCell : row.getColumnCells(REPOSITORY_COLFAMILY, JAVA_USERNAME_PROPERTY_KEY)) {
+        for (Cell userNameCell : row.getColumnCells(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY)) {
           userNameKeyedByTimestampMap.put(userNameCell.getTimestamp(),
                   Bytes.getBytes(CellUtil.getValueBufferShallowCopy(userNameCell)));
         }

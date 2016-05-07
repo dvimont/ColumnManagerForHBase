@@ -78,7 +78,7 @@ class MTableMultiplexer extends HTableMultiplexer {
       }
       if (!puts.isEmpty()) {
         try {
-          repository.putColumnAuditors(TableName.valueOf(tableName), puts);
+          repository.putColumnAuditorSchemaEntities(TableName.valueOf(tableName), puts);
           // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
         } catch (IOException e) {
           repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
@@ -116,7 +116,7 @@ class MTableMultiplexer extends HTableMultiplexer {
     // ColumnManager auditing
     if (repository.isActivated() && putRequestQueued) {
       try {
-        repository.putColumnAuditors(TableName.valueOf(tableName), put);
+        repository.putColumnAuditorSchemaEntities(TableName.valueOf(tableName), put);
         // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
@@ -154,7 +154,7 @@ class MTableMultiplexer extends HTableMultiplexer {
     // ColumnManager auditing
     if (repository.isActivated() && putRequestQueued) {
       try {
-        repository.putColumnAuditors(TableName.valueOf(tableName), put);
+        repository.putColumnAuditorSchemaEntities(TableName.valueOf(tableName), put);
         // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
@@ -215,7 +215,7 @@ class MTableMultiplexer extends HTableMultiplexer {
     // ColumnManager auditing
     if (repository.isActivated() && putRequestQueued) {
       try {
-        repository.putColumnAuditors(tableName, put);
+        repository.putColumnAuditorSchemaEntities(tableName, put);
         // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
@@ -250,7 +250,7 @@ class MTableMultiplexer extends HTableMultiplexer {
     // ColumnManager auditing
     if (repository.isActivated() && putRequestQueued) {
       try {
-        repository.putColumnAuditors(tableName, put);
+        repository.putColumnAuditorSchemaEntities(tableName, put);
         // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());

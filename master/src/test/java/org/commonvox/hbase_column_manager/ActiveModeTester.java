@@ -174,8 +174,8 @@ public class ActiveModeTester {
 
                 // AUDIT TRAIL TEST
                 ChangeEventMonitor auditTrail = repositoryAdmin.getChangeEventMonitor();
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getAllChangeEvents(), TARGET_PATH, "changeEvents.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getAllChangeEvents(), TARGET_PATH, "changeEvents.csv");
 
 
             }

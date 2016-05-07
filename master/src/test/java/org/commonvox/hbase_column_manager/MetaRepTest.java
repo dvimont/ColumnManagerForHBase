@@ -164,30 +164,30 @@ public class MetaRepTest {
 
                 // AUDIT TRAIL TEST
                 ChangeEventMonitor auditTrail = repositoryAdmin.getChangeEventMonitor();
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getAllChangeEvents(), TARGET_PATH, "changeEvents.csv");
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getChangeEventsForEntity
-                            (SchemaEntityType.TABLE, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
-                                    null, null), TARGET_PATH, "changeEventsForEntityTable.csv");
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getChangeEventsForEntity
-                            (SchemaEntityType.NAMESPACE, Bytes.toBytes(MY_NAMESPACE_NAME), null,
-                                    null, null), TARGET_PATH, "changeEventsForEntityNamespace.csv");
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getChangeEventsForEntity
-                            (SchemaEntityType.COLUMN_FAMILY, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
-                                    MY_COLUMN_FAMILY_NAME, null), TARGET_PATH, "changeEventsForEntityColFamily.csv");
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getChangeEventsForEntity
-                            (SchemaEntityType.COLUMN_AUDITOR, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
-                                    MY_COLUMN_FAMILY_NAME, MY_FIRST_COLUMN_QUALIFIER),
-                                    TARGET_PATH, "changeEventsForEntityColAuditor.csv");
-                ChangeEventMonitor.exportChangeEventListToCsvFile
-                        (auditTrail.getChangeEventsForEntity
-                            (SchemaEntityType.COLUMN_DEFINITION, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
-                                    MY_COLUMN_FAMILY_NAME, MY_FIRST_COLUMN_QUALIFIER),
-                                    TARGET_PATH, "changeEventsForEntityColDefinition.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getAllChangeEvents(), TARGET_PATH, "changeEvents.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getChangeEventsForEntity
+//                            (SchemaEntityType.TABLE, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+//                                    null, null), TARGET_PATH, "changeEventsForEntityTable.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getChangeEventsForEntity
+//                            (SchemaEntityType.NAMESPACE, Bytes.toBytes(MY_NAMESPACE_NAME), null,
+//                                    null, null), TARGET_PATH, "changeEventsForEntityNamespace.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getChangeEventsForEntity
+//                            (SchemaEntityType.COLUMN_FAMILY, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+//                                    MY_COLUMN_FAMILY_NAME, null), TARGET_PATH, "changeEventsForEntityColFamily.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getChangeEventsForEntity
+//                            (SchemaEntityType.COLUMN_AUDITOR, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+//                                    MY_COLUMN_FAMILY_NAME, MY_FIRST_COLUMN_QUALIFIER),
+//                                    TARGET_PATH, "changeEventsForEntityColAuditor.csv");
+//                ChangeEventMonitor.exportChangeEventListToCsvFile
+//                        (auditTrail.getChangeEventsForEntity
+//                            (SchemaEntityType.COLUMN_DEFINITION, Bytes.toBytes(MY_NAMESPACE_NAME), MY_TABLE_NAME.getName(),
+//                                    MY_COLUMN_FAMILY_NAME, MY_FIRST_COLUMN_QUALIFIER),
+//                                    TARGET_PATH, "changeEventsForEntityColDefinition.csv");
 
 //                System.out.println("** Beginning of list of ALL Change Events **");
 //                for (ChangeEvent ce : auditTrail.getAllChangeEvents()) {

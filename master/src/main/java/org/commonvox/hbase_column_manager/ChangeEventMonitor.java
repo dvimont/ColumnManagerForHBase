@@ -17,11 +17,11 @@
 package org.commonvox.hbase_column_manager;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -36,14 +36,12 @@ import org.commonvox.collections.OrderedSet;
  * {@link RepositoryAdmin#getChangeEventMonitor() getChangeEventMonitor} method) provides various
  * {@link ChangeEventMonitor#getAllChangeEvents() get methods} by which lists of
  * {@link ChangeEvent}s may be obtained (grouped and ordered in various ways), and the class
- * provides a static  {@link #exportChangeEventListToCsvFile(java.util.List, java.lang.String, java.lang.String)
+ * provides a static  {@link #exportChangeEventListToCsvFile(java.util.List, java.io.File)
  * convenience method} for outputting a list of {@code ChangeEvent}s to a CSV file.
  *
  * @author Daniel Vimont
  */
 public class ChangeEventMonitor {
-//    private IndexedCollection<ChangeEvent> changeEvents;
-
   private final static String COMMA = ",";
   private final KeyComponentProfile<ChangeEvent> timestampComponent
           = new KeyComponentProfile<>(ChangeEvent.class, ChangeEvent.Timestamp.class);
@@ -62,11 +60,9 @@ public class ChangeEventMonitor {
   private final static Charset ENCODING = StandardCharsets.UTF_8;
 
   ChangeEventMonitor() {
-//        changeEvents = new IndexedCollection<>(ChangeEvent.class, entityIndex);
   }
 
   void add(ChangeEvent changeEvent) {
-//        changeEvents.add(changeEvent);
     entityIndex.add(changeEvent);
   }
 
@@ -78,14 +74,11 @@ public class ChangeEventMonitor {
       entityForeignKeyMap.put(entity.getEntityForeignKey().getBytes(), entity);
     }
 
-    // "denormalize" each ChangeEvent by adding namespace, table, etc. to each
-//        IndexedCollection<ChangeEvent> denormalizedEvents
-//                = new IndexedCollection<>(ChangeEvent.class, timestampIndex, userIndex, entityIndex);
+    // "denormalize" each ChangeEvent by adding namespace, table, etc. to each one
     OrderedSet<ChangeEvent> denormalizedEntityIndex
             = new OrderedSet<>(entityComponent, timestampComponent, attributeNameComponent);
     ChangeEvent.Entity denormalizedEntity
             = ChangeEvent.createEntityObject((byte) ' ', null, null);
-//        for (ChangeEvent event : changeEvents.getValues(ChangeEvent.class, ChangeEvent.Entity.class)) {
     for (ChangeEvent event : entityIndex.values()) {
       ChangeEvent.Entity entity = event.getEntityObject();
       if (entity.compareTo(denormalizedEntity) != 0) {
@@ -125,7 +118,6 @@ public class ChangeEventMonitor {
         denormalizedEntity = entity;
       }
       event.setEntityObject(denormalizedEntity);
-//            denormalizedEvents.add(event);
       timestampIndex.add(event);
       userIndex.add(event);
       denormalizedEntityIndex.add(event);
@@ -141,7 +133,7 @@ public class ChangeEventMonitor {
    * @return complete list of ChangeEvents in timestamp order
    */
   public List<ChangeEvent> getAllChangeEvents() {
-    return entityIndex.values();
+    return timestampIndex.values();
   }
 
   /**
@@ -243,21 +235,19 @@ public class ChangeEventMonitor {
    *
    * @param changeEventList list of ChangeEvent objects returned by one of the "get" methods of the
    * {@code ChangeEventMonitor} class.
-   * @param targetPathString path to which target file should be written.
-   * @param targetFileNameString file name to assign to target file.
+   * @param targetFile target file
    * @throws IOException if a remote or network exception occurs
    */
-  public static void exportChangeEventListToCsvFile(List<ChangeEvent> changeEventList, String targetPathString, String targetFileNameString)
-          throws IOException {
-    try (BufferedWriter writer
-            = Files.newBufferedWriter(Paths.get(targetPathString, targetFileNameString), ENCODING)) {
+  public static void exportChangeEventListToCsvFile(
+          List<ChangeEvent> changeEventList, File targetFile) throws IOException {
+    try (BufferedWriter writer = Files.newBufferedWriter(targetFile.toPath(), ENCODING)) {
       if (changeEventList == null || changeEventList.isEmpty()) {
         return;
       }
       writer.write(buildCommaDelimitedString(
-              "Timestamp", "Java Username", "Entity Type",
-              "Namespace", "Table", "Column Family", "Column Qualifier",
-              "Attribute Name", "Attribute Value"));
+              "Timestamp", "Java_Username", "Entity_Type",
+              "Namespace", "Table", "Column_Family", "Column_Qualifier",
+              "Attribute_Name", "Attribute_Value"));
       writer.newLine();
       for (ChangeEvent ce : changeEventList) {
         writer.write(buildCommaDelimitedString(
