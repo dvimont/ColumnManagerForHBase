@@ -258,7 +258,8 @@ class Repository {
               + REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
     } else {
       standardAdmin.createNamespace(REPOSITORY_NAMESPACE_DESCRIPTOR);
-      staticLogger.info("ColumnManager Repository Namespace has been created (did not already exist): "
+      staticLogger.info(
+              "ColumnManager Repository Namespace has been created (did not already exist): "
               + REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
     }
   }

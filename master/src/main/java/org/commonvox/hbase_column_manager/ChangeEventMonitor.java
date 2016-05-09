@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.commonvox.collections.KeyComponentProfile;
 import org.commonvox.collections.OrderedSet;
@@ -42,7 +43,7 @@ import org.commonvox.collections.OrderedSet;
  * @author Daniel Vimont
  */
 public class ChangeEventMonitor {
-  private final static String COMMA = ",";
+  private final static char COMMA = ',';
   private final KeyComponentProfile<ChangeEvent> timestampComponent
           = new KeyComponentProfile<>(ChangeEvent.class, ChangeEvent.Timestamp.class);
   private final KeyComponentProfile<ChangeEvent> entityComponent
@@ -157,6 +158,33 @@ public class ChangeEventMonitor {
     return userIndex.values(ChangeEvent.createUserNameObject(userName));
   }
 
+  public List<ChangeEvent> getChangeEventsForNamespace(byte[] namespaceName) {
+    return getChangeEventsForEntity(SchemaEntityType.NAMESPACE, namespaceName, null, null, null);
+  }
+
+  public List<ChangeEvent> getChangeEventsForTable(TableName tableName) {
+    return getChangeEventsForEntity(
+            SchemaEntityType.TABLE, tableName.getNamespace(), tableName.getName(), null, null);
+  }
+
+  public List<ChangeEvent> getChangeEventsForColumnFamily(
+          TableName tableName, byte[] columnFamily) {
+    return getChangeEventsForEntity(SchemaEntityType.COLUMN_FAMILY, tableName.getNamespace(),
+            tableName.getName(), columnFamily, null);
+  }
+
+  public List<ChangeEvent> getChangeEventsForColumnDefinition(
+          TableName tableName, byte[] columnFamily, byte[] columnQualifier) {
+    return getChangeEventsForEntity(SchemaEntityType.COLUMN_DEFINITION, tableName.getNamespace(),
+            tableName.getName(), columnFamily, columnQualifier);
+  }
+
+  public List<ChangeEvent> getChangeEventsForColumnAuditor(
+          TableName tableName, byte[] columnFamily, byte[] columnQualifier) {
+    return getChangeEventsForEntity(SchemaEntityType.COLUMN_AUDITOR, tableName.getNamespace(),
+            tableName.getName(), columnFamily, columnQualifier);
+  }
+
   /**
    * Get the {@link ChangeEvent}s pertaining to a specified Entity (e.g., a specific <i>Table</i>),
    * in timestamp order. Note that some parameters will not apply to some {@link SchemaEntityType}s (e.g.
@@ -170,7 +198,7 @@ public class ChangeEventMonitor {
    * @param columnQualifier <i>Column Qualifier</i> which pertains to the Entity (if applicable)
    * @return list of ChangeEvents pertaining to the specified Entity, in timestamp order
    */
-  public List<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
+  private List<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
           byte[] namespaceName, byte[] tableName,
           byte[] columnFamily, byte[] columnQualifier) {
     Set<Object> entityList = entityIndex.keyComponentSet(entityComponent);
@@ -193,27 +221,33 @@ public class ChangeEventMonitor {
             = ((ChangeEvent.Entity) entityListArray[namespaceIndex]).getEntityForeignKey().getBytes();
     int tableIndex
             = Arrays.binarySearch(entityListArray,
-                    ChangeEvent.createEntityObject(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
+                    ChangeEvent.createEntityObject(SchemaEntityType.TABLE.getRecordType(),
+                            namespaceForeignKey, tableName));
     if (tableIndex < 0) {
       return null;
     }
     if (entityType.equals(SchemaEntityType.TABLE)) {
-      return entityIndex.values(ChangeEvent.createEntityObject(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
+      return entityIndex.values(ChangeEvent.createEntityObject(
+              SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
     }
 
     byte[] tableForeignKey
             = ((ChangeEvent.Entity) entityListArray[tableIndex]).getEntityForeignKey().getBytes();
     int colFamilyIndex
             = Arrays.binarySearch(entityListArray,
-                    ChangeEvent.createEntityObject(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
+                    ChangeEvent.createEntityObject(
+                            SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey,
+                            columnFamily));
     if (colFamilyIndex < 0) {
       return null;
     }
     if (entityType.equals(SchemaEntityType.COLUMN_FAMILY)) {
-      return entityIndex.values(ChangeEvent.createEntityObject(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
+      return entityIndex.values(ChangeEvent.createEntityObject(
+              SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
     }
     byte[] colFamilyForeignKey
-            = ((ChangeEvent.Entity) entityListArray[colFamilyIndex]).getEntityForeignKey().getBytes();
+            = ((ChangeEvent.Entity)entityListArray[colFamilyIndex])
+                    .getEntityForeignKey().getBytes();
     int colQualifierIndex
             = Arrays.binarySearch(entityListArray,
                     ChangeEvent.createEntityObject(
@@ -221,7 +255,8 @@ public class ChangeEventMonitor {
     if (colQualifierIndex < 0) {
       return null;
     }
-    if (entityType.equals(SchemaEntityType.COLUMN_AUDITOR) || entityType.equals(SchemaEntityType.COLUMN_DEFINITION)) {
+    if (entityType.equals(SchemaEntityType.COLUMN_AUDITOR)
+            || entityType.equals(SchemaEntityType.COLUMN_DEFINITION)) {
       return entityIndex.values(
               ChangeEvent.createEntityObject(
                       entityType.getRecordType(), colFamilyForeignKey, columnQualifier));

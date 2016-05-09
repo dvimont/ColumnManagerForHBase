@@ -1,0 +1,4 @@
+Timestamp,Java_Username,Entity_Type,Namespace,Table,Column_Family,Column_Qualifier,Attribute_Name,Attribute_Value
+1462776115257,userfalse,ColumnDefinition,testNamespace01,testNamespace01:testTable01,CF2,column03,Value__COLUMN_VALIDATION_REGEX,https?://.*
+1462776115257,userfalse,ColumnDefinition,testNamespace01,testNamespace01:testTable01,CF2,column03,_Status,A
+1462776116931,userfalse,ColumnDefinition,testNamespace01,testNamespace01:testTable01,CF2,column03,_Status,D

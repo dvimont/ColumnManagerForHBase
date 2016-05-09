@@ -1,0 +1,6 @@
+Timestamp,Java_Username,Entity_Type,Namespace,Table,Column_Family,Column_Qualifier,Attribute_Name,Attribute_Value
+1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__DURABILITY,SKIP_WAL
+1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__IS_META,false
+1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__MEMSTORE_FLUSHSIZE,60000000
+1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,_Status,A
+1462776116850,userfalse,Table,testNamespace01,testNamespace01:testTable01,,,_Status,D

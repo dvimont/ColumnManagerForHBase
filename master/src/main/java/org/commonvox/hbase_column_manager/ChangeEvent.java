@@ -95,9 +95,20 @@ public class ChangeEvent {
    *
    * @return {@link SchemaEntityType} of the Entity to which the {@code ChangeEvent} pertains.
    */
-  public SchemaEntityType getEntityType() {
+  SchemaEntityType getEntityType() {
     return SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP
             .get(this.entity.getEntityRecordType().getBytes()[0]);
+  }
+
+  /**
+   * Get the type of the Entity to which the {@code ChangeEvent} pertains (e.g., "Table",
+   * "ColumnFamily", etc.).
+   *
+   * @return type of the Entity to which the {@code ChangeEvent} pertains.
+   */
+  public String getEntityTypeAsString() {
+    return SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP
+            .get(this.entity.getEntityRecordType().getBytes()[0]).toString();
   }
 
   byte[] getParentForeignKey() {
@@ -401,12 +412,22 @@ public class ChangeEvent {
       }
       return this.entityName.compareTo(other.entityName);
     }
+
+    @Override
+    public String toString() {
+      return entityType + " EntityName:<" + entityName + ">";
+    }
   }
 
   class EntityRecordType extends BytesContainer {
 
     EntityRecordType(byte entityRecordType) {
       super(new byte[]{entityRecordType});
+    }
+
+    @Override
+    public String toString() {
+      return "EntityType:<" + Bytes.toString(this.getBytes()) + ">";
     }
   }
 

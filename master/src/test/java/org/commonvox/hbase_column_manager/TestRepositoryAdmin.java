@@ -18,9 +18,12 @@ package org.commonvox.hbase_column_manager;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -199,6 +202,8 @@ public class TestRepositoryAdmin {
   private static final String COL_VALUE_ENFORCE_FAILURE
           = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Value (regex)";
   private static final String HSA_FAILURE = "FAILURE IN HBase Schema Archive PROCESSING!! ==>> ";
+
+  private static final String CHANGE_EVENT_FAILURE = "FAILURE IN ChangeEvent PROCESSING!! ==>> ";
 
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
@@ -840,29 +845,9 @@ public class TestRepositoryAdmin {
   }
 
   @Test
-  public void testChangeEventMonitor() throws IOException {
+  public void testChangeEventMonitor() throws IOException, URISyntaxException {
     System.out.println("#testChangeEventMonitor has been invoked.");
-    // file setup
-    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
-    final String TARGET_EXPORT_ALL_BY_TIMESTAMP_FILE = "temp.changeEvents.timestampOrder.csv";
-    final String TARGET_EXPORT_ALL_BY_USERNAME_FILE = "temp.changeEvents.userNameOrder.csv";
-    final String TARGET_EXPORT_FOR_USER_FILE = "temp.changeEvents.forUser.csv";
-    final String TARGET_EXPORT_FOR_TABLE_FILE = "temp.changeEvents.forTable.csv";
-    File exportAllByTimestampFile;
-    File exportAllByUsernameFile;
-    File exportForUserFile;
-    File exportForTableFile;
-    try {
-      exportAllByTimestampFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_BY_TIMESTAMP_FILE);
-      exportAllByUsernameFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_BY_USERNAME_FILE);
-      exportForUserFile = tempTestFolder.newFile(TARGET_EXPORT_FOR_USER_FILE);
-      exportForTableFile = tempTestFolder.newFile(TARGET_EXPORT_FOR_TABLE_FILE);
-    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
-      exportAllByTimestampFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_BY_TIMESTAMP_FILE);
-      exportAllByUsernameFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_BY_USERNAME_FILE);
-      exportForUserFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_FOR_USER_FILE);
-      exportForTableFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_FOR_TABLE_FILE);
-    }
+
     // environment cleanup before testing
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
@@ -876,26 +861,128 @@ public class TestRepositoryAdmin {
     createAndEnforceColumnDefinitions(configuration);
     deleteTableInHBase(configuration);
 
+    // file setup
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
+    final String TEMP_PREFIX = "temp.";
+    final String RESOURCE_PREFIX = "test.";
+    final String EVENTS_BY_TIMESTAMP = "changeEvents.timestampOrder.csv";
+    final String EVENTS_BY_TIMESTAMP_FILE = TEMP_PREFIX + EVENTS_BY_TIMESTAMP;
+    final String EVENTS_BY_TIMESTAMP_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_BY_TIMESTAMP;
+    final String EVENTS_BY_USERNAME = "changeEvents.userNameOrder.csv";
+    final String EVENTS_BY_USERNAME_FILE = TEMP_PREFIX + EVENTS_BY_USERNAME;
+    final String EVENTS_BY_USERNAME_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_BY_USERNAME;
+    final String EVENTS_FOR_USER = "changeEvents.forUser.csv";
+    final String EVENTS_FOR_USER_FILE = TEMP_PREFIX + EVENTS_FOR_USER;
+    final String EVENTS_FOR_USER_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_FOR_USER;
+    final String EVENTS_FOR_NAMESPACE = "changeEvents.forNamespace.csv";
+    final String EVENTS_FOR_NAMESPACE_FILE = TEMP_PREFIX + EVENTS_FOR_NAMESPACE;
+    final String EVENTS_FOR_NAMESPACE_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_FOR_NAMESPACE;
+    final String EVENTS_FOR_TABLE = "changeEvents.forTable.csv";
+    final String EVENTS_FOR_TABLE_FILE = TEMP_PREFIX + EVENTS_FOR_TABLE;
+    final String EVENTS_FOR_TABLE_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_FOR_TABLE;
+    final String EVENTS_FOR_COL_FAMILY = "changeEvents.forColFamily.csv";
+    final String EVENTS_FOR_COL_FAMILY_FILE = TEMP_PREFIX + EVENTS_FOR_COL_FAMILY;
+    final String EVENTS_FOR_COL_FAMILY_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_FOR_COL_FAMILY;
+    final String EVENTS_FOR_COL_DEF = "changeEvents.forColDefinition.csv";
+    final String EVENTS_FOR_COL_DEF_FILE = TEMP_PREFIX + EVENTS_FOR_COL_DEF;
+    final String EVENTS_FOR_COL_DEF_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_FOR_COL_DEF;
+    final String EVENTS_FOR_COL_AUDITOR = "changeEvents.forColAuditor.csv";
+    final String EVENTS_FOR_COL_AUDITOR_FILE = TEMP_PREFIX + EVENTS_FOR_COL_AUDITOR;
+    final String EVENTS_FOR_COL_AUDITOR_RESOURCE_FILE = RESOURCE_PREFIX + EVENTS_FOR_COL_AUDITOR;
+    File eventsByTimestampFile;
+    File eventsByUsernameFile;
+    File eventsForUserFile;
+    File eventsForNamespaceFile;
+    File eventsForTableFile;
+    File eventsForColumnFamilyFile;
+    File eventsForColumnDefinitionFile;
+    File eventsForColumnAuditorFile;
+    try {
+      eventsByTimestampFile = tempTestFolder.newFile(EVENTS_BY_TIMESTAMP_FILE);
+      eventsByUsernameFile = tempTestFolder.newFile(EVENTS_BY_USERNAME_FILE);
+      eventsForUserFile = tempTestFolder.newFile(EVENTS_FOR_USER_FILE);
+      eventsForNamespaceFile = tempTestFolder.newFile(EVENTS_FOR_NAMESPACE_FILE);
+      eventsForTableFile = tempTestFolder.newFile(EVENTS_FOR_TABLE_FILE);
+      eventsForColumnFamilyFile = tempTestFolder.newFile(EVENTS_FOR_COL_FAMILY_FILE);
+      eventsForColumnDefinitionFile = tempTestFolder.newFile(EVENTS_FOR_COL_DEF_FILE);
+      eventsForColumnAuditorFile = tempTestFolder.newFile(EVENTS_FOR_COL_AUDITOR_FILE);
+    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
+      eventsByTimestampFile = new File(TARGET_DIRECTORY + EVENTS_BY_TIMESTAMP_FILE);
+      eventsByUsernameFile = new File(TARGET_DIRECTORY + EVENTS_BY_USERNAME_FILE);
+      eventsForUserFile = new File(TARGET_DIRECTORY + EVENTS_FOR_USER_FILE);
+      eventsForNamespaceFile = new File(TARGET_DIRECTORY + EVENTS_FOR_NAMESPACE_FILE);
+      eventsForTableFile = new File(TARGET_DIRECTORY + EVENTS_FOR_TABLE_FILE);
+      eventsForColumnFamilyFile = new File(TARGET_DIRECTORY + EVENTS_FOR_COL_FAMILY_FILE);
+      eventsForColumnDefinitionFile = new File(TARGET_DIRECTORY + EVENTS_FOR_COL_DEF_FILE);
+      eventsForColumnAuditorFile = new File(TARGET_DIRECTORY + EVENTS_FOR_COL_AUDITOR_FILE);
+    }
     // create and test ChangeEventMonitor
     try (RepositoryAdmin repositoryAdmin
             = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
       ChangeEventMonitor monitor = repositoryAdmin.getChangeEventMonitor();
 
-      List<ChangeEvent> allChangeEvents = monitor.getAllChangeEvents();
-      ChangeEventMonitor.exportChangeEventListToCsvFile(allChangeEvents, exportAllByTimestampFile);
-
-      List<ChangeEvent> allChangeEventsByUsername = monitor.getAllChangeEventsByUserName();
       ChangeEventMonitor.exportChangeEventListToCsvFile(
-              allChangeEventsByUsername, exportAllByUsernameFile);
+              monitor.getAllChangeEvents(), eventsByTimestampFile);
+      compareResourceFileToExportedFile(
+              EVENTS_BY_TIMESTAMP_RESOURCE_FILE, eventsByTimestampFile, "#getAllChangeEvents");
 
-      List<ChangeEvent> allChangeEventsOfSpecificUser
-              = monitor.getChangeEventsForUserName("userfalse");
       ChangeEventMonitor.exportChangeEventListToCsvFile(
-              allChangeEventsOfSpecificUser, exportForUserFile);
+              monitor.getAllChangeEventsByUserName(), eventsByUsernameFile);
+      compareResourceFileToExportedFile(EVENTS_BY_USERNAME_RESOURCE_FILE, eventsByUsernameFile,
+              "#getAllChangeEventsByUserName");
 
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForUserName("userfalse"), eventsForUserFile);
+      compareResourceFileToExportedFile(EVENTS_FOR_USER_RESOURCE_FILE, eventsForUserFile,
+              "#getChangeEventsForUserName");
+
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForNamespace(NAMESPACE01_TABLE01.getNamespace()),
+              eventsForNamespaceFile);
+      compareResourceFileToExportedFile(EVENTS_FOR_NAMESPACE_RESOURCE_FILE, eventsForNamespaceFile,
+              "#getChangeEventsForNamespace");
+
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForTable(NAMESPACE01_TABLE01), eventsForTableFile);
+      compareResourceFileToExportedFile(EVENTS_FOR_TABLE_RESOURCE_FILE, eventsForTableFile,
+              "#getChangeEventsForTable");
+
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForColumnFamily(NAMESPACE01_TABLE02, CF02),
+              eventsForColumnFamilyFile);
+      compareResourceFileToExportedFile(EVENTS_FOR_COL_FAMILY_RESOURCE_FILE,
+              eventsForColumnFamilyFile, "#getChangeEventsForColumnFamily");
+
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForColumnDefinition(
+                      NAMESPACE01_TABLE01, CF02, COLQUALIFIER03), eventsForColumnDefinitionFile);
+      compareResourceFileToExportedFile(EVENTS_FOR_COL_DEF_RESOURCE_FILE,
+              eventsForColumnDefinitionFile, "#getChangeEventsForColumnDefinition");
+
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForColumnAuditor(NAMESPACE01_TABLE01, CF01, COLQUALIFIER01),
+              eventsForColumnAuditorFile);
+      compareResourceFileToExportedFile(EVENTS_FOR_COL_AUDITOR_RESOURCE_FILE,
+              eventsForColumnAuditorFile, "#getChangeEventsForColumnAuditor");
     }
     clearTestingEnvironment();
     System.out.println("#testChangeEventMonitor has run to completion.");
+  }
+
+  private void compareResourceFileToExportedFile(String resourceFileString, File exportedFile,
+          String methodName) throws IOException, URISyntaxException {
+    Path resourcePath = Paths.get(ClassLoader.getSystemResource(resourceFileString).toURI());
+    assertEquals(CHANGE_EVENT_FAILURE + "unexpected item count from " + methodName + " method",
+            Files.lines(resourcePath).count(), Files.lines(exportedFile.toPath()).count());
+    Iterator<String> resourceLinesIterator = Files.lines(resourcePath).iterator();
+    Iterator<String> exportedLinesIterator = Files.lines(exportedFile.toPath()).iterator();
+    resourceLinesIterator.next(); // skip first header line in both files
+    exportedLinesIterator.next(); // skip first header line in both files
+    while (resourceLinesIterator.hasNext()) {
+      assertEquals(CHANGE_EVENT_FAILURE + "unexpected content returned by " + methodName,
+              resourceLinesIterator.next().substring(14), // bypass timestamp at start of line
+              exportedLinesIterator.next().substring(14)); // bypass timestamp at start of line
+    }
   }
 
   private void changeJavaUsername() {
