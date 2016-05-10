@@ -41,7 +41,6 @@ import org.apache.hadoop.hbase.util.Bytes;
 class SchemaEntity implements Comparable<SchemaEntity> {
 
   // all simple fields are non-final Strings to facilitate straightforward JAXB marshal/unmarshal
-
   @XmlAttribute
   private String schemaEntityType; // full String used for explicit JAXB marshalling
   @XmlAttribute

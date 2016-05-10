@@ -35,7 +35,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  */
 public class ChangeEvent {
 
-    // Row-level metadata: Each row in repository pertains to a user entity
+  // Row-level metadata: Each row in repository pertains to a user entity
   //   (e.g., a table, or a column family) and tracks all changes to all
   //   of that entity's attributes
   private Entity entity; // corresponds to RowId in repository table
@@ -63,20 +63,19 @@ public class ChangeEvent {
   private ChangeEvent() {
   }
 
-  static UserName createUserNameObject(String userName) {
+  static UserName createUserName(String userName) {
     ChangeEvent changeEvent = new ChangeEvent();
     changeEvent.setUserName(Bytes.toBytes(userName));
     return changeEvent.getUserNameObject();
   }
 
-  static Entity createEntityObject(byte entityType, byte[] parentForeignKey,
-          byte[] entityName) {
+  static Entity createEntity(byte entityType, byte[] parentForeignKey, byte[] entityName) {
     ChangeEvent changeEvent = new ChangeEvent();
     changeEvent.setEntity(entityType, parentForeignKey, entityName, null);
-    return changeEvent.getEntityObject();
+    return changeEvent.getEntity();
   }
 
-  Entity getEntityObject() {
+  Entity getEntity() {
     return entity;
   }
 
@@ -86,7 +85,7 @@ public class ChangeEvent {
     this.entity.setEntityForeignKey(entityForeignKey);
   }
 
-  void setEntityObject(Entity entity) {
+  void setEntity(Entity entity) {
     this.entity = entity;
   }
 
@@ -305,46 +304,25 @@ public class ChangeEvent {
     this.attributeValue = new AttributeValue(attributeValue);
   }
 
-  private class BytesContainer implements Comparable<BytesContainer> {
-
-    private final byte[] bytes;
-
-    BytesContainer(byte[] bytes) {
-      if (bytes == null) {
-        this.bytes = new byte[0];
-      } else {
-        this.bytes = bytes;
-      }
-    }
-
-    byte[] getBytes() {
-      return bytes;
-    }
-
-    @Override
-    public int compareTo(BytesContainer other) {
-      return Bytes.compareTo(this.bytes, other.bytes);
-    }
-  }
-
   class Entity implements Comparable<Entity> {
 
-    private final EntityRecordType entityType; // part of Entity unique identifier
-    private final ParentForeignKey parentForeignKey; // part of Entity unique identifier
-    private final EntityName entityName; // part of Entity unique identifier
+    private final EntityType entityType; // part of Entity unique identifier (rowId)
+    private final ParentForeignKey parentForeignKey; // part of Entity unique identifier (rowId)
+    private final EntityName entityName; // part of Entity unique identifier (rowId)
     private EntityForeignKey entityForeignKey;
+    // Entity pointers for denormalization
     private Entity namespace = null;
     private Entity table = null;
     private Entity colFamily = null;
     private Entity column = null;
 
     Entity(byte entityType, byte[] parentForeignKey, byte[] entityName) {
-      this.entityType = new EntityRecordType(entityType);
+      this.entityType = new EntityType(entityType);
       this.parentForeignKey = new ParentForeignKey(parentForeignKey);
       this.entityName = new EntityName(entityName);
     }
 
-    EntityRecordType getEntityRecordType() {
+    EntityType getEntityRecordType() {
       return entityType;
     }
 
@@ -419,9 +397,31 @@ public class ChangeEvent {
     }
   }
 
-  class EntityRecordType extends BytesContainer {
+  private class BytesContainer implements Comparable<BytesContainer> {
 
-    EntityRecordType(byte entityRecordType) {
+    private final byte[] bytes;
+
+    BytesContainer(byte[] bytes) {
+      if (bytes == null) {
+        this.bytes = new byte[0];
+      } else {
+        this.bytes = bytes;
+      }
+    }
+
+    byte[] getBytes() {
+      return bytes;
+    }
+
+    @Override
+    public int compareTo(BytesContainer other) {
+      return Bytes.compareTo(this.bytes, other.bytes);
+    }
+  }
+
+  class EntityType extends BytesContainer {
+
+    EntityType(byte entityRecordType) {
       super(new byte[]{entityRecordType});
     }
 
