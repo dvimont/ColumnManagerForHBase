@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -184,6 +185,27 @@ public class ChangeEventMonitor {
   }
 
   /**
+   * Get the {@link ChangeEvent}s pertaining to the specified Attribute of the specified
+   * {@link org.apache.hadoop.hbase.HTableDescriptor Table}, in timestamp order.
+   *
+   * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
+   * @param attributeName name of attribute
+   * @return list of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
+   * {@link org.apache.hadoop.hbase.HTableDescriptor Table}
+   */
+  public List<ChangeEvent> getChangeEventsForTableAttribute(
+          TableName tableName, String attributeName) {
+    List<ChangeEvent> tableEvents = getChangeEventsForTable(tableName);
+    List<ChangeEvent> attributeEvents = new ArrayList<>();
+    for (ChangeEvent changeEvent : tableEvents) {
+      if (attributeName.equals(changeEvent.getAttributeNameAsString())) {
+        attributeEvents.add(changeEvent);
+      }
+    }
+    return attributeEvents;
+  }
+
+  /**
    * Get the {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}, in timestamp order.
    *
@@ -196,6 +218,28 @@ public class ChangeEventMonitor {
           TableName tableName, byte[] columnFamily) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_FAMILY, tableName.getNamespace(),
             tableName.getName(), columnFamily, null);
+  }
+
+  /**
+   * Get the {@link ChangeEvent}s pertaining to the specified Attribute of the specified
+   * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}, in timestamp order.
+   *
+   * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
+   * @param columnFamily name of Column Family
+   * @param attributeName name of attribute
+   * @return list of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
+   * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}
+   */
+  public List<ChangeEvent> getChangeEventsForColumnFamilyAttribute(
+          TableName tableName, byte[] columnFamily, String attributeName) {
+    List<ChangeEvent> cfEvents = getChangeEventsForColumnFamily(tableName, columnFamily);
+    List<ChangeEvent> attributeEvents = new ArrayList<>();
+    for (ChangeEvent changeEvent : cfEvents) {
+      if (attributeName.equals(changeEvent.getAttributeNameAsString())) {
+        attributeEvents.add(changeEvent);
+      }
+    }
+    return attributeEvents;
   }
 
   /**

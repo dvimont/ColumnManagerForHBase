@@ -964,6 +964,27 @@ public class TestRepositoryAdmin {
               eventsForColumnAuditorFile);
       compareResourceFileToExportedFile(EVENTS_FOR_COL_AUDITOR_RESOURCE_FILE,
               eventsForColumnAuditorFile, "#getChangeEventsForColumnAuditor");
+
+      final String ATTRIBUTE_NAME = "Value__MEMSTORE_FLUSHSIZE";
+      List<ChangeEvent> attributeChangeEvents
+              = monitor.getChangeEventsForTableAttribute(NAMESPACE01_TABLE01, ATTRIBUTE_NAME);
+      assertEquals(CHANGE_EVENT_FAILURE + "unexpected value count returned from "
+              + "#getChangeEventsForTableAttribute method", 1, attributeChangeEvents.size());
+      assertEquals(CHANGE_EVENT_FAILURE + "unexpected attribute_name returned from "
+              + "#getChangeEventsForTableAttribute method",
+              ATTRIBUTE_NAME, attributeChangeEvents.get(0).getAttributeNameAsString());
+
+      final String STATUS_ATTRIBUTE_NAME = "_Status";
+      attributeChangeEvents
+              = monitor.getChangeEventsForColumnFamilyAttribute(
+                      NAMESPACE01_TABLE01, CF02, STATUS_ATTRIBUTE_NAME);
+      assertEquals(CHANGE_EVENT_FAILURE + "unexpected value count returned from "
+              + "#getChangeEventsForColumnFamilyAttribute method", 2, attributeChangeEvents.size());
+      for (ChangeEvent ce : attributeChangeEvents) {
+        assertEquals(CHANGE_EVENT_FAILURE + "unexpected attribute_name returned from "
+                + "#getChangeEventsForColumnFamilyAttribute method",
+                STATUS_ATTRIBUTE_NAME, ce.getAttributeNameAsString());
+      }
     }
     clearTestingEnvironment();
     System.out.println("#testChangeEventMonitor has run to completion.");
@@ -997,6 +1018,66 @@ public class TestRepositoryAdmin {
     }
   }
 
+  @Test
+  public void testRepositoryMaxVersions() throws IOException {
+    System.out.println("#testMaxVersions has been invoked.");
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+
+    testRepositoryMaxVersionsOperation(configuration, NAMESPACE01_TABLE01);
+
+    // test get and set methods for RepositoryMaxVersions
+    final int INCREASE_IN_MAX_VERSIONS = 21;
+    try (Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
+      assertEquals(CHANGE_EVENT_FAILURE
+              + "unexpected default value returned by #getRepositoryMaxVersions",
+              Repository.REPOSITORY_DEFAULT_MAX_VERSIONS,
+              RepositoryAdmin.getRepositoryMaxVersions(standardAdmin));
+      RepositoryAdmin.setRepositoryMaxVersions(
+              standardAdmin, Repository.REPOSITORY_DEFAULT_MAX_VERSIONS + INCREASE_IN_MAX_VERSIONS);
+      assertEquals(CHANGE_EVENT_FAILURE
+              + "unexpected value returned by #getRepositoryMaxVersions after setting incremented "
+              + "with #setRepositoryMaxVersions",
+              Repository.REPOSITORY_DEFAULT_MAX_VERSIONS + INCREASE_IN_MAX_VERSIONS,
+              RepositoryAdmin.getRepositoryMaxVersions(standardAdmin));
+    }
+    // Test with new MaxVersions setting
+    testRepositoryMaxVersionsOperation(configuration, NAMESPACE01_TABLE02);
+
+    clearTestingEnvironment();
+    System.out.println("#testMaxVersions has run to completion.");
+  }
+
+  private void testRepositoryMaxVersionsOperation (Configuration configuration, TableName tableName)
+          throws IOException {
+    // Submit 5 more changes to an attribute than maxVersions allows for.
+    final int BASE_MEMSTORE_FLUSHSIZE = 64000000;
+    try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin()) {
+      HTableDescriptor table01 = mAdmin.getTableDescriptor(tableName);
+      for (int i = 0; i < (RepositoryAdmin.getRepositoryMaxVersions(mAdmin) + 5); i++) {
+        table01.setMemStoreFlushSize(BASE_MEMSTORE_FLUSHSIZE + i);
+        mAdmin.modifyTable(table01.getTableName(), table01);
+      }
+    }
+    // Confirm that the first 5 changes have NOT been retained due to maxVersions limitation.
+    final String ATTRIBUTE_NAME = "Value__MEMSTORE_FLUSHSIZE";
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      ChangeEventMonitor monitor = repositoryAdmin.getChangeEventMonitor();
+      assertEquals(CHANGE_EVENT_FAILURE
+              + "unexpected attribute value found when testing maxVersions processing",
+              Integer.toString(BASE_MEMSTORE_FLUSHSIZE + 5),
+              monitor.getChangeEventsForTableAttribute(
+                      tableName, ATTRIBUTE_NAME).get(0).getAttributeValueAsString());
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
@@ -1005,5 +1086,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
     new TestRepositoryAdmin().testChangeEventMonitor();
+    // new TestRepositoryAdmin().testRepositoryMaxVersions();
   }
 }

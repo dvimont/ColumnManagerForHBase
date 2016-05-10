@@ -304,6 +304,13 @@ public class ChangeEvent {
     this.attributeValue = new AttributeValue(attributeValue);
   }
 
+  @Override
+  public String toString() {
+    return "EntityType:<" + getEntityTypeAsString() + "> EntityName:<" + getEntityNameAsString()
+            + "> Timestamp:<" + getTimestamp() + "> AttributeName:<" + getAttributeNameAsString()
+            + "> AttributeValue:<" + getAttributeValueAsString() + ">";
+  }
+
   class Entity implements Comparable<Entity> {
 
     private final EntityType entityType; // part of Entity unique identifier (rowId)
