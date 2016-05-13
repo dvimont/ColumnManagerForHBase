@@ -236,7 +236,7 @@ public class TestRepositoryAdmin {
       assertEquals(REPOSITORY_ADMIN_FAILURE
               + "Incorrect default value for Repository maxVersions returned by "
               + "#getRepositoryMaxVersions method.",
-              Repository.REPOSITORY_DEFAULT_MAX_VERSIONS,
+              Repository.DEFAULT_REPOSITORY_MAX_VERSIONS,
               RepositoryAdmin.getRepositoryMaxVersions(standardAdmin));
 
       final int NEW_MAX_VERSIONS = 160;
@@ -1037,14 +1037,14 @@ public class TestRepositoryAdmin {
     try (Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
       assertEquals(CHANGE_EVENT_FAILURE
               + "unexpected default value returned by #getRepositoryMaxVersions",
-              Repository.REPOSITORY_DEFAULT_MAX_VERSIONS,
+              Repository.DEFAULT_REPOSITORY_MAX_VERSIONS,
               RepositoryAdmin.getRepositoryMaxVersions(standardAdmin));
       RepositoryAdmin.setRepositoryMaxVersions(
-              standardAdmin, Repository.REPOSITORY_DEFAULT_MAX_VERSIONS + INCREASE_IN_MAX_VERSIONS);
+              standardAdmin, Repository.DEFAULT_REPOSITORY_MAX_VERSIONS + INCREASE_IN_MAX_VERSIONS);
       assertEquals(CHANGE_EVENT_FAILURE
               + "unexpected value returned by #getRepositoryMaxVersions after setting incremented "
               + "with #setRepositoryMaxVersions",
-              Repository.REPOSITORY_DEFAULT_MAX_VERSIONS + INCREASE_IN_MAX_VERSIONS,
+              Repository.DEFAULT_REPOSITORY_MAX_VERSIONS + INCREASE_IN_MAX_VERSIONS,
               RepositoryAdmin.getRepositoryMaxVersions(standardAdmin));
     }
     // Test with new MaxVersions setting

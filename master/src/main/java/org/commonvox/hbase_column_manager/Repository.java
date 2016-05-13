@@ -21,8 +21,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +53,10 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.RowMutations;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
@@ -105,7 +109,7 @@ class Repository {
           = TableName.valueOf(REPOSITORY_NAMESPACE_DESCRIPTOR.getName(),
                   "column_manager_repository_table");
   private static final byte[] REPOSITORY_CF = Bytes.toBytes("se"); // ("se"="SchemaEntities")
-  static final int REPOSITORY_DEFAULT_MAX_VERSIONS = 50; // should this be set higher?
+  static final int DEFAULT_REPOSITORY_MAX_VERSIONS = 50; // should this be set higher?
 
   static final byte[] NAMESPACE_PARENT_FOREIGN_KEY = {'-'};
   private static final byte[] DEFAULT_NAMESPACE = Bytes.toBytes("default");
@@ -287,7 +291,7 @@ class Repository {
     // Create new repositoryTable, since it doesn't already exist
     standardAdmin.createTable(new HTableDescriptor(REPOSITORY_TABLENAME).
             addFamily(new HColumnDescriptor(REPOSITORY_CF).
-                    setMaxVersions(REPOSITORY_DEFAULT_MAX_VERSIONS).
+                    setMaxVersions(DEFAULT_REPOSITORY_MAX_VERSIONS).
                     setInMemory(true)));
     try (Table newRepositoryTable
             = standardConnection.getTable(REPOSITORY_TABLENAME)) {
@@ -1078,8 +1082,7 @@ class Repository {
     return entity;
   }
 
-  private static byte[] buildRowId(byte recordType, byte[] parentForeignKey,
-          byte[] entityName) {
+  private static byte[] buildRowId(byte recordType, byte[] parentForeignKey, byte[] entityName) {
     ByteBuffer rowId;
     if (entityName == null) {
       rowId = ByteBuffer.allocate(1 + parentForeignKey.length);
@@ -1103,23 +1106,21 @@ class Repository {
    * @return stopRow value
    */
   private byte[] buildStopRow(byte[] startRowValue, byte[] entityName) {
+    final byte[] fillerArray;
     if (entityName == null) {
-      return ByteBuffer.allocate(startRowValue.length + HEX_FF_ARRAY.length)
-              .put(startRowValue).put(HEX_FF_ARRAY).array();
+      fillerArray = HEX_FF_ARRAY;
     } else {
-      return ByteBuffer.allocate(startRowValue.length + HEX_00_ARRAY.length)
-              .put(startRowValue).put(HEX_00_ARRAY).array();
+      fillerArray = HEX_00_ARRAY;
     }
+    return ByteBuffer.allocate(startRowValue.length + fillerArray.length)
+            .put(startRowValue).put(fillerArray).array();
   }
 
   private Result getActiveRow(byte recordType, byte[] parentForeignKey, byte[] entityName,
           byte[] columnToGet)
           throws IOException {
     Result[] rows = getActiveRows(false, recordType, parentForeignKey, entityName, columnToGet);
-    if (rows == null || rows.length == 0) {
-      return null;
-    }
-    return rows[0];
+    return (rows == null || rows.length == 0) ? null : rows[0];
   }
 
   private Result[] getActiveRows(byte recordType, byte[] parentForeignKey)
@@ -1130,28 +1131,20 @@ class Repository {
   private Result[] getActiveRows(boolean getRowIdAndStatusOnly, byte recordType,
           byte[] parentForeignKey, byte[] entityName, byte[] columnToGet)
           throws IOException {
-    Result[] allRows = getRows(getRowIdAndStatusOnly, recordType,
-            parentForeignKey, entityName, columnToGet);
-    if (allRows == null) {
-      return null;
-    }
-    Set<Result> activeRows = new HashSet<>();
-    for (Result row : allRows) {
-      if (Bytes.equals(row.getValue(REPOSITORY_CF, ENTITY_STATUS_COLUMN), ACTIVE_STATUS)) {
-        activeRows.add(row);
-      }
-    }
-    return activeRows.toArray(new Result[activeRows.size()]);
+    SingleColumnValueFilter activeRowsOnlyFilter = new SingleColumnValueFilter(
+            REPOSITORY_CF, ENTITY_STATUS_COLUMN, CompareFilter.CompareOp.EQUAL, ACTIVE_STATUS);
+    activeRowsOnlyFilter.setFilterIfMissing(true);
+    return getRows(getRowIdAndStatusOnly, recordType, parentForeignKey, entityName,
+            columnToGet, activeRowsOnlyFilter);
   }
 
   private Result[] getRows(byte recordType, byte[] parentForeignKey, byte[] columnToGet)
           throws IOException {
-    return getRows(false, recordType, parentForeignKey, null, columnToGet);
+    return getRows(false, recordType, parentForeignKey, null, columnToGet, null);
   }
 
   private Result[] getRows(boolean getRowIdAndStatusOnly, byte recordType,
-          byte[] parentForeignKey, byte[] entityName,
-          byte[] columnToGet)
+          byte[] parentForeignKey, byte[] entityName, byte[] columnToGet, Filter filter)
           throws IOException {
     if (parentForeignKey == null) {
       return null;
@@ -1165,6 +1158,9 @@ class Repository {
       if (columnToGet != null) {
         scanParms.addColumn(REPOSITORY_CF, columnToGet);
       }
+    }
+    if (filter != null) {
+      scanParms.setFilter(filter);
     }
     List<Result> rows = new ArrayList<>();
     try (ResultScanner results = repositoryTable.getScanner(scanParms)) {
@@ -1191,10 +1187,7 @@ class Repository {
       return null;
     }
     Result row = repositoryTable.get(new Get(buildRowId(recordType, parentForeignKey, entityName)));
-    if (row.isEmpty()) {
-      return null;
-    }
-    return row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
+    return row.isEmpty() ? null : row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
   }
 
   private byte[] getNamespaceForeignKey(byte[] namespace) throws IOException {
@@ -1206,8 +1199,8 @@ class Repository {
     //  time its foreign key is accessed or one of its descendents is modified.
     if (namespaceForeignKey == null) {
       if (namespaceExists(standardAdmin, namespace)) {
-        namespaceForeignKey
-                = putNamespaceSchemaEntity(standardAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
+        namespaceForeignKey = putNamespaceSchemaEntity(
+                standardAdmin.getNamespaceDescriptor(Bytes.toString(namespace)));
       }
     }
     return namespaceForeignKey;
@@ -1276,12 +1269,6 @@ class Repository {
     return Bytes.toBoolean(colValue);
   }
 
-//    void setColumnDefinitionsEnforced (boolean enabled, TableName tableName)
-//            throws IOException {
-//        setColumnDefinitionsEnforced(enabled, TABLE_RECORD_TYPE,
-//                        getNamespaceForeignKey(tableName.getNamespace()), tableName.getName());
-//    }
-//
   void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException {
     if (!isIncludedTable(tableName)) {
@@ -1403,8 +1390,8 @@ class Repository {
     if (colFamilyForeignKey == null) {
       return;
     }
-    // TO DO?: before (or as part of) conceptual deletion, reset ColumnDefinition's validation-related attributes
-
+    // TO DO?: before (or as part of) conceptual deletion, reset
+    //   ColumnDefinition's validation-related attributes
     deleteSchemaEntity(false, false, SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
             colFamilyForeignKey, colQualifier);
   }
@@ -1415,7 +1402,7 @@ class Repository {
     if (parentForeignKey == null) {
       return;
     }
-    for (Result row : getRows(true, recordType, parentForeignKey, entityName, null)) {
+    for (Result row : getRows(true, recordType, parentForeignKey, entityName, null, null)) {
       if (!truncateColumns || (truncateColumns &&
               recordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType())) {
         if (purge) {
