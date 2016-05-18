@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
+import org.apache.hadoop.hbase.NamespaceNotFoundException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -49,6 +51,10 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.log4j.AppenderSkeleton;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.apache.log4j.spi.LoggingEvent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -405,20 +411,23 @@ public class TestRepositoryAdmin {
 
       RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
 
-      // loop to disable and drop test tables and namespaces
-      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
-        if (!standardAdmin.tableExists(tableName)) {
-          continue;
-        }
-        standardAdmin.disableTable(tableName);
-        standardAdmin.deleteTable(tableName);
+      dropTestTablesAndNamespaces(standardAdmin);
+    }
+  }
+
+  private void dropTestTablesAndNamespaces(Admin standardAdmin)
+          throws IOException {
+    // loop to disable and drop test tables and namespaces
+    for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+      if (!standardAdmin.tableExists(tableName)) {
+        continue;
       }
-      for (String namespaceName : testNamespacesAndDescriptors.keySet()) {
-        if (!repositoryAdmin.namespaceExists(namespaceName)) {
-          continue;
-        }
-        standardAdmin.deleteNamespace(namespaceName);
-      }
+      standardAdmin.disableTable(tableName);
+      standardAdmin.deleteTable(tableName);
+    }
+    for (String namespaceName : testNamespacesAndDescriptors.keySet()) {
+      try { standardAdmin.deleteNamespace(namespaceName);
+      } catch (NamespaceNotFoundException e) {}
     }
   }
 
@@ -1078,6 +1087,172 @@ public class TestRepositoryAdmin {
     }
   }
 
+  @Test
+  public void testRepositorySyncCheckForMissingNamespaces() throws IOException {
+    System.out.println("#testRepositorySyncCheckForMissingNamespaces has been invoked.");
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+
+    try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
+      dropTestTablesAndNamespaces(standardAdmin);
+    }
+
+    // out-of-sync logger message should be generated upon Repository startup
+    TestAppender testAppender = new TestAppender();
+    Logger.getRootLogger().addAppender(testAppender);
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      int outOfSyncWarningCount = 0;
+      for (LoggingEvent loggingEvent : testAppender.events) {
+        if (loggingEvent.getMessage().toString().startsWith(
+                Repository.NAMESPACE_NOT_FOUND_SYNC_ERROR_MSG)) {
+          assertEquals("Unexpected loggingEvent level for Namespace OUT OF SYNC condition",
+                  Level.WARN, loggingEvent.getLevel());
+          outOfSyncWarningCount++;
+        }
+      }
+      assertEquals("Unexpected loggingEvent count for Namespace OUT OF SYNC conditions",
+              2, outOfSyncWarningCount);
+    }
+    clearTestingEnvironment();
+    System.out.println("#testRepositorySyncCheckForMissingNamespaces has run to completion.");
+  }
+
+  @Test
+  public void testRepositorySyncCheckForMissingTables() throws IOException {
+    System.out.println("#testRepositorySyncCheckForMissingTables has been invoked.");
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+
+    // bypass ColumnManager while deleting Tables to cause out of sync condition w/ Repository
+    try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
+      standardAdmin.disableTable(NAMESPACE01_TABLE02);
+      standardAdmin.deleteTable(NAMESPACE01_TABLE02);
+      standardAdmin.disableTable(NAMESPACE02_TABLE01); // not tracked by ColumnManager!
+      standardAdmin.deleteTable(NAMESPACE02_TABLE01);
+      standardAdmin.disableTable(NAMESPACE03_TABLE03);
+      standardAdmin.deleteTable(NAMESPACE03_TABLE03);
+    }
+
+    // out-of-sync logger message should be generated upon Repository startup
+    TestAppender testAppender = new TestAppender();
+    Logger.getRootLogger().addAppender(testAppender);
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      int outOfSyncWarningCount = 0;
+      for (LoggingEvent loggingEvent : testAppender.events) {
+        if (loggingEvent.getMessage().toString().startsWith(
+                Repository.TABLE_NOT_FOUND_SYNC_ERROR_MSG)) {
+          assertEquals("Unexpected loggingEvent level for Table OUT OF SYNC condition",
+                  Level.WARN, loggingEvent.getLevel());
+          outOfSyncWarningCount++;
+        }
+      }
+      assertEquals("Unexpected loggingEvent count for Table OUT OF SYNC conditions",
+              2, outOfSyncWarningCount);
+    }
+    clearTestingEnvironment();
+    System.out.println("#testRepositorySyncCheckForMissingTables has run to completion.");
+  }
+
+  @Test
+  public void testRepositorySyncCheckForAttributeDiscrepancies() throws IOException {
+    System.out.println("#testRepositorySyncCheckForAttributeDiscrepancies has been invoked.");
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+
+    // bypass ColumnManager while making mods to cause out of sync condition w/ Repository
+    try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
+      HTableDescriptor namespace01Table01 = standardAdmin.getTableDescriptor(NAMESPACE01_TABLE01);
+      namespace01Table01.setCompactionEnabled(!namespace01Table01.isCompactionEnabled());
+      namespace01Table01.setReadOnly(!namespace01Table01.isReadOnly());
+      Collection<HColumnDescriptor> hcdCollection = namespace01Table01.getFamilies();
+      for (HColumnDescriptor hcd : hcdCollection) {
+        hcd.setCompressTags(!hcd.isCompressTags());
+        hcd.setCacheBloomsOnWrite(!hcd.isCacheBloomsOnWrite());
+        namespace01Table01.modifyFamily(hcd);
+      }
+      standardAdmin.modifyTable(namespace01Table01.getTableName(), namespace01Table01);
+      HTableDescriptor namespace02Table01 = standardAdmin.getTableDescriptor(NAMESPACE02_TABLE01);
+      namespace02Table01.setDurability(Durability.FSYNC_WAL);
+      hcdCollection = namespace02Table01.getFamilies();
+      for (HColumnDescriptor hcd : hcdCollection) {
+        hcd.setCacheDataOnWrite(!hcd.isCacheDataOnWrite());
+        namespace02Table01.modifyFamily(hcd);
+      }
+      standardAdmin.modifyTable(namespace02Table01.getTableName(), namespace02Table01);
+      HTableDescriptor namespace03Table03 = standardAdmin.getTableDescriptor(NAMESPACE03_TABLE03);
+      namespace03Table03.setDurability(Durability.FSYNC_WAL);
+      hcdCollection = namespace03Table03.getFamilies();
+      for (HColumnDescriptor hcd : hcdCollection) {
+        hcd.setCacheDataOnWrite(!hcd.isCacheDataOnWrite());
+        namespace03Table03.modifyFamily(hcd);
+        break;
+      }
+      standardAdmin.modifyTable(namespace03Table03.getTableName(), namespace03Table03);
+    }
+
+    // out-of-sync logger message should be generated upon Repository startup
+    TestAppender testAppender = new TestAppender();
+    Logger.getRootLogger().addAppender(testAppender);
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+      int tableAttributesOutOfSyncWarningCount = 0;
+      int colDescriptorAttributesOutOfSyncWarningCount = 0;
+      for (LoggingEvent loggingEvent : testAppender.events) {
+        if (loggingEvent.getMessage().toString().startsWith(
+                Repository.TABLE_ATTRIBUTE_SYNC_ERROR_MSG)) {
+          assertEquals("Unexpected loggingEvent level for Table OUT OF SYNC condition",
+                  Level.WARN, loggingEvent.getLevel());
+          tableAttributesOutOfSyncWarningCount++;
+        }
+        if (loggingEvent.getMessage().toString().startsWith(
+                Repository.COLDESCRIPTOR_ATTRIBUTE_SYNC_ERROR_MSG)) {
+          assertEquals("Unexpected loggingEvent level for ColumnDescriptor OUT OF SYNC condition",
+                  Level.WARN, loggingEvent.getLevel());
+          colDescriptorAttributesOutOfSyncWarningCount++;
+        }
+      }
+      assertEquals("Unexpected loggingEvent count for Table OUT OF SYNC conditions",
+              2, tableAttributesOutOfSyncWarningCount);
+      assertEquals("Unexpected loggingEvent count for ColumnDescriptor OUT OF SYNC conditions",
+              3, colDescriptorAttributesOutOfSyncWarningCount);
+    }
+    clearTestingEnvironment();
+    System.out.println("#testRepositorySyncCheckForAttributeDiscrepancies has run to completion.");
+  }
+
+  private class TestAppender extends AppenderSkeleton{
+    public List<LoggingEvent> events = new ArrayList<>();
+    @Override
+    public void close() {}
+    @Override
+    public boolean requiresLayout() {return false;}
+    @Override
+    protected void append(LoggingEvent event) {
+      events.add(event);
+    }
+  }
+
+
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
@@ -1085,7 +1260,10 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
-    new TestRepositoryAdmin().testChangeEventMonitor();
+    // new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
+    // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
+    // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
+    new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
   }
 }

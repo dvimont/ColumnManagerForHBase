@@ -21,9 +21,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -123,8 +122,24 @@ class Repository {
           .put(VALUE_COLUMN_PREFIX_BYTES).put(Bytes.toBytes(ColumnAuditor.MAX_VALUE_LENGTH_KEY))
           .array();
 
-  static final String OUT_OF_SYNC_ERROR_MSG
-          = PRODUCT_NAME + " repository may be out of sync with HBase.";
+  private static final String SYNC_ERROR_MSG
+          = "SYNCHRONIZATION ERROR FOUND IN " + PRODUCT_NAME + " REPOSITORY. ";
+  private static final String SCHEMA_ENTITY_NOT_FOUND_SYNC_ERROR_MSG = SYNC_ERROR_MSG
+          + "%s in Repository NOT FOUND in HBase: ";
+  static final String NAMESPACE_NOT_FOUND_SYNC_ERROR_MSG = String.format(
+          SCHEMA_ENTITY_NOT_FOUND_SYNC_ERROR_MSG, NamespaceDescriptor.class.getSimpleName());
+  static final String TABLE_NOT_FOUND_SYNC_ERROR_MSG = String.format(
+          SCHEMA_ENTITY_NOT_FOUND_SYNC_ERROR_MSG, HTableDescriptor.class.getSimpleName());
+  static final String COLDESCRIPTOR_NOT_FOUND_SYNC_ERROR_MSG = String.format(
+          SCHEMA_ENTITY_NOT_FOUND_SYNC_ERROR_MSG, HColumnDescriptor.class.getSimpleName());
+  private static final String SCHEMA_ENTITY_ATTRIBUTE_SYNC_ERROR_MSG = SYNC_ERROR_MSG
+          + "%s in Repository has attribute-value(s) differing from that in HBase: ";
+  static final String NAMESPACE_ATTRIBUTE_SYNC_ERROR_MSG = String.format(
+          SCHEMA_ENTITY_ATTRIBUTE_SYNC_ERROR_MSG, NamespaceDescriptor.class.getSimpleName());
+  static final String TABLE_ATTRIBUTE_SYNC_ERROR_MSG = String.format(
+          SCHEMA_ENTITY_ATTRIBUTE_SYNC_ERROR_MSG, HTableDescriptor.class.getSimpleName());
+  static final String COLDESCRIPTOR_ATTRIBUTE_SYNC_ERROR_MSG = String.format(
+          SCHEMA_ENTITY_ATTRIBUTE_SYNC_ERROR_MSG, HColumnDescriptor.class.getSimpleName());
   private static final String BLANKS = "                    ";
   private static final int TAB = 3;
   private static final byte[] ENTITY_STATUS_COLUMN = Bytes.toBytes("_Status");
@@ -241,6 +256,7 @@ class Repository {
       logger.info(PRODUCT_NAME + " Repository activated for ONLY the following user tables: "
               + conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES));
     }
+    doSyncCheck();
   }
 
   private Table getRepositoryTable() throws IOException {
@@ -341,6 +357,104 @@ class Repository {
 
   boolean isActivated() {
     return columnManagerIsActivated;
+  }
+
+  private boolean doSyncCheck() throws IOException {
+    boolean syncErrorFound = false;
+    for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
+      try {
+        NamespaceDescriptor nd = standardAdmin.getNamespaceDescriptor(mnd.getNameAsString());
+        if (!schemaEntityAttributesInSync(nd.getName(), NAMESPACE_ATTRIBUTE_SYNC_ERROR_MSG,
+                mnd.getConfiguration(), nd.getConfiguration(), null, null)) {
+          syncErrorFound = true;
+        }
+      } catch (NamespaceNotFoundException e) {
+        logger.warn(NAMESPACE_NOT_FOUND_SYNC_ERROR_MSG + mnd.getNameAsString());
+        syncErrorFound = true;
+        continue;
+      }
+      for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
+        if (!standardAdmin.tableExists(mtd.getTableName())) {
+          logger.warn(TABLE_NOT_FOUND_SYNC_ERROR_MSG + mtd.getNameAsString());
+          syncErrorFound = true;
+          continue;
+        }
+        HTableDescriptor htd = standardAdmin.getTableDescriptor(mtd.getTableName());
+        if (!schemaEntityAttributesInSync(mtd.getTableName().getNameAsString(),
+                TABLE_ATTRIBUTE_SYNC_ERROR_MSG,
+                mtd.getConfiguration(), htd.getConfiguration(),
+                mtd.getValues(), htd.getValues())) {
+          syncErrorFound = true;
+        }
+        Collection<HColumnDescriptor> hcdCollection = htd.getFamilies();
+        Set<String> hcdNames = new TreeSet<>();
+        for (HColumnDescriptor hcd : hcdCollection) {
+          hcdNames.add(hcd.getNameAsString());
+        }
+        for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
+          if (!hcdNames.contains(mcd.getNameAsString())) {
+            logger.warn(COLDESCRIPTOR_NOT_FOUND_SYNC_ERROR_MSG + mcd.getNameAsString());
+            syncErrorFound = true;
+            continue;
+          }
+          HColumnDescriptor hcd = htd.getFamily(mcd.getName());
+          if (!schemaEntityAttributesInSync(mtd.getNameAsString() + ":" + mcd.getNameAsString(),
+                  COLDESCRIPTOR_ATTRIBUTE_SYNC_ERROR_MSG,
+                  mcd.getConfiguration(), hcd.getConfiguration(),
+                  mcd.getValues(), hcd.getValues())) {
+            syncErrorFound = true;
+          }
+        }
+      }
+    }
+    if (syncErrorFound) {
+      logger.warn("DISCREPANCIES found between " + PRODUCT_NAME + " repository and schema "
+              + "structures found in HBase; invocation of RepositoryAdmin#discoverSchema method "
+              + "may be required for resynchronization.");
+    }
+    return syncErrorFound;
+  }
+
+  private boolean schemaEntityAttributesInSync(String entityName, String errorMsg,
+                  Map<String,String> repositoryConfigurationMap,
+                  Map<String,String> hbaseConfigurationMap,
+                  Map<ImmutableBytesWritable,ImmutableBytesWritable> repositoryValuesMap,
+                  Map<ImmutableBytesWritable,ImmutableBytesWritable> hbaseValuesMap) {
+
+    for (Entry<String,String> configEntry : repositoryConfigurationMap.entrySet()) {
+      String configValue = hbaseConfigurationMap.get(configEntry.getKey());
+      if (configValue == null || !configValue.equals(configEntry.getValue())) {
+        logger.warn(errorMsg + entityName);
+        return false;
+      }
+    }
+    for (Entry<String,String> configEntry : hbaseConfigurationMap.entrySet()) {
+      String configValue = repositoryConfigurationMap.get(configEntry.getKey());
+      if (configValue == null || !configValue.equals(configEntry.getValue())) {
+        logger.warn(errorMsg + entityName);
+        return false;
+      }
+    }
+    if (repositoryValuesMap == null || hbaseValuesMap == null) { // Namespace has no values Map!
+     return true;
+    }
+    for (Entry<ImmutableBytesWritable,ImmutableBytesWritable> valueEntry
+            : repositoryValuesMap.entrySet()) {
+      ImmutableBytesWritable valueEntryValue = hbaseValuesMap.get(valueEntry.getKey());
+      if (valueEntryValue == null || !valueEntryValue.equals(valueEntry.getValue())) {
+        logger.warn(errorMsg + entityName);
+        return false;
+      }
+    }
+    for (Entry<ImmutableBytesWritable,ImmutableBytesWritable> valueEntry
+            : hbaseValuesMap.entrySet()) {
+      ImmutableBytesWritable valueEntryValue = repositoryValuesMap.get(valueEntry.getKey());
+      if (valueEntryValue == null || !valueEntryValue.equals(valueEntry.getValue())) {
+        logger.warn(errorMsg + entityName);
+        return false;
+      }
+    }
+    return true;
   }
 
   Admin getAdmin() {
