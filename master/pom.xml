@@ -26,6 +26,9 @@
     <version>1.0</version>
   </parent>
 
+  <properties>
+    <hbaseVersion>1.0.1.1</hbaseVersion>
+  </properties>
   <artifactId>hbase-column-manager</artifactId>
   <version>master</version>
   <packaging>jar</packaging>
@@ -145,13 +148,13 @@
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-testing-util</artifactId>
-      <version>1.0.1.1</version>
+      <version>${hbaseVersion}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
-      <version>1.0.1.1</version>
+      <version>${hbaseVersion}</version>
     </dependency>
   </dependencies>
 </project>

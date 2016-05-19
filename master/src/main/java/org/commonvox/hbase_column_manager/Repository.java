@@ -409,7 +409,7 @@ class Repository {
     }
     if (syncErrorFound) {
       logger.warn("DISCREPANCIES found between " + PRODUCT_NAME + " repository and schema "
-              + "structures found in HBase; invocation of RepositoryAdmin#discoverSchema method "
+              + "structures in HBase; invocation of RepositoryAdmin#discoverSchema method "
               + "may be required for resynchronization.");
     }
     return syncErrorFound;

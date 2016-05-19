@@ -26,8 +26,11 @@
     <version>1.0</version>
   </parent>
 
+  <properties>
+    <hbaseVersion>1.0.2</hbaseVersion>
+  </properties>
   <artifactId>hbase-column-manager</artifactId>
-  <version>1.0.2</version>
+  <version>${hbaseVersion}-beta</version>
   <packaging>jar</packaging>
 
   <name>CommonVox tools for HBase™ - ColumnManagerAPI for HBase™</name>
@@ -40,13 +43,13 @@
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-testing-util</artifactId>
-      <version>${project.version}</version>
+      <version>${hbaseVersion}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>
-      <version>${project.version}</version>
+      <version>${hbaseVersion}</version>
     </dependency>
   </dependencies>
 </project>
