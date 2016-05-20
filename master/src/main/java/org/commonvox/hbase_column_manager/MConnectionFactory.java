@@ -60,6 +60,11 @@ public class MConnectionFactory {
     return new MConnection(ConnectionFactory.createConnection(conf));
   }
 
+  static MConnection getMConnection(Connection standardConnection) throws IOException {
+    standardConnection.getConfiguration().addResource(COLUMN_MANAGER_CONFIG_FILE);
+    return new MConnection(standardConnection);
+  }
+
   /**
    * Create a new Connection instance using the passed Configuration instance instead of the default
    * HBaseConfiguration.

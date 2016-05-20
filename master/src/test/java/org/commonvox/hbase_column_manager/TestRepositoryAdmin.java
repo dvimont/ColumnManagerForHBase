@@ -397,7 +397,7 @@ public class TestRepositoryAdmin {
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
     createSchemaStructuresInHBase(configuration, false);
-    createAndEnforceColumnDefinitions(configuration);
+    createColumnDefinitionsAndPutColumns(configuration);
     clearTestingEnvironment();
 
     System.out.println("#testColumnDefinitionAndEnforcement using WILDCARDED EXCLUDE config "
@@ -406,8 +406,9 @@ public class TestRepositoryAdmin {
 
   private void clearTestingEnvironment() throws IOException {
     try (Connection standardConnection = ConnectionFactory.createConnection();
-            Admin standardAdmin = standardConnection.getAdmin();
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(standardConnection)) {
+            Admin standardAdmin = standardConnection.getAdmin()
+           // RepositoryAdmin repositoryAdmin = new RepositoryAdmin(standardConnection)
+            ) {
 
       RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
 
@@ -674,7 +675,71 @@ public class TestRepositoryAdmin {
     clearTestingEnvironment();
   }
 
-  private void createAndEnforceColumnDefinitions(Configuration configuration) throws IOException {
+  /**
+   * JUnit assertions are only activated here if enforce parm set to {@code true}; otherwise,
+   * this method used by other tests to simply create sample ColumnDefinitions and column entries.
+   *
+   * @param configuration
+   * @param enforce
+   * @throws IOException
+   */
+  private void createColumnDefinitionsAndPutColumns(Configuration configuration)
+          throws IOException {
+
+    createColumnDefinitions(configuration);
+
+    try (Connection connection = MConnectionFactory.createConnection(configuration);
+            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection)) {
+
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF02);
+       // next def not enforced, since namespace02 tables not included for CM processing!
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
+
+      try (Table namespace01Table01 = connection.getTable(NAMESPACE01_TABLE01);
+              Table namespace02Table03 = connection.getTable(NAMESPACE02_TABLE03)) {
+        // put a row with valid columns
+        namespace01Table01.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
+        // put a row with invalid column qualifier
+        try {
+          namespace01Table01.put(new Put(ROW_ID_01).
+                  addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG));
+          fail(COL_QUALIFIER_ENFORCE_FAILURE);
+        } catch (ColumnDefinitionNotFoundException e) {
+        }
+        // put same row to unenforced namespace/table
+        namespace02Table03.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG));
+        // put a row with invalid column length
+        try {
+          namespace01Table01.put(new Put(ROW_ID_01).
+                  addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
+          fail(COL_LENGTH_ENFORCE_FAILURE);
+        } catch (InvalidColumnValueException e) {
+        }
+        // put same row to unenforced namespace/table
+        namespace02Table03.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
+        // put a row with valid column value to regex-restricted column
+        namespace01Table01.put(new Put(ROW_ID_01).
+                addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("http://google.com")));
+        // put a row with invalid column value
+        try {
+          namespace01Table01.put(new Put(ROW_ID_01).
+                  addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
+          fail(COL_VALUE_ENFORCE_FAILURE);
+        } catch (InvalidColumnValueException e) {
+        }
+        // put same row to unenforced namespace/table
+        namespace02Table03.put(new Put(ROW_ID_01).
+                addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
+      }
+    }
+  }
+
+  private void createColumnDefinitions(Configuration configuration) throws IOException {
     ColumnDefinition col01Definition = new ColumnDefinition(COLQUALIFIER01);
     ColumnDefinition col02Definition = new ColumnDefinition(COLQUALIFIER02).setColumnLength(20L);
     ColumnDefinition col03Definition
@@ -689,53 +754,6 @@ public class TestRepositoryAdmin {
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF02, col03Definition);
       // next def not enforced, since namespace02 tables not included for CM processing!
       repositoryAdmin.addColumnDefinition(NAMESPACE02_TABLE03, CF01, col04Definition);
-
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF02);
-       // next def not enforced, since namespace02 tables not included for CM processing!
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
-
-      try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01);
-              Table table03InNamespace02 = connection.getTable(NAMESPACE02_TABLE03)) {
-        // put a row with valid columns
-        table01InNamespace01.put(new Put(ROW_ID_01).
-                addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
-                addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
-        // put a row with invalid column qualifier
-        try {
-          table01InNamespace01.put(new Put(ROW_ID_01).
-                  addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG));
-          fail(COL_QUALIFIER_ENFORCE_FAILURE);
-        } catch (ColumnDefinitionNotFoundException e) {
-        }
-        // put same row to unenforced namespace/table
-        table03InNamespace02.put(new Put(ROW_ID_01).
-                addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG));
-        // put a row with invalid column length
-        try {
-          table01InNamespace01.put(new Put(ROW_ID_01).
-                  addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
-          fail(COL_LENGTH_ENFORCE_FAILURE);
-        } catch (InvalidColumnValueException e) {
-        }
-        // put same row to unenforced namespace/table
-        table03InNamespace02.put(new Put(ROW_ID_01).
-                addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
-        // put a row with valid column value to regex-restricted column
-        table01InNamespace01.put(new Put(ROW_ID_01).
-                addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("http://google.com")));
-        // put a row with invalid column value
-        try {
-          table01InNamespace01.put(new Put(ROW_ID_01).
-                  addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
-          fail(COL_VALUE_ENFORCE_FAILURE);
-        } catch (InvalidColumnValueException e) {
-          // this Exception SHOULD be thrown!
-        }
-        // put same row to unenforced namespace/table
-        table03InNamespace02.put(new Put(ROW_ID_01).
-                addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
-      }
     }
   }
 
@@ -867,7 +885,7 @@ public class TestRepositoryAdmin {
     changeJavaUsername();
     createSchemaStructuresInHBase(configuration, false);
     changeJavaUsername();
-    createAndEnforceColumnDefinitions(configuration);
+    createColumnDefinitionsAndPutColumns(configuration);
     deleteTableInHBase(configuration);
 
     // file setup
@@ -1252,6 +1270,64 @@ public class TestRepositoryAdmin {
     }
   }
 
+  @Test
+  public void testGenerateReportOnInvalidColumnQualifiers() throws IOException {
+    System.out.println("#testGenerateReportOnInvalidColumnQualifiers has been invoked.");
+
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+    createColumnDefinitions(configuration);
+
+    // (For NAMESPACE01_TABLE01 colFamily CF01, the only valid colQualifiers are:
+    //   COLQUALIFIER01 & COLQUALIFIER02.)
+
+    final byte[] BAD_QUALIFIER01 = Bytes.toBytes("bad_qualifier");
+    final byte[] BAD_QUALIFIER02 = Bytes.toBytes("very_bad_qualifier");
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      try (Table namespace01Table01 = connection.getTable(NAMESPACE01_TABLE01)) {
+        // put two rows with valid column qualifiers
+        namespace01Table01.put(new Put(ROW_ID_01).
+                addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
+        namespace01Table01.put(new Put(ROW_ID_02).
+                addColumn(CF01, COLQUALIFIER01, VALUE_9_BYTES_LONG).
+                addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
+        // put two rows with invalid column qualifiers
+        namespace01Table01.put(new Put(ROW_ID_03).
+                addColumn(CF01, BAD_QUALIFIER01, VALUE_5_BYTES_LONG).
+                addColumn(CF01, BAD_QUALIFIER02, VALUE_2_BYTES_LONG));
+        namespace01Table01.put(new Put(ROW_ID_04).
+                addColumn(CF01, BAD_QUALIFIER02, VALUE_82_BYTES_LONG));
+      }
+    }
+    // file setup
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
+    final String TEMP_PREFIX = "temp.";
+    final String RESOURCE_PREFIX = "test.";
+    final String INVALID_COLUMN_QUALIFIERS = "invalidColumnQualifiers.csv";
+    final String INVALID_COLUMN_QUALIFIERS_FILE = TEMP_PREFIX + INVALID_COLUMN_QUALIFIERS;
+    File invalidColumnQualifiersFile;
+    try {
+      invalidColumnQualifiersFile = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_FILE);
+    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
+      invalidColumnQualifiersFile = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_FILE);
+    }
+
+    try (RepositoryAdmin repositoryAdmin
+            = new RepositoryAdmin(ConnectionFactory.createConnection())) {
+      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              true, invalidColumnQualifiersFile, NAMESPACE01_TABLE01);
+    }
+
+    clearTestingEnvironment();
+    System.out.println("#testGenerateReportOnInvalidColumnQualifiers has run to completion.");
+  }
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
@@ -1264,6 +1340,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
-    new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
+    // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
+    new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
   }
 }

@@ -467,7 +467,7 @@ class Repository {
     }
   }
 
-  private static boolean namespaceExists(Admin hbaseAdmin, NamespaceDescriptor nd)
+  static boolean namespaceExists(Admin hbaseAdmin, NamespaceDescriptor nd)
           throws IOException {
     try {
       hbaseAdmin.getNamespaceDescriptor(nd.getName());
@@ -477,7 +477,7 @@ class Repository {
     return true;
   }
 
-  private static boolean namespaceExists(Admin hbaseAdmin, byte[] namespace)
+  static boolean namespaceExists(Admin hbaseAdmin, byte[] namespace)
           throws IOException {
     return namespaceExists(hbaseAdmin,
             NamespaceDescriptor.create(Bytes.toString(namespace)).build());
@@ -614,7 +614,7 @@ class Repository {
                     tableForeignKey, hcd.getName()), entityAttributeMap, false);
 
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
-      setColumnDefinitionsEnforced(((MColumnDescriptor) hcd).columnDefinitionsEnforced(),
+      setColumnDefinitionsEnforced(((MColumnDescriptor)hcd).columnDefinitionsEnforced(),
               SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName());
     }
     return colFamilyForeignKey;
@@ -677,7 +677,7 @@ class Repository {
     }
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     for (Mutation mutation : mutations) {
-      Repository.this.putColumnAuditorSchemaEntities(mtd, mutation);
+      putColumnAuditorSchemaEntities(mtd, mutation);
     }
   }
 
@@ -686,7 +686,7 @@ class Repository {
     if (!isIncludedTable(tableName)) {
       return;
     }
-    Repository.this.putColumnAuditorSchemaEntities(getMTableDescriptor(tableName), mutation);
+    putColumnAuditorSchemaEntities(getMTableDescriptor(tableName), mutation);
   }
 
   void putColumnAuditorSchemaEntities(MTableDescriptor mtd, RowMutations mutations) throws IOException {
@@ -694,7 +694,7 @@ class Repository {
       return;
     }
     for (Mutation mutation : mutations.getMutations()) {
-      Repository.this.putColumnAuditorSchemaEntities(mtd, mutation);
+      putColumnAuditorSchemaEntities(mtd, mutation);
     }
   }
 
@@ -703,7 +703,7 @@ class Repository {
       return;
     }
     for (Mutation mutation : mutations) {
-      Repository.this.putColumnAuditorSchemaEntities(mtd, mutation);
+      putColumnAuditorSchemaEntities(mtd, mutation);
     }
   }
 
@@ -1832,6 +1832,59 @@ class Repository {
       }
     }
     return changeEventMonitor.denormalize();
+  }
+
+  void generateReportOnInvalidColumnQualifiers (boolean verbose, File targetFile,
+          TableName tableName, byte[] colFamily) throws IOException {
+
+    MTableDescriptor mtd = getMTableDescriptor(tableName);
+    if (mtd == null || !mtd.hasColumnDefinitions()) {
+      throw new ColumnManagerIOException("No ColumnDefinitions found in Repository for Table "
+              + tableName.getNameAsString()) {};
+    }
+
+    // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
+    Table table = hbaseConnection.getTable(tableName);
+    try (InvalidColumnReport invalidColumnReport
+            = new InvalidColumnReport(hbaseConnection, tableName, targetFile, verbose);
+            ResultScanner rows
+                    = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
+      for (Result row : rows) {
+        for (Entry<byte[], NavigableMap<byte[],byte[]>> familyToColumnsMapEntry :
+                row.getNoVersionMap().entrySet()) {
+          MColumnDescriptor mcd = mtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
+          if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no validation if no defs!!
+            continue;
+          }
+          for (Entry<byte[],byte[]> entry : familyToColumnsMapEntry.getValue().entrySet()) {
+            byte[] colQualifier = entry.getKey();
+            ColumnDefinition colDefinition = mcd.getColumnDefinition(colQualifier);
+            if (colDefinition == null) {
+//              System.out.println("**Invalid col qualifier: " + Bytes.toString(colQualifier));
+              invalidColumnReport.addEntry(
+                      mcd.getName(), colQualifier, Bytes.toInt(entry.getValue()), null, row.getRow());
+            }
+//            if (colDefinition.getColumnLength() > 0
+//                    && cell.getValueLength() > colDefinition.getColumnLength()) {
+//              throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
+//                      "Value length of <" + cell.getValueLength()
+//                      + "> is longer than defined maximum length of <"
+//                      + colDefinition.getColumnLength() + ">.");
+//            }
+//            String colValidationRegex = colDefinition.getColumnValidationRegex();
+//            if (colValidationRegex != null && colValidationRegex.length() > 0) {
+//              byte[] colValue = Bytes.getBytes(CellUtil.getValueBufferShallowCopy(cell));
+//              if (!Bytes.toString(colValue).matches(colValidationRegex)) {
+//                throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(),
+//                        colQualifier, colValue,
+//                        "Value does not match the regular expression defined for column: <"
+//                        + colValidationRegex + ">");
+//              }
+//            }
+          }
+        }
+      }
+    }
   }
 
   static void dropRepository(Admin hbaseAdmin, Logger logger) throws IOException {

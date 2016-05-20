@@ -157,14 +157,15 @@ class MTableDescriptor extends HTableDescriptor {
     return foreignKeyValue;
   }
 
-//    void setColumnDefinitionsEnforced (boolean enabled) {
-//        this.columnDefinitionsEnforced = enabled;
-//    }
-//
-//    boolean columnDefinitionsEnforced () {
-//        return this.columnDefinitionsEnforced;
-//    }
-//
+  boolean hasColumnDefinitions() {
+    for (MColumnDescriptor mcd : getMColumnDescriptors()) {
+      if (!mcd.getColumnDefinitions().isEmpty()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   boolean hasColDescriptorWithColDefinitionsEnforced() {
     for (MColumnDescriptor mcd : getMColumnDescriptors()) {
       if (mcd.columnDefinitionsEnforced()) {

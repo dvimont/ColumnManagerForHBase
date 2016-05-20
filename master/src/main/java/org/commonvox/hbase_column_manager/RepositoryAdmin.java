@@ -65,14 +65,14 @@ public class RepositoryAdmin implements Closeable {
    */
   public RepositoryAdmin(Connection connection) throws IOException {
     logger = Logger.getLogger(this.getClass().getPackage().getName());
+    MConnection mConnection;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
-      MConnection mConnection = (MConnection) connection;
-      this.hbaseConnection = mConnection.getStandardConnection();
-      repository = mConnection.getRepository();
+      mConnection = (MConnection) connection;
     } else {
-      this.hbaseConnection = connection;
-      repository = new Repository(this.hbaseConnection, this);
+      mConnection = MConnectionFactory.getMConnection(connection);
     }
+    this.hbaseConnection = mConnection.getStandardConnection();
+    repository = mConnection.getRepository();
   }
 
   /**
@@ -124,6 +124,7 @@ public class RepositoryAdmin implements Closeable {
    */
   public static void uninstallRepositoryStructures(Admin hbaseAdmin) throws IOException {
     Repository.dropRepository(hbaseAdmin, Logger.getLogger(RepositoryAdmin.class.getPackage().getName()));
+    InvalidColumnReport.dropTempReportNamespace(hbaseAdmin);
   }
 
   /**
@@ -589,7 +590,7 @@ public class RepositoryAdmin implements Closeable {
    */
   public void importSchema(boolean includeColumnAuditors, File sourceFile)
           throws IOException, JAXBException {
-    submitImportLoggerMessages(includeColumnAuditors, null, null, sourceFile);
+    submitImportMessagesToLogger(includeColumnAuditors, null, null, sourceFile);
     Set<Object> importedDescriptors
             = repository.deserializeHBaseSchemaArchive(
                     includeColumnAuditors, null, null, sourceFile);
@@ -617,7 +618,7 @@ public class RepositoryAdmin implements Closeable {
   public void importNamespaceSchema(boolean includeColumnAuditors,
           String namespaceName, File sourceFile)
           throws IOException, JAXBException {
-    submitImportLoggerMessages(includeColumnAuditors, namespaceName, null, sourceFile);
+    submitImportMessagesToLogger(includeColumnAuditors, namespaceName, null, sourceFile);
     Set<Object> importedDescriptors
             = repository.deserializeHBaseSchemaArchive(
                     includeColumnAuditors, namespaceName, null, sourceFile);
@@ -643,14 +644,14 @@ public class RepositoryAdmin implements Closeable {
   public void importTableSchema(
           boolean includeColumnAuditors, TableName tableName, File sourceFile)
           throws IOException, JAXBException {
-    submitImportLoggerMessages(includeColumnAuditors, null, tableName, sourceFile);
+    submitImportMessagesToLogger(includeColumnAuditors, null, tableName, sourceFile);
     Set<Object> importedDescriptors
             = repository.deserializeHBaseSchemaArchive(includeColumnAuditors,
                     tableName.getNamespaceAsString(), tableName, sourceFile);
     createImportedStructures(includeColumnAuditors, importedDescriptors);
   }
 
-  private void submitImportLoggerMessages(boolean includeColumnAuditors,
+  private void submitImportMessagesToLogger(boolean includeColumnAuditors,
           String namespaceName, TableName tableName, File sourceFile) {
     logger.info("IMPORT of schema "
             + ((includeColumnAuditors) ? "<INCLUDING COLUMN AUDITOR METADATA> " : "")
@@ -704,6 +705,54 @@ public class RepositoryAdmin implements Closeable {
    */
   public String generateHsaFileSummary(File sourceFile) throws JAXBException {
     return repository.getHBaseSchemaArchiveSummary(sourceFile);
+  }
+
+  /**
+   * Generates and outputs a CSV-formatted report of all invalid column qualifiers stored in a
+   * Table, as stipulated by the Table's {@link ColumnDefinition}s.
+   * If no {@link ColumnDefinition}s exist for any of the Table's Column Families, a
+   * {@link ColumnManagerIOException} will be thrown.
+   * Note that enforcement of the {@link ColumnDefinition}s of any of the Table's Column
+   * Families need not be
+   * {@link #setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * enabled} in order for this report to be produced.
+   *
+   * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
+   * the fully-qualified column name and rowId) for each explicit invalid column qualifier that is
+   * found; otherwise the report will contain a summary, with one line for each invalid column
+   * qualifier found, along with a count of the number of rows which contain that same invalid
+   * column qualifier.
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table to be reported on
+   * @throws IOException if a remote or network exception occurs
+   */
+  public void generateReportOnInvalidColumnQualifiers(boolean verbose, File targetFile,
+          TableName tableName) throws IOException {
+    generateReportOnInvalidColumnQualifiers(verbose, targetFile, tableName, null);
+  }
+
+  /**
+   * Generates and outputs a CSV-formatted report of all invalid column qualifiers stored in a
+   * Column Family, as stipulated by the Column Family's {@link ColumnDefinition}s.
+   * If no {@link ColumnDefinition}s exist for the Column Family, a
+   * {@link ColumnManagerIOException} will be thrown.
+   * Note that enforcement of the {@link ColumnDefinition}s of the Column Family need not be
+   * {@link #setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * enabled} in order for this report to be produced.
+   *
+   * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
+   * the fully-qualified column name and rowId) for each explicit invalid column qualifier that is
+   * found; otherwise the report will contain a summary, with one line for each invalid column
+   * qualifier found, along with a count of the number of rows which contain that same invalid
+   * column qualifier.
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table containing the Column Family to be reported on
+   * @param colFamily name of the Column Family to be reported on
+   * @throws IOException if a remote or network exception occurs
+   */
+  public void generateReportOnInvalidColumnQualifiers(boolean verbose, File targetFile,
+          TableName tableName, byte[] colFamily) throws IOException {
+    repository.generateReportOnInvalidColumnQualifiers(verbose, targetFile, tableName, colFamily);
   }
 
   /**
