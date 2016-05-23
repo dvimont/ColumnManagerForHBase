@@ -717,18 +717,18 @@ public class RepositoryAdmin implements Closeable {
    * {@link #setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * enabled} in order for this report to be produced.
    *
+   * @param tableName name of the Table to be reported on
+   * @param targetFile file to which the CSV file is to be outputted
    * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
    * the fully-qualified column name and rowId) for each explicit invalid column qualifier that is
    * found; otherwise the report will contain a summary, with one line for each invalid column
    * qualifier found, along with a count of the number of rows which contain that same invalid
    * column qualifier.
-   * @param targetFile file to which the CSV file is to be outputted
-   * @param tableName name of the Table to be reported on
    * @throws IOException if a remote or network exception occurs
    */
-  public void generateReportOnInvalidColumnQualifiers(boolean verbose, File targetFile,
-          TableName tableName) throws IOException {
-    generateReportOnInvalidColumnQualifiers(verbose, targetFile, tableName, null);
+  public void generateReportOnInvalidColumnQualifiers(TableName tableName, File targetFile,
+          boolean verbose) throws IOException {
+    generateReportOnInvalidColumnQualifiers(tableName, null, targetFile, verbose);
   }
 
   /**
@@ -740,19 +740,19 @@ public class RepositoryAdmin implements Closeable {
    * {@link #setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * enabled} in order for this report to be produced.
    *
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table containing the Column Family to be reported on
+   * @param colFamily name of the Column Family to be reported on
    * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
    * the fully-qualified column name and rowId) for each explicit invalid column qualifier that is
    * found; otherwise the report will contain a summary, with one line for each invalid column
    * qualifier found, along with a count of the number of rows which contain that same invalid
    * column qualifier.
-   * @param targetFile file to which the CSV file is to be outputted
-   * @param tableName name of the Table containing the Column Family to be reported on
-   * @param colFamily name of the Column Family to be reported on
    * @throws IOException if a remote or network exception occurs
    */
-  public void generateReportOnInvalidColumnQualifiers(boolean verbose, File targetFile,
-          TableName tableName, byte[] colFamily) throws IOException {
-    repository.generateReportOnInvalidColumnQualifiers(verbose, targetFile, tableName, colFamily);
+  public void generateReportOnInvalidColumnQualifiers(TableName tableName, byte[] colFamily,
+          File targetFile, boolean verbose) throws IOException {
+    repository.generateReportOnInvalidColumnQualifiers(tableName, colFamily, targetFile, verbose);
   }
 
   /**

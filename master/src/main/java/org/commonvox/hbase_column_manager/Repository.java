@@ -103,7 +103,7 @@ class Repository {
   private static final NamespaceDescriptor HBASE_SYSTEM_NAMESPACE_DESCRIPTOR
           = NamespaceDescriptor.create("hbase").build();
   static final NamespaceDescriptor REPOSITORY_NAMESPACE_DESCRIPTOR
-          = NamespaceDescriptor.create("column_manager_repository_namespace").build();
+          = NamespaceDescriptor.create("__column_manager_repository_namespace").build();
   static final TableName REPOSITORY_TABLENAME
           = TableName.valueOf(REPOSITORY_NAMESPACE_DESCRIPTOR.getName(),
                   "column_manager_repository_table");
@@ -485,7 +485,8 @@ class Repository {
 
   private boolean isIncludedNamespace(String namespaceName) {
     if (namespaceName.equals(HBASE_SYSTEM_NAMESPACE_DESCRIPTOR.getName())
-            || namespaceName.equals(REPOSITORY_NAMESPACE_DESCRIPTOR.getName())) {
+            || namespaceName.equals(REPOSITORY_NAMESPACE_DESCRIPTOR.getName())
+            || namespaceName.equals(InvalidColumnReport.TEMP_REPORT_NAMESPACE)) {
       return false;
     }
     if (includedNamespaces == null) {
@@ -1834,56 +1835,16 @@ class Repository {
     return changeEventMonitor.denormalize();
   }
 
-  void generateReportOnInvalidColumnQualifiers (boolean verbose, File targetFile,
-          TableName tableName, byte[] colFamily) throws IOException {
+  void generateReportOnInvalidColumnQualifiers (TableName tableName, byte[] colFamily,
+          File targetFile, boolean verbose) throws IOException {
 
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     if (mtd == null || !mtd.hasColumnDefinitions()) {
       throw new ColumnManagerIOException("No ColumnDefinitions found in Repository for Table "
               + tableName.getNameAsString()) {};
     }
-
-    // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
-    Table table = hbaseConnection.getTable(tableName);
     try (InvalidColumnReport invalidColumnReport
-            = new InvalidColumnReport(hbaseConnection, tableName, targetFile, verbose);
-            ResultScanner rows
-                    = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
-      for (Result row : rows) {
-        for (Entry<byte[], NavigableMap<byte[],byte[]>> familyToColumnsMapEntry :
-                row.getNoVersionMap().entrySet()) {
-          MColumnDescriptor mcd = mtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
-          if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no validation if no defs!!
-            continue;
-          }
-          for (Entry<byte[],byte[]> entry : familyToColumnsMapEntry.getValue().entrySet()) {
-            byte[] colQualifier = entry.getKey();
-            ColumnDefinition colDefinition = mcd.getColumnDefinition(colQualifier);
-            if (colDefinition == null) {
-//              System.out.println("**Invalid col qualifier: " + Bytes.toString(colQualifier));
-              invalidColumnReport.addEntry(
-                      mcd.getName(), colQualifier, Bytes.toInt(entry.getValue()), null, row.getRow());
-            }
-//            if (colDefinition.getColumnLength() > 0
-//                    && cell.getValueLength() > colDefinition.getColumnLength()) {
-//              throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
-//                      "Value length of <" + cell.getValueLength()
-//                      + "> is longer than defined maximum length of <"
-//                      + colDefinition.getColumnLength() + ">.");
-//            }
-//            String colValidationRegex = colDefinition.getColumnValidationRegex();
-//            if (colValidationRegex != null && colValidationRegex.length() > 0) {
-//              byte[] colValue = Bytes.getBytes(CellUtil.getValueBufferShallowCopy(cell));
-//              if (!Bytes.toString(colValue).matches(colValidationRegex)) {
-//                throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(),
-//                        colQualifier, colValue,
-//                        "Value does not match the regular expression defined for column: <"
-//                        + colValidationRegex + ">");
-//              }
-//            }
-          }
-        }
-      }
+            = new InvalidColumnReport(hbaseConnection, mtd, colFamily, targetFile, verbose)) {
     }
   }
 

@@ -17,16 +17,27 @@ package org.commonvox.hbase_column_manager;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.util.Date;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
 
@@ -36,21 +47,29 @@ import org.apache.log4j.Logger;
  */
 class InvalidColumnReport implements Closeable {
 
+  public static final CSVFormat SUMMARY_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
+          .withCommentMarker('#').withHeader(SummaryReportHeader.class);
+  public static final CSVFormat VERBOSE_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
+          .withCommentMarker('#').withHeader(VerboseReportHeader.class);
   private static final Logger staticLogger
           = Logger.getLogger(Repository.class.getPackage().getName());
-  private static final String TEMP_REPORT_NAMESPACE = "column_manager_temp_reports";
+  static final String TEMP_REPORT_NAMESPACE = "__column_manager_temp_reports";
   private static final String TEMP_REPORT_TABLENAME_PREFIX = "temp_report_table_";
   private static final byte[] TEMP_REPORT_CF = Bytes.toBytes("cr");
   private static final byte ROW_ID_DELIMITER = ':';
+  private static final String ROW_ID_DELIMITER_STRING = String.valueOf((char)ROW_ID_DELIMITER);
 
   private final Connection standardConnection;
+  private final MTableDescriptor userMtd;
   private final Table userTable; // table being analyzed
+  private final byte[] userColFamily; // colFamily being analyzed (optional)
   private final Table tempReportTable; // table to which analysis metadata is written
   private final File targetFile;
   private final boolean mapReduceMode;
+  private final boolean verboseReport;
 
-  InvalidColumnReport(Connection connection, TableName userTableName, File targetFile,
-          boolean verbose) throws IOException {
+  InvalidColumnReport(Connection connection, MTableDescriptor userTableDescriptor,
+          byte[] userColFamily, File targetFile, boolean verbose) throws IOException {
     mapReduceMode = false;
     this.targetFile = targetFile;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
@@ -59,19 +78,24 @@ class InvalidColumnReport implements Closeable {
       standardConnection = connection;
     }
     createTempReportNamespace(standardConnection.getAdmin());
-    userTable = connection.getTable(userTableName);
+    userMtd = userTableDescriptor;
+    userTable = connection.getTable(userTableDescriptor.getTableName());
+    this.userColFamily = userColFamily;
 
     TableName tempReportTableName
             = TableName.valueOf(TEMP_REPORT_NAMESPACE, TEMP_REPORT_TABLENAME_PREFIX
                             + new Timestamp(System.currentTimeMillis()).toString().
-                                    replaceAll("[\\.: ]", "_"));
+                                    replaceAll("[\\.\\-: ]", ""));
     standardConnection.getAdmin().createTable(new HTableDescriptor(tempReportTableName).
             addFamily(new HColumnDescriptor(TEMP_REPORT_CF)));
     tempReportTable = standardConnection.getTable(tempReportTableName);
+    verboseReport = verbose;
+    collectInvalidColumnMetadata();
   }
 
-  public InvalidColumnReport(Connection connection, TableName userTableName,
-          TableName tempReportTableName) throws IOException {
+  public InvalidColumnReport(Connection connection, MTableDescriptor userTableDescriptor,
+          byte[] userColFamily, TableName tempReportTableName, boolean verbose)
+          throws IOException {
     mapReduceMode = true;
     this.targetFile = null;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
@@ -79,9 +103,62 @@ class InvalidColumnReport implements Closeable {
     } else {
       standardConnection = connection;
     }
-    userTable = connection.getTable(userTableName);
-
+    userMtd = userTableDescriptor;
+    userTable = standardConnection.getTable(userTableDescriptor.getTableName());
+    this.userColFamily = userColFamily;
     tempReportTable = standardConnection.getTable(tempReportTableName);
+    verboseReport = verbose;
+  }
+
+  /**
+   * Note that collecting invalid column metadata in an HBase table is intended to make for
+   * easy implementation in a distributed mapreduce version of this procedure.
+   *
+   * @throws IOException if a remote or network exception occurs
+   */
+  private void collectInvalidColumnMetadata() throws IOException {
+    // perform full scan (w/ KeyOnlyFilter(true) if summary report)
+    Scan columnScan = new Scan();
+    if (!verboseReport) {
+      columnScan.setFilter(new KeyOnlyFilter(true));
+    }
+    if (userColFamily != null) {
+      columnScan.addFamily(userColFamily);
+    }
+    try (ResultScanner rows = userTable.getScanner(columnScan)) {
+      for (Result row : rows) {
+        for (Entry<byte[], NavigableMap<byte[],byte[]>> familyToColumnsMapEntry :
+                row.getNoVersionMap().entrySet()) {
+          MColumnDescriptor mcd = userMtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
+          if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no def? everything's valid!
+            continue;
+          }
+          for (Entry<byte[],byte[]> entry : familyToColumnsMapEntry.getValue().entrySet()) {
+            byte[] colQualifier = entry.getKey();
+            if (mcd.getColumnDefinition(colQualifier) == null) {
+              addEntry(mcd.getName(), colQualifier, row.getRow(), entry.getValue());
+            }
+//            if (colDefinition.getColumnLength() > 0
+//                    && cell.getValueLength() > colDefinition.getColumnLength()) {
+//              throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
+//                      "Value length of <" + cell.getValueLength()
+//                      + "> is longer than defined maximum length of <"
+//                      + colDefinition.getColumnLength() + ">.");
+//            }
+//            String colValidationRegex = colDefinition.getColumnValidationRegex();
+//            if (colValidationRegex != null && colValidationRegex.length() > 0) {
+//              byte[] colValue = Bytes.getBytes(CellUtil.getValueBufferShallowCopy(cell));
+//              if (!Bytes.toString(colValue).matches(colValidationRegex)) {
+//                throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(),
+//                        colQualifier, colValue,
+//                        "Value does not match the regular expression defined for column: <"
+//                        + colValidationRegex + ">");
+//              }
+//            }
+          }
+        }
+      }
+    }
   }
 
   public TableName getTempReportTableName() {
@@ -92,10 +169,11 @@ class InvalidColumnReport implements Closeable {
     return new Timestamp(System.currentTimeMillis()).toString().replaceAll("[\\.: ]", "_");
   }
 
-  public void addEntry(byte[] colFamily, byte[] colQualifier, int valueLength, byte[] value,
-          byte[] userTableRowId) {
-    byte[] rowId = buildRowId(colFamily, colQualifier);
-    System.out.println(Bytes.toString(rowId));
+  private void addEntry(byte[] colFamily, byte[] colQualifier, byte[] userTableRowId, byte[] value)
+          throws IOException {
+    byte[] rowId = buildRowId(colFamily, colQualifier); // namespace:table:cf:colQualifier
+    tempReportTable.put(new Put(rowId).addColumn(
+            TEMP_REPORT_CF, userTableRowId, (value.length < 200 ? value : Bytes.head(value, 200))));
   }
 
   private byte[] buildRowId(byte[] colFamily, byte[] colQualifier) {
@@ -105,6 +183,52 @@ class InvalidColumnReport implements Closeable {
             put(userTable.getName().getQualifier()).put(ROW_ID_DELIMITER).
             put(colFamily).put(ROW_ID_DELIMITER).put(colQualifier);
     return rowId.array();
+  }
+
+  private String[] parseRowId(byte[] rowId) {
+    return Bytes.toString(rowId).split(ROW_ID_DELIMITER_STRING, 4);
+  }
+
+  public enum SummaryReportHeader {
+    NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, OCCURRENCES}
+
+  public enum VerboseReportHeader {
+     NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, ROW_ID, COLUMN_VALUE}
+
+  private void outputReport() throws IOException {
+    CSVFormat csvFormat = (verboseReport ? VERBOSE_CSV_FORMAT : SUMMARY_CSV_FORMAT);
+    try (ResultScanner rows = tempReportTable.getScanner(new Scan());
+            CSVPrinter csvPrinter = csvFormat.withHeaderComments(
+                    (verboseReport ? "VERBOSE" : "SUMMARY")
+                            + " Invalid Columns Report for Table <"
+                            + userTable.getName().getNameAsString()
+                            + (userColFamily == null ? "" :
+                                    ">, ColumnFamily <" + Bytes.toString (userColFamily))
+                            + "> -- Generated by " + Repository.PRODUCT_NAME + ":"
+                            + this.getClass().getSimpleName(),
+                            new Date())
+                            .print(new FileWriter(targetFile))) {
+      for (Result row : rows) {
+        NavigableMap<byte[],byte[]> tempReportColumnMap = row.getFamilyMap(TEMP_REPORT_CF);
+        String[] reportLineComponents = parseRowId(row.getRow());
+        if (verboseReport) { // print line for each invalid occurrence found
+          for (Entry<byte[],byte[]> tempReportColumn : tempReportColumnMap.entrySet()) {
+            for (String reportLineComponent : reportLineComponents) {
+              csvPrinter.print(reportLineComponent);
+            }
+            csvPrinter.print(Repository.getPrintableString(tempReportColumn.getKey())); // userRowId
+            csvPrinter.print(Repository.getPrintableString(tempReportColumn.getValue())); // colVal
+            csvPrinter.println();
+          }
+        } else { // print summary line giving count of invalid occurrences
+          for (String reportLineComponent : reportLineComponents) {
+            csvPrinter.print(reportLineComponent);
+          }
+          csvPrinter.print(String.valueOf(tempReportColumnMap.size()));
+          csvPrinter.println();
+        }
+      }
+    }
   }
 
   static void createTempReportNamespace(Admin standardAdmin) throws IOException {
@@ -124,8 +248,8 @@ class InvalidColumnReport implements Closeable {
     }
     staticLogger.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
             + " TempReport tables and namespace has been requested.");
-    standardAdmin.disableTables(TEMP_REPORT_TABLENAME_PREFIX + ".*");
-    standardAdmin.deleteTables(TEMP_REPORT_TABLENAME_PREFIX + ".*");
+    standardAdmin.disableTables(TEMP_REPORT_NAMESPACE + ":" + ".*");
+    standardAdmin.deleteTables(TEMP_REPORT_NAMESPACE + ":" + ".*");
     standardAdmin.deleteNamespace(TEMP_REPORT_NAMESPACE);
     staticLogger.warn("DROP (delete) of " + Repository.PRODUCT_NAME
             + " TempReport tables and namespace has been completed: " + TEMP_REPORT_NAMESPACE);
@@ -134,6 +258,7 @@ class InvalidColumnReport implements Closeable {
   @Override
   public void close() throws IOException {
     userTable.close();
+    outputReport();
     tempReportTable.close();
     if (!mapReduceMode) {
       Admin admin = standardConnection.getAdmin();
