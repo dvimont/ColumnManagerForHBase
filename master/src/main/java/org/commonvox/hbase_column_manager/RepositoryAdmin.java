@@ -155,6 +155,9 @@ public class RepositoryAdmin implements Closeable {
    */
   public Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
+    if (!repository.isIncludedTable(htd.getTableName())) {
+      throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
+    }
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
       return ((MColumnDescriptor) hcd).getColumnAuditors();
     } else {
@@ -173,6 +176,9 @@ public class RepositoryAdmin implements Closeable {
    */
   public Set<ColumnAuditor> getColumnAuditors(TableName tableName, byte[] colFamily)
           throws IOException {
+    if (!repository.isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
     MTableDescriptor mtd = getRepository().getMTableDescriptor(tableName);
     if (mtd == null) {
       return null;
@@ -195,7 +201,10 @@ public class RepositoryAdmin implements Closeable {
    */
   public Set<byte[]> getColumnQualifiers(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
-    Set<byte[]> columnQualifiers = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
+    if (!repository.isIncludedTable(htd.getTableName())) {
+      throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
+    }
+     Set<byte[]> columnQualifiers = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
       return ((MColumnDescriptor) hcd).getColumnQualifiers();
     } else {
@@ -221,7 +230,10 @@ public class RepositoryAdmin implements Closeable {
    */
   public Set<byte[]> getColumnQualifiers(TableName tableName, byte[] colFamily)
           throws IOException {
-    MTableDescriptor mtd = getRepository().getMTableDescriptor(tableName);
+    if (!repository.isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
+    MTableDescriptor mtd = repository.getMTableDescriptor(tableName);
     if (mtd == null) {
       return null;
     }
@@ -245,11 +257,7 @@ public class RepositoryAdmin implements Closeable {
           final ColumnDefinition colDefinition)
           throws IOException {
     List<ColumnDefinition> colDefinitions
-            = new ArrayList<ColumnDefinition>() {
-              {
-                add(colDefinition);
-              }
-            };
+            = new ArrayList<ColumnDefinition>() { { add(colDefinition); } };
     repository.putColumnDefinitionSchemaEntities(tableName, colFamily, colDefinitions);
   }
 
@@ -724,11 +732,14 @@ public class RepositoryAdmin implements Closeable {
    * found; otherwise the report will contain a summary, with one line for each invalid column
    * qualifier found, along with a count of the number of rows which contain that same invalid
    * column qualifier.
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public void generateReportOnInvalidColumnQualifiers(TableName tableName, File targetFile,
-          boolean verbose) throws IOException {
-    generateReportOnInvalidColumnQualifiers(tableName, null, targetFile, verbose);
+  public boolean generateReportOnInvalidColumnQualifiers(TableName tableName, File targetFile,
+          boolean verbose, boolean useMapreduce) throws IOException {
+    return generateReportOnInvalidColumnQualifiers(
+            tableName, null, targetFile, verbose, useMapreduce);
   }
 
   /**
@@ -748,11 +759,14 @@ public class RepositoryAdmin implements Closeable {
    * found; otherwise the report will contain a summary, with one line for each invalid column
    * qualifier found, along with a count of the number of rows which contain that same invalid
    * column qualifier.
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public void generateReportOnInvalidColumnQualifiers(TableName tableName, byte[] colFamily,
-          File targetFile, boolean verbose) throws IOException {
-    repository.generateReportOnInvalidColumnQualifiers(tableName, colFamily, targetFile, verbose);
+  public boolean generateReportOnInvalidColumnQualifiers(TableName tableName, byte[] colFamily,
+          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+    return repository.generateReportOnInvalidColumnQualifiers(
+            tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
   /**

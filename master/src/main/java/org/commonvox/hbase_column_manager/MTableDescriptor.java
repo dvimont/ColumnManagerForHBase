@@ -35,7 +35,6 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 class MTableDescriptor extends HTableDescriptor {
 
   private byte[] foreignKeyValue;
-//    private boolean columnDefinitionsEnforced;
 
   /**
    * The superclass constructor that is mirrored by this constructor is slated for deprecation in
@@ -66,11 +65,9 @@ class MTableDescriptor extends HTableDescriptor {
   }
 
   /**
-   * Makes a deep copy of submitted HTableDescriptor object. If submitted object is also an
-   * MTableDescriptor, a deep copy of its component {@link MColumnDescriptor} collection is also
-   * made.
+   * Makes a deep copy of submitted HTableDescriptor object.
    *
-   * @param desc Column descriptor to "clone".
+   * @param desc Table descriptor to copy.
    */
   public MTableDescriptor(HTableDescriptor desc) {
     super(desc);
@@ -115,7 +112,6 @@ class MTableDescriptor extends HTableDescriptor {
   MTableDescriptor(SchemaEntity entity) {
     super(entity.getName());
     this.setForeignKey(entity.getForeignKey());
-//        this.columnDefinitionsEnforced = entity.getColumnDefinitionsEnforced();
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey(), valueEntry.getValue());

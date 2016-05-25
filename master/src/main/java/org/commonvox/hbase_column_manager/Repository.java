@@ -500,7 +500,7 @@ class Repository {
     }
   }
 
-  private boolean isIncludedTable(TableName tableName) {
+  boolean isIncludedTable(TableName tableName) {
     if (!isIncludedNamespace(tableName.getNamespaceAsString())) {
       return false;
     }
@@ -814,7 +814,7 @@ class Repository {
         }
         if (colDefinition.getColumnLength() > 0
                 && cell.getValueLength() > colDefinition.getColumnLength()) {
-          throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
+          throw new ColumnValueInvalidException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
                   "Value length of <" + cell.getValueLength()
                   + "> is longer than defined maximum length of <"
                   + colDefinition.getColumnLength() + ">.");
@@ -823,7 +823,7 @@ class Repository {
         if (colValidationRegex != null && colValidationRegex.length() > 0) {
           byte[] colValue = Bytes.getBytes(CellUtil.getValueBufferShallowCopy(cell));
           if (!Bytes.toString(colValue).matches(colValidationRegex)) {
-            throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(),
+            throw new ColumnValueInvalidException(mtd.getTableName().getName(), mcd.getName(),
                     colQualifier, colValue,
                     "Value does not match the regular expression defined for column: <"
                     + colValidationRegex + ">");
@@ -886,7 +886,7 @@ class Repository {
    */
   boolean putColumnDefinitionSchemaEntities(MTableDescriptor mtd) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
-      return false;
+      throw new TableNotIncludedForProcessingException(mtd.getTableName().getName(), null);
     }
     byte[] tableForeignKey = getTableForeignKey(mtd);
     boolean serializationCompleted = true;
@@ -921,6 +921,9 @@ class Repository {
   boolean putColumnDefinitionSchemaEntities(
           TableName tableName, byte[] colFamily, List<ColumnDefinition> colDefinitions)
           throws IOException {
+    if (!isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
     boolean allPutsCompleted = false;
     byte[] colFamilyForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName),
@@ -1055,7 +1058,7 @@ class Repository {
     if (row == null || row.isEmpty()) {
       // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so namespace SchemaEntity might not yet have been captured in repository,
-      //  or namespaceName may not represent active namespace (and so not stored in repository).
+      //  or namespaceName may not represent included namespace (and so not stored in repository).
       //return new MNamespaceDescriptor(standardAdmin.getNamespaceDescriptor(namespaceName));
       if (isIncludedNamespace(namespaceName)) {
         putNamespaceSchemaEntity(standardAdmin.getNamespaceDescriptor(namespaceName));
@@ -1123,6 +1126,9 @@ class Repository {
 
   Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
+    if (!isIncludedTable(htd.getTableName())) {
+      throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
+    }
     byte[] colFamilyForeignKey
             = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
                     getTableForeignKey(htd), hcd.getName());
@@ -1149,6 +1155,9 @@ class Repository {
 
   Set<ColumnDefinition> getColumnDefinitions(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
+    if (!isIncludedTable(htd.getTableName())) {
+      throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
+    }
     byte[] colFamilyForeignKey
             = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
     return getColumnDefinitions(colFamilyForeignKey);
@@ -1367,6 +1376,9 @@ class Repository {
 
   boolean columnDefinitionsEnforced(TableName tableName, byte[] colFamily)
           throws IOException {
+    if (!isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
     return columnDefinitionsEnforced(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
   }
@@ -1387,7 +1399,7 @@ class Repository {
   void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException {
     if (!isIncludedTable(tableName)) {
-      return; // should an Exception be thrown?
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
     setColumnDefinitionsEnforced(enabled, SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
@@ -1499,6 +1511,9 @@ class Repository {
    */
   void deleteColumnDefinition(TableName tableName, byte[] colFamily, byte[] colQualifier)
           throws IOException {
+    if (!isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
     byte[] colFamilyForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName),
             colFamily);
@@ -1561,7 +1576,7 @@ class Repository {
   void discoverSchema(TableName tableName, boolean includeColumnQualifiers)
           throws IOException {
     if (!isIncludedTable(tableName)) {
-      return;
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
     putTableSchemaEntity(standardAdmin.getTableDescriptor(tableName));
     if (includeColumnQualifiers) {
@@ -1835,16 +1850,20 @@ class Repository {
     return changeEventMonitor.denormalize();
   }
 
-  void generateReportOnInvalidColumnQualifiers (TableName tableName, byte[] colFamily,
-          File targetFile, boolean verbose) throws IOException {
-
+  boolean generateReportOnInvalidColumnQualifiers (TableName tableName, byte[] colFamily,
+          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+    if (!isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     if (mtd == null || !mtd.hasColumnDefinitions()) {
-      throw new ColumnManagerIOException("No ColumnDefinitions found in Repository for Table "
-              + tableName.getNameAsString()) {};
+      throw new ColumnDefinitionNotFoundException(tableName.getName(), colFamily, null,
+              "No ColumnDefinitions found for table/columnFamily");
     }
     try (InvalidColumnReport invalidColumnReport
-            = new InvalidColumnReport(hbaseConnection, mtd, colFamily, targetFile, verbose)) {
+            = new InvalidColumnReport(
+                    hbaseConnection, mtd, colFamily, targetFile, verbose, useMapreduce)) {
+      return !invalidColumnReport.isEmpty();
     }
   }
 

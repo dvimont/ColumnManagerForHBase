@@ -65,12 +65,12 @@ class InvalidColumnReport implements Closeable {
   private final byte[] userColFamily; // colFamily being analyzed (optional)
   private final Table tempReportTable; // table to which analysis metadata is written
   private final File targetFile;
-  private final boolean mapReduceMode;
   private final boolean verboseReport;
+  private final boolean mapreduceSlave;
 
   InvalidColumnReport(Connection connection, MTableDescriptor userTableDescriptor,
-          byte[] userColFamily, File targetFile, boolean verbose) throws IOException {
-    mapReduceMode = false;
+          byte[] userColFamily, File targetFile, boolean verbose, boolean useMapreduce)
+          throws IOException {
     this.targetFile = targetFile;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
       this.standardConnection = ((MConnection)connection).getStandardConnection();
@@ -90,13 +90,17 @@ class InvalidColumnReport implements Closeable {
             addFamily(new HColumnDescriptor(TEMP_REPORT_CF)));
     tempReportTable = standardConnection.getTable(tempReportTableName);
     verboseReport = verbose;
-    collectInvalidColumnMetadata();
+    mapreduceSlave = false;
+    if (useMapreduce) {
+      collectInvalidColumnMetadataViaMapreduce(); // invoke mapreduce method
+    } else {
+      collectInvalidColumnMetadataViaScan();
+    }
   }
 
   public InvalidColumnReport(Connection connection, MTableDescriptor userTableDescriptor,
           byte[] userColFamily, TableName tempReportTableName, boolean verbose)
           throws IOException {
-    mapReduceMode = true;
     this.targetFile = null;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
       this.standardConnection = ((MConnection)connection).getStandardConnection();
@@ -108,6 +112,8 @@ class InvalidColumnReport implements Closeable {
     this.userColFamily = userColFamily;
     tempReportTable = standardConnection.getTable(tempReportTableName);
     verboseReport = verbose;
+    mapreduceSlave = true;
+    collectInvalidColumnMetadataViaScan();
   }
 
   /**
@@ -116,7 +122,7 @@ class InvalidColumnReport implements Closeable {
    *
    * @throws IOException if a remote or network exception occurs
    */
-  private void collectInvalidColumnMetadata() throws IOException {
+  private void collectInvalidColumnMetadataViaScan() throws IOException {
     // perform full scan (w/ KeyOnlyFilter(true) if summary report)
     Scan columnScan = new Scan();
     if (!verboseReport) {
@@ -161,6 +167,20 @@ class InvalidColumnReport implements Closeable {
     }
   }
 
+  private void collectInvalidColumnMetadataViaMapreduce() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
+
+  public boolean isEmpty() {
+    boolean reportIsEmpty;
+    try (ResultScanner pingScan = tempReportTable.getScanner(new Scan().setMaxResultSize(1))) {
+      reportIsEmpty = (pingScan.next() == null);
+    } catch (IOException e) {
+      reportIsEmpty = true;
+    }
+    return reportIsEmpty;
+  }
+
   public TableName getTempReportTableName() {
     return tempReportTable.getName();
   }
@@ -200,7 +220,7 @@ class InvalidColumnReport implements Closeable {
     try (ResultScanner rows = tempReportTable.getScanner(new Scan());
             CSVPrinter csvPrinter = csvFormat.withHeaderComments(
                     (verboseReport ? "VERBOSE" : "SUMMARY")
-                            + " Invalid Columns Report for Table <"
+                            + " Report on Invalid Columns in Table <"
                             + userTable.getName().getNameAsString()
                             + (userColFamily == null ? "" :
                                     ">, ColumnFamily <" + Bytes.toString (userColFamily))
@@ -258,9 +278,9 @@ class InvalidColumnReport implements Closeable {
   @Override
   public void close() throws IOException {
     userTable.close();
-    outputReport();
     tempReportTable.close();
-    if (!mapReduceMode) {
+    if (!mapreduceSlave) {
+      outputReport();
       Admin admin = standardConnection.getAdmin();
       admin.disableTable(tempReportTable.getName());
       admin.deleteTable(tempReportTable.getName());

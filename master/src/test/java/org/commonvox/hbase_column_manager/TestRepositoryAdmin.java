@@ -43,6 +43,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.NamespaceNotFoundException;
@@ -200,9 +201,9 @@ public class TestRepositoryAdmin {
           = "FAILURE IN " + RepositoryAdmin.class.getSimpleName() + " PROCESSING!! ==>> ";
   private static final String COLUMN_AUDIT_FAILURE = "FAILURE IN Column Audit PROCESSING!! ==>> ";
   private static final String GET_COL_QUALIFIERS_FAILURE
-          = COLUMN_AUDIT_FAILURE + "#getColumnQualifiers method returned unexpected results";
+          = COLUMN_AUDIT_FAILURE + "#getColumnQualifiers method returned unexpected results ";
   private static final String GET_COL_AUDITORS_FAILURE
-          = COLUMN_AUDIT_FAILURE + "#getColumnAuditors method returned unexpected results";
+          = COLUMN_AUDIT_FAILURE + "#getColumnAuditors method returned unexpected results ";
   private static final String COLUMN_ENFORCE_FAILURE
           = "FAILURE IN Column Enforce PROCESSING!! ==>> ";
   private static final String COL_QUALIFIER_ENFORCE_FAILURE
@@ -216,7 +217,7 @@ public class TestRepositoryAdmin {
   private static final String CHANGE_EVENT_FAILURE = "FAILURE IN ChangeEvent PROCESSING!! ==>> ";
 
   private static final String INVALID_COLUMN_REPORT_FAILURE
-          = "FAILURE IN InvalidColumnReport PROCESSING!! ==>>";
+          = "FAILURE IN InvalidColumnReport PROCESSING!! ==>> ";
 
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
@@ -580,11 +581,15 @@ public class TestRepositoryAdmin {
               expectedColQualifiersForNamespace1Table1Cf2.equals(
                       returnedColQualifiersForNamespace1Table1Cf2));
 
-      Set<byte[]> returnedColQualifiersForNamespace2Table1Cf1
+      try {
+        Set<byte[]> returnedColQualifiersForNamespace2Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-      assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
       Set<byte[]> returnedColQualifiersForNamespace3Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
@@ -594,11 +599,15 @@ public class TestRepositoryAdmin {
               expectedColQualifiersForNamespace3Table1Cf1.equals(
                       returnedColQualifiersForNamespace3Table1Cf1));
 
-      Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnQualifiers(
-                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
-                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-      assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace3Table2Cf1 == null);
+      try {
+        Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnQualifiers(
+                        testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
+                        testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
       // Test #getColumnQualifiers with alternate signature
       returnedColQualifiersForNamespace1Table1Cf1
@@ -613,13 +622,17 @@ public class TestRepositoryAdmin {
               expectedColQualifiersForNamespace1Table1Cf2.equals(
                       returnedColQualifiersForNamespace1Table1Cf2));
 
-      returnedColQualifiersForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnQualifiers(NAMESPACE02_TABLE01, CF01);
-      assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
+//      returnedColQualifiersForNamespace2Table1Cf1
+//              = repositoryAdmin.getColumnQualifiers(NAMESPACE02_TABLE01, CF01);
+//      assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
 
-      returnedColQualifiersForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02, CF01);
-      assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace3Table2Cf1 == null);
+      try {
+        Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02, CF01);
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
       // Test #getColumnAuditors
       Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf1
@@ -638,11 +651,15 @@ public class TestRepositoryAdmin {
               expectedColAuditorsForNamespace1Table1Cf2.equals(
                       returnedColAuditorsForNamespace1Table1Cf2));
 
-      Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
-                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-      assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
+                = repositoryAdmin.getColumnAuditors(
+                        testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
+                        testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
       Set<ColumnAuditor> returnedColAuditorsForNamespace3Table1Cf1
               = repositoryAdmin.getColumnAuditors(
@@ -652,11 +669,15 @@ public class TestRepositoryAdmin {
               expectedColAuditorsForNamespace3Table1Cf1.equals(
                       returnedColAuditorsForNamespace3Table1Cf1));
 
-      Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnAuditors(
-                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
-                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-      assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace3Table2Cf1 == null);
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnAuditors(
+                        testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
+                        testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
       // Test #getColumnAuditors with alternate signature
       returnedColAuditorsForNamespace1Table1Cf1
@@ -671,13 +692,21 @@ public class TestRepositoryAdmin {
               expectedColAuditorsForNamespace1Table1Cf2.equals(
                       returnedColAuditorsForNamespace1Table1Cf2));
 
-      returnedColAuditorsForNamespace2Table1Cf1
-              = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01, CF01);
-      assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace2Table1Cf1 == null);
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
+                = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01, CF01);
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
-      returnedColAuditorsForNamespace3Table2Cf1
-              = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02, CF01);
-      assertTrue(GET_COL_AUDITORS_FAILURE, returnedColAuditorsForNamespace3Table2Cf1 == null);
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02, CF01);
+        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
     }
     clearTestingEnvironment();
   }
@@ -701,7 +730,13 @@ public class TestRepositoryAdmin {
       repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF02);
        // next def not enforced, since namespace02 tables not included for CM processing!
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
+      try {
+        repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
+        fail(COL_QUALIFIER_ENFORCE_FAILURE
+                + TableNotIncludedForProcessingException.class.getSimpleName()
+                + " failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
 
       try (Table namespace01Table01 = connection.getTable(NAMESPACE01_TABLE01);
               Table namespace02Table03 = connection.getTable(NAMESPACE02_TABLE03)) {
@@ -724,7 +759,7 @@ public class TestRepositoryAdmin {
           namespace01Table01.put(new Put(ROW_ID_01).
                   addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG));
           fail(COL_LENGTH_ENFORCE_FAILURE);
-        } catch (InvalidColumnValueException e) {
+        } catch (ColumnValueInvalidException e) {
         }
         // put same row to unenforced namespace/table
         namespace02Table03.put(new Put(ROW_ID_01).
@@ -737,7 +772,7 @@ public class TestRepositoryAdmin {
           namespace01Table01.put(new Put(ROW_ID_01).
                   addColumn(CF02, COLQUALIFIER03, Bytes.toBytes("ftp://google.com")));
           fail(COL_VALUE_ENFORCE_FAILURE);
-        } catch (InvalidColumnValueException e) {
+        } catch (ColumnValueInvalidException e) {
         }
         // put same row to unenforced namespace/table
         namespace02Table03.put(new Put(ROW_ID_01).
@@ -759,8 +794,13 @@ public class TestRepositoryAdmin {
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF01, col01Definition);
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF01, col02Definition);
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF02, col03Definition);
-      // next def not enforced, since namespace02 tables not included for CM processing!
-      repositoryAdmin.addColumnDefinition(NAMESPACE02_TABLE03, CF01, col04Definition);
+
+      try {
+        repositoryAdmin.addColumnDefinition(NAMESPACE02_TABLE03, CF01, col04Definition);
+        fail("RepositoryAdmin#addColumnDefinition failed to throw expected exception: "
+                + TableNotIncludedForProcessingException.class.getSimpleName());
+      } catch (TableNotIncludedForProcessingException e) {
+      }
     }
   }
 
@@ -1334,12 +1374,15 @@ public class TestRepositoryAdmin {
             = TEMP_PREFIX + "invalidColumnQualifiers.table01cf02.summary.csv";
     final String INVALID_COLUMN_QUALIFIERS_CF02_VERBOSE_FILE
             = TEMP_PREFIX + "invalidColumnQualifiers.table01cf02verbose.csv";
+    final String INVALID_COLUMN_QUALIFIERS_EMPTY_TABLE
+            = TEMP_PREFIX + "invalidColumnQualifiersEmptyTable.summary.csv";
     File fileForSummaryTable01;
     File fileForVerboseTable01;
     File fileForSummaryTable01Cf01;
     File fileForVerboseTable01Cf01;
     File fileForSummaryTable01Cf02;
     File fileForVerboseTable01Cf02;
+    File fileForSummaryOfEmptyTable;
     try {
       fileForSummaryTable01 = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_SUMMARY_FILE);
       fileForVerboseTable01 = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_VERBOSE_FILE);
@@ -1347,6 +1390,7 @@ public class TestRepositoryAdmin {
       fileForVerboseTable01Cf01 = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_CF01_VERBOSE_FILE);
       fileForSummaryTable01Cf02 = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_CF02_SUMMARY_FILE);
       fileForVerboseTable01Cf02 = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_CF02_VERBOSE_FILE);
+      fileForSummaryOfEmptyTable = tempTestFolder.newFile(INVALID_COLUMN_QUALIFIERS_EMPTY_TABLE);
     } catch (IllegalStateException e) { // standalone (non-JUnit) execution
       fileForSummaryTable01 = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_SUMMARY_FILE);
       fileForVerboseTable01 = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_VERBOSE_FILE);
@@ -1354,23 +1398,40 @@ public class TestRepositoryAdmin {
       fileForVerboseTable01Cf01 = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_CF01_VERBOSE_FILE);
       fileForSummaryTable01Cf02 = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_CF02_SUMMARY_FILE);
       fileForVerboseTable01Cf02 = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_CF02_VERBOSE_FILE);
+      fileForSummaryOfEmptyTable = new File(TARGET_DIRECTORY + INVALID_COLUMN_QUALIFIERS_EMPTY_TABLE);
     }
+
+    String reportGenerationFailure = INVALID_COLUMN_REPORT_FAILURE
+            + "RepositoryAdmin#generateReportOnInvalidColumnQualifiers method "
+            + "returned unexpected boolean value";
 
     // generate reports
     try (RepositoryAdmin repositoryAdmin
             = new RepositoryAdmin(ConnectionFactory.createConnection())) {
-      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-              NAMESPACE01_TABLE01, fileForSummaryTable01, false);
-      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-              NAMESPACE01_TABLE01, fileForVerboseTable01, true);
-      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-              NAMESPACE01_TABLE01, CF01, fileForSummaryTable01Cf01, false);
-      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-              NAMESPACE01_TABLE01, CF01, fileForVerboseTable01Cf01, true);
-      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-              NAMESPACE01_TABLE01, CF02, fileForSummaryTable01Cf02, false);
-      repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-              NAMESPACE01_TABLE01, CF02, fileForVerboseTable01Cf02, true);
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE01_TABLE01, fileForVerboseTable01, true, false));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE01_TABLE01, CF01, fileForSummaryTable01Cf01, false, false));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE01_TABLE01, CF01, fileForVerboseTable01Cf01, true, false));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE01_TABLE01, CF02, fileForSummaryTable01Cf02, false, false));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE01_TABLE01, CF02, fileForVerboseTable01Cf02, true, false));
+      try {
+        repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+                      NAMESPACE02_TABLE03, fileForSummaryOfEmptyTable, false, false);
+        fail(reportGenerationFailure + "TableNotIncludedForProcessingException failed to be thrown");
+      } catch (TableNotIncludedForProcessingException e) {
+      }
     }
 
     // read in reports and validate contents
@@ -1378,6 +1439,13 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
+//        System.out.println(record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE) + ":"
+//                + record.get(InvalidColumnReport.SummaryReportHeader.TABLE) + ":"
+//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY) + ":"
+//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER) + " "
+//                + InvalidColumnReport.SummaryReportHeader.OCCURRENCES.toString() + "="
+//                + record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES)
+//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -1432,6 +1500,8 @@ public class TestRepositoryAdmin {
             break;
         }
       }
+      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+              3, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01, StandardCharsets.UTF_8,
@@ -1447,6 +1517,7 @@ public class TestRepositoryAdmin {
 //                + InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
 //                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE)
 //                );
+        recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
@@ -1455,7 +1526,6 @@ public class TestRepositoryAdmin {
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
                 record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
-
         switch (recordCount) {
           case 1:
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
@@ -1468,7 +1538,7 @@ public class TestRepositoryAdmin {
                     record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    ROW_ID_03, record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
@@ -1485,7 +1555,7 @@ public class TestRepositoryAdmin {
                     record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    ROW_ID_03, record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_2_BYTES_LONG),
@@ -1502,7 +1572,7 @@ public class TestRepositoryAdmin {
                     record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    ROW_ID_04, record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+                    Bytes.toString(ROW_ID_04), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
@@ -1519,7 +1589,7 @@ public class TestRepositoryAdmin {
                     record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    ROW_ID_05, record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
@@ -1536,7 +1606,7 @@ public class TestRepositoryAdmin {
                     record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    ROW_ID_05,  record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+                    Bytes.toString(ROW_ID_05),  record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
             assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_9_BYTES_LONG),
@@ -1544,17 +1614,228 @@ public class TestRepositoryAdmin {
             break;
         }
       }
+      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+              5, recordCount);
     }
 
-    clearTestingEnvironment();
+    try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf01, StandardCharsets.UTF_8,
+            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+        switch (recordCount) {
+          case 1:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF01),
+                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(BAD_QUALIFIER01),
+                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Occurrences-count value not as expected",
+                    String.valueOf(1),
+                    record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES));
+            break;
+          case 2:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF01),
+                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(BAD_QUALIFIER02),
+                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Occurrences-count value not as expected",
+                    String.valueOf(3),
+                    record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES));
+            break;
+        }
+      }
+      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+              2, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf01, StandardCharsets.UTF_8,
+            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+        switch (recordCount) {
+          case 1:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF01),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(BAD_QUALIFIER01),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_5_BYTES_LONG),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+            break;
+          case 2:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF01),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(BAD_QUALIFIER02),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_2_BYTES_LONG),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+            break;
+          case 3:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF01),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(BAD_QUALIFIER02),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_82_BYTES_LONG),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+            break;
+          case 4:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF01),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(BAD_QUALIFIER02),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_5_BYTES_LONG),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+            break;
+        }
+      }
+      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+              4, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf02, StandardCharsets.UTF_8,
+            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+        switch (recordCount) {
+          case 1:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF02),
+                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(COLQUALIFIER02),
+                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Occurrences-count value not as expected",
+                    String.valueOf(1),
+                    record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES));
+            break;
+        }
+      }
+      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+              1, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf02, StandardCharsets.UTF_8,
+            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+        switch (recordCount) {
+          case 1:
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColFamily value not as expected",
+                    Bytes.toString(CF02),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " ColQualifier value not as expected",
+                    Bytes.toString(COLQUALIFIER02),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_05),  record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
+            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_9_BYTES_LONG),
+                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+            break;
+        }
+      }
+      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+              1, recordCount);
+    }
+
+     clearTestingEnvironment();
     System.out.println("#testGenerateReportOnInvalidColumnQualifiers has run to completion.");
   }
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
+    // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
     // new TestRepositoryAdmin().testChangeEventMonitor();
