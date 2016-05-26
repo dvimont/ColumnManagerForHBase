@@ -598,11 +598,7 @@ public class RepositoryAdmin implements Closeable {
    */
   public void importSchema(boolean includeColumnAuditors, File sourceFile)
           throws IOException, JAXBException {
-    submitImportMessagesToLogger(includeColumnAuditors, null, null, sourceFile);
-    Set<Object> importedDescriptors
-            = repository.deserializeHBaseSchemaArchive(
-                    includeColumnAuditors, null, null, sourceFile);
-    createImportedStructures(includeColumnAuditors, importedDescriptors);
+    repository.importSchema(includeColumnAuditors, null, null, sourceFile);
   }
 
   /**
@@ -626,11 +622,7 @@ public class RepositoryAdmin implements Closeable {
   public void importNamespaceSchema(boolean includeColumnAuditors,
           String namespaceName, File sourceFile)
           throws IOException, JAXBException {
-    submitImportMessagesToLogger(includeColumnAuditors, namespaceName, null, sourceFile);
-    Set<Object> importedDescriptors
-            = repository.deserializeHBaseSchemaArchive(
-                    includeColumnAuditors, namespaceName, null, sourceFile);
-    createImportedStructures(includeColumnAuditors, importedDescriptors);
+    repository.importSchema(includeColumnAuditors, namespaceName, null, sourceFile);
   }
 
   /**
@@ -652,53 +644,8 @@ public class RepositoryAdmin implements Closeable {
   public void importTableSchema(
           boolean includeColumnAuditors, TableName tableName, File sourceFile)
           throws IOException, JAXBException {
-    submitImportMessagesToLogger(includeColumnAuditors, null, tableName, sourceFile);
-    Set<Object> importedDescriptors
-            = repository.deserializeHBaseSchemaArchive(includeColumnAuditors,
-                    tableName.getNamespaceAsString(), tableName, sourceFile);
-    createImportedStructures(includeColumnAuditors, importedDescriptors);
-  }
-
-  private void submitImportMessagesToLogger(boolean includeColumnAuditors,
-          String namespaceName, TableName tableName, File sourceFile) {
-    logger.info("IMPORT of schema "
-            + ((includeColumnAuditors) ? "<INCLUDING COLUMN AUDITOR METADATA> " : "")
-            + "from external HBaseSchemaArchive (XML) file has been requested.");
-    if (namespaceName != null && !namespaceName.isEmpty()) {
-      logger.info("IMPORT NAMESPACE: " + namespaceName);
-    }
-    if (tableName != null && !tableName.getNameAsString().isEmpty()) {
-      logger.info("IMPORT TABLE: " + tableName.getNameAsString());
-    }
-    logger.info("IMPORT source PATH/FILE-NAME: " + sourceFile.getAbsolutePath());
-  }
-
-  private void createImportedStructures(boolean includeColumnAuditors,
-          Set<Object> importedDescriptors)
-          throws IOException {
-    for (Object descriptor : importedDescriptors) {
-      if (MNamespaceDescriptor.class.isAssignableFrom(descriptor.getClass())) {
-        NamespaceDescriptor nd
-                = ((MNamespaceDescriptor) descriptor).getNamespaceDescriptor();
-        if (!namespaceExists(nd)) {
-          repository.getAdmin().createNamespace(nd);
-          repository.putNamespaceSchemaEntity(nd);
-          logger.info("IMPORT COMPLETED FOR NAMESPACE: " + nd.getName());
-        }
-      } else if (MTableDescriptor.class.isAssignableFrom(descriptor.getClass())) {
-        MTableDescriptor mtd = (MTableDescriptor) descriptor;
-        if (!repository.getAdmin().tableExists(mtd.getTableName())) {
-          repository.getAdmin().createTable(mtd); // includes creation of Column Families
-          repository.putTableSchemaEntity(mtd);
-          repository.putColumnDefinitionSchemaEntities(mtd);
-          if (includeColumnAuditors) {
-            repository.putColumnAuditorSchemaEntities(mtd);
-          }
-          logger.info("IMPORT COMPLETED FOR TABLE: " + mtd.getNameAsString()
-                  + (includeColumnAuditors ? " <INCLUDING COLUMN AUDITOR METADATA>" : ""));
-        }
-      }
-    }
+    repository.importSchema(
+            includeColumnAuditors, tableName.getNamespaceAsString(), tableName, sourceFile);
   }
 
   /**
@@ -777,7 +724,7 @@ public class RepositoryAdmin implements Closeable {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean namespaceExists(NamespaceDescriptor nd) throws IOException {
-    return namespaceExists(nd.getName());
+    return repository.namespaceExists(nd.getName());
   }
 
   /**
@@ -787,14 +734,8 @@ public class RepositoryAdmin implements Closeable {
    * @return true if namespace exists
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean namespaceExists(String namespaceName)
-          throws IOException {
-    try {
-      repository.getAdmin().getNamespaceDescriptor(namespaceName);
-    } catch (NamespaceNotFoundException e) {
-      return false;
-    }
-    return true;
+  public boolean namespaceExists(String namespaceName) throws IOException {
+    return repository.namespaceExists(namespaceName);
   }
 
   @Override

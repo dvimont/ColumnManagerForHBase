@@ -1635,16 +1635,33 @@ class Repository {
     }
   }
 
+  private void validateNamespaceTableNameCombination(String namespace, TableName tableName)
+          throws TableNotIncludedForProcessingException {
+    if (tableName == null || tableName.getNameAsString().isEmpty()) {
+      if (namespace != null && !namespace.isEmpty()
+              && !isIncludedNamespace(namespace)) {
+        throw new TableNotIncludedForProcessingException(Bytes.toBytes(namespace + ":*"),
+                "NO table from namespace <" + namespace + "> is included for "
+                        + PRODUCT_NAME + " processing.");
+      }
+    } else {
+      if (!isIncludedTable(tableName)) {
+        throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+      }
+    }
+  }
+
   void exportSchema(String sourceNamespace, TableName sourceTableName,
           File targetFile, boolean formatted)
           throws IOException, JAXBException {
+    validateNamespaceTableNameCombination(sourceNamespace, sourceTableName);
     String allLiteral = "";
     if ((sourceNamespace == null || sourceNamespace.isEmpty())
             && (sourceTableName == null || sourceTableName.getNameAsString().isEmpty())) {
       allLiteral = "ALL ";
     }
     logger.info("EXPORT of " + allLiteral
-            + "ColumnManager repository schema to external XML file has been requested.");
+            + "ColumnManager repository schema to external XML file has been invoked.");
     if (sourceNamespace != null && !sourceNamespace.isEmpty()) {
       logger.info("EXPORT source NAMESPACE: " + sourceNamespace);
     }
@@ -1681,6 +1698,59 @@ class Repository {
     }
     HBaseSchemaArchive.exportToXmlFile(schemaArchive, targetFile, formatted);
     logger.info("EXPORT of ColumnManager repository schema has been completed.");
+  }
+
+  void importSchema(
+          boolean includeColumnAuditors, String namespaceName, TableName tableName, File sourceFile)
+          throws IOException, JAXBException {
+    validateNamespaceTableNameCombination(namespaceName, tableName);
+    submitImportMessagesToLogger(includeColumnAuditors, namespaceName, tableName, sourceFile);
+    Set<Object> importedDescriptors = deserializeHBaseSchemaArchive(
+            includeColumnAuditors, namespaceName, tableName, sourceFile);
+    createImportedStructures(includeColumnAuditors, importedDescriptors);
+  }
+
+  private void submitImportMessagesToLogger(boolean includeColumnAuditors,
+          String namespaceName, TableName tableName, File sourceFile) {
+    logger.info("IMPORT of schema "
+            + ((includeColumnAuditors) ? "<INCLUDING COLUMN AUDITOR METADATA> " : "")
+            + "from external HBaseSchemaArchive (XML) file has been requested.");
+    if (namespaceName != null && !namespaceName.isEmpty()
+            && (tableName == null || tableName.getNameAsString().isEmpty())) {
+      logger.info("IMPORT NAMESPACE: " + namespaceName);
+    }
+    if (tableName != null && !tableName.getNameAsString().isEmpty()) {
+      logger.info("IMPORT TABLE: " + tableName.getNameAsString());
+    }
+    logger.info("IMPORT source PATH/FILE-NAME: " + sourceFile.getAbsolutePath());
+  }
+
+  private void createImportedStructures(boolean includeColumnAuditors,
+          Set<Object> importedDescriptors)
+          throws IOException {
+    for (Object descriptor : importedDescriptors) {
+      if (MNamespaceDescriptor.class.isAssignableFrom(descriptor.getClass())) {
+        NamespaceDescriptor nd
+                = ((MNamespaceDescriptor) descriptor).getNamespaceDescriptor();
+        if (!namespaceExists(nd.getName())) {
+          getAdmin().createNamespace(nd);
+          putNamespaceSchemaEntity(nd);
+          logger.info("IMPORT COMPLETED FOR NAMESPACE: " + nd.getName());
+        }
+      } else if (MTableDescriptor.class.isAssignableFrom(descriptor.getClass())) {
+        MTableDescriptor mtd = (MTableDescriptor) descriptor;
+        if (!getAdmin().tableExists(mtd.getTableName())) {
+          getAdmin().createTable(mtd); // includes creation of Column Families
+          putTableSchemaEntity(mtd);
+          putColumnDefinitionSchemaEntities(mtd);
+          if (includeColumnAuditors) {
+            putColumnAuditorSchemaEntities(mtd);
+          }
+          logger.info("IMPORT COMPLETED FOR TABLE: " + mtd.getNameAsString()
+                  + (includeColumnAuditors ? " <INCLUDING COLUMN AUDITOR METADATA>" : ""));
+        }
+      }
+    }
   }
 
   Set<Object> deserializeHBaseSchemaArchive(boolean includeColumnAuditors,
@@ -1882,6 +1952,15 @@ class Repository {
     standardAdmin.deleteNamespace(REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
     logger.warn("DROP (delete) of " + PRODUCT_NAME + " Repository namespace has been completed: "
             + REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
+  }
+
+  boolean namespaceExists(String namespaceName) throws IOException {
+    try {
+      getAdmin().getNamespaceDescriptor(namespaceName);
+    } catch (NamespaceNotFoundException e) {
+      return false;
+    }
+    return true;
   }
 
   void logIOExceptionAsError(IOException e, String originatingClassName) {

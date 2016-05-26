@@ -29,6 +29,6 @@ public class TableNotIncludedForProcessingException extends ColumnManagerIOExcep
             + "Please see <" + Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES
             + "> or <" + Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
             + "> configuration property for details on user Tables administratively included "
-            + "for ColumnManagerAPI processing."
-            + ((msgExtension == null) ? "" : msgExtension));  }
+            + "for " + Repository.PRODUCT_NAME + " processing."
+            + ((msgExtension == null) ? "" : " " + msgExtension));  }
 }

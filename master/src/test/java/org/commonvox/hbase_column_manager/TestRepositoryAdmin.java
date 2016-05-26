@@ -213,11 +213,12 @@ public class TestRepositoryAdmin {
   private static final String COL_VALUE_ENFORCE_FAILURE
           = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Value (regex)";
   private static final String HSA_FAILURE = "FAILURE IN HBase Schema Archive PROCESSING!! ==>> ";
-
   private static final String CHANGE_EVENT_FAILURE = "FAILURE IN ChangeEvent PROCESSING!! ==>> ";
-
   private static final String INVALID_COLUMN_REPORT_FAILURE
           = "FAILURE IN InvalidColumnReport PROCESSING!! ==>> ";
+  private static final String TABLE_NOT_INCLUDED_EXCEPTION_FAILURE
+          = TableNotIncludedForProcessingException.class.getSimpleName() + " failed to be thrown ";
+
 
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
@@ -586,8 +587,7 @@ public class TestRepositoryAdmin {
               = repositoryAdmin.getColumnQualifiers(
                       testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
                       testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
@@ -604,8 +604,7 @@ public class TestRepositoryAdmin {
                 = repositoryAdmin.getColumnQualifiers(
                         testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
                         testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
@@ -629,8 +628,7 @@ public class TestRepositoryAdmin {
       try {
         Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
                 = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02, CF01);
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
@@ -656,8 +654,7 @@ public class TestRepositoryAdmin {
                 = repositoryAdmin.getColumnAuditors(
                         testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
                         testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
@@ -674,8 +671,7 @@ public class TestRepositoryAdmin {
                 = repositoryAdmin.getColumnAuditors(
                         testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
                         testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
@@ -695,16 +691,14 @@ public class TestRepositoryAdmin {
       try {
         Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
                 = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01, CF01);
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
       try {
         Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
                 = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02, CF01);
-        fail(GET_COL_QUALIFIERS_FAILURE + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
     }
@@ -732,9 +726,7 @@ public class TestRepositoryAdmin {
        // next def not enforced, since namespace02 tables not included for CM processing!
       try {
         repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
-        fail(COL_QUALIFIER_ENFORCE_FAILURE
-                + TableNotIncludedForProcessingException.class.getSimpleName()
-                + " failed to be thrown");
+        fail(COL_QUALIFIER_ENFORCE_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
 
@@ -797,8 +789,7 @@ public class TestRepositoryAdmin {
 
       try {
         repositoryAdmin.addColumnDefinition(NAMESPACE02_TABLE03, CF01, col04Definition);
-        fail("RepositoryAdmin#addColumnDefinition failed to throw expected exception: "
-                + TableNotIncludedForProcessingException.class.getSimpleName());
+        fail(TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
     }
@@ -814,17 +805,21 @@ public class TestRepositoryAdmin {
     final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
     final String TARGET_EXPORT_ALL_FILE = "temp.export.repository.hsa.xml";
     final String TARGET_EXPORT_NAMESPACE_FILE = "temp.export.namespace.hsa.xml";
+    final String TARGET_EXPORT_INVALID_NAMESPACE_FILE = "temp.export.invalidnamespace.hsa.xml";
     final String TARGET_EXPORT_TABLE_FILE = "temp.export.table.hsa.xml";
     File exportAllFile;
     File exportNamespaceFile;
+    File exportInvalidNamespaceFile;
     File exportTableFile;
     try {
       exportAllFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_FILE);
       exportNamespaceFile = tempTestFolder.newFile(TARGET_EXPORT_NAMESPACE_FILE);
+      exportInvalidNamespaceFile = tempTestFolder.newFile(TARGET_EXPORT_INVALID_NAMESPACE_FILE);
       exportTableFile = tempTestFolder.newFile(TARGET_EXPORT_TABLE_FILE);
     } catch (IllegalStateException e) { // standalone (non-JUnit) execution
       exportAllFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_FILE);
       exportNamespaceFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_NAMESPACE_FILE);
+      exportInvalidNamespaceFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_INVALID_NAMESPACE_FILE);
       exportTableFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_TABLE_FILE);
     }
     // environment cleanup before testing
@@ -843,6 +838,12 @@ public class TestRepositoryAdmin {
       repositoryAdmin.exportRepository(exportAllFile, true);
       repositoryAdmin.exportNamespaceSchema(
               TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX), exportNamespaceFile, true);
+      try {
+        repositoryAdmin.exportNamespaceSchema(
+                TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX), exportInvalidNamespaceFile, true);
+        fail(TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
       repositoryAdmin.exportTableSchema(NAMESPACE01_TABLE01, exportTableFile, true);
     }
     clearTestingEnvironment();
@@ -885,7 +886,7 @@ public class TestRepositoryAdmin {
         }
       }
     }
-    System.out.println("#testExportImport has run to completeion.");
+    System.out.println("#testExportImport has run to completion.");
   }
 
   private void validateXmlAgainstXsd(File xmlFile) throws IOException {
@@ -1429,7 +1430,7 @@ public class TestRepositoryAdmin {
       try {
         repositoryAdmin.generateReportOnInvalidColumnQualifiers(
                       NAMESPACE02_TABLE03, fileForSummaryOfEmptyTable, false, false);
-        fail(reportGenerationFailure + "TableNotIncludedForProcessingException failed to be thrown");
+        fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
     }
@@ -1838,11 +1839,11 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
-    // new TestRepositoryAdmin().testChangeEventMonitor();
+    new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
-    new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
+    // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
   }
 }
