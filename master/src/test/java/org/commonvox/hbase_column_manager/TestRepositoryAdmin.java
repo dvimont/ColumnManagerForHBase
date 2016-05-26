@@ -1041,13 +1041,13 @@ public class TestRepositoryAdmin {
               eventsForColumnAuditorFile, "#getChangeEventsForColumnAuditor");
 
       final String ATTRIBUTE_NAME = "Value__MEMSTORE_FLUSHSIZE";
-      List<ChangeEvent> attributeChangeEvents
+      Set<ChangeEvent> attributeChangeEvents
               = monitor.getChangeEventsForTableAttribute(NAMESPACE01_TABLE01, ATTRIBUTE_NAME);
       assertEquals(CHANGE_EVENT_FAILURE + "unexpected value count returned from "
               + "#getChangeEventsForTableAttribute method", 1, attributeChangeEvents.size());
       assertEquals(CHANGE_EVENT_FAILURE + "unexpected attribute_name returned from "
               + "#getChangeEventsForTableAttribute method",
-              ATTRIBUTE_NAME, attributeChangeEvents.get(0).getAttributeNameAsString());
+              ATTRIBUTE_NAME, attributeChangeEvents.iterator().next().getAttributeNameAsString());
 
       final String STATUS_ATTRIBUTE_NAME = "_Status";
       attributeChangeEvents
@@ -1149,7 +1149,7 @@ public class TestRepositoryAdmin {
               + "unexpected attribute value found when testing maxVersions processing",
               Integer.toString(BASE_MEMSTORE_FLUSHSIZE + 5),
               monitor.getChangeEventsForTableAttribute(
-                      tableName, ATTRIBUTE_NAME).get(0).getAttributeValueAsString());
+                      tableName, ATTRIBUTE_NAME).iterator().next().getAttributeValueAsString());
     }
   }
 

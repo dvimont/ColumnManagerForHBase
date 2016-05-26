@@ -166,11 +166,6 @@
 
   <dependencies>
     <dependency>
-        <groupId>org.commonvox.collections</groupId>
-        <artifactId>ordered-set</artifactId>
-        <version>1.0.0</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-csv</artifactId>
       <version>1.3</version>

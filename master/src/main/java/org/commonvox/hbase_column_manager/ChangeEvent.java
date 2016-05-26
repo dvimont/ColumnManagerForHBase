@@ -33,7 +33,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  *
  * @author Daniel Vimont
  */
-public class ChangeEvent {
+public class ChangeEvent implements Comparable<ChangeEvent> {
 
   // Row-level metadata: Each row in repository pertains to a user entity
   //   (e.g., a table, or a column family) and tracks all changes to all
@@ -311,6 +311,24 @@ public class ChangeEvent {
             + "> AttributeValue:<" + getAttributeValueAsString() + ">";
   }
 
+  @Override
+  public int compareTo(ChangeEvent other) {
+    int result = this.timestamp.compareTo(other.timestamp);
+    if (result == 0) {
+      result = this.userName.compareTo(other.userName);
+    }
+    if (result == 0) {
+      result = this.entity.compareTo(other.entity);
+    }
+    if (result == 0) {
+      result = this.attributeName.compareTo(other.attributeName);
+    }
+    if (result == 0) {
+      result = this.attributeValue.compareTo(other.attributeValue);
+    }
+    return result;
+  }
+
   class Entity implements Comparable<Entity> {
 
     private final EntityType entityType; // part of Entity unique identifier (rowId)
@@ -391,11 +409,19 @@ public class ChangeEvent {
       if (comparison != 0) {
         return comparison;
       }
-      comparison = this.parentForeignKey.compareTo(other.parentForeignKey);
+      comparison = this.entityName.compareTo(other.entityName);
       if (comparison != 0) {
         return comparison;
       }
-      return this.entityName.compareTo(other.entityName);
+      return this.parentForeignKey.compareTo(other.parentForeignKey);
+    }
+
+    @Override
+    public boolean equals (Object other) {
+      if (!this.getClass().equals(other.getClass())) {
+        return false;
+      }
+      return (compareTo((Entity)other) == 0);
     }
 
     @Override
@@ -423,6 +449,14 @@ public class ChangeEvent {
     @Override
     public int compareTo(BytesContainer other) {
       return Bytes.compareTo(this.bytes, other.bytes);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (!this.getClass().equals(other.getClass())) {
+        return false;
+      }
+      return compareTo((BytesContainer)other) == 0;
     }
   }
 

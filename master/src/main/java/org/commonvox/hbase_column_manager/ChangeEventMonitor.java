@@ -22,65 +22,94 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.commonvox.collections.KeyComponentProfile;
-import org.commonvox.collections.OrderedSet;
 
 /**
  * A <b>ChangeEventMonitor</b> (obtained via a {@code RepositoryAdmin}'s
  * {@link RepositoryAdmin#getChangeEventMonitor() getChangeEventMonitor} method) provides various
  * {@link ChangeEventMonitor#getAllChangeEvents() get methods} by which lists of
  * {@link ChangeEvent}s may be obtained (grouped and ordered in various ways), and the class
- * provides a static  {@link #exportChangeEventListToCsvFile(java.util.List, java.io.File)
+ * provides a static {@link #exportChangeEventListToCsvFile(java.util.Collection, java.io.File)
  * convenience method} for outputting a list of {@code ChangeEvent}s to a CSV file.
  *
  * @author Daniel Vimont
  */
 public class ChangeEventMonitor {
   private final static char COMMA = ',';
-  private final KeyComponentProfile<ChangeEvent> timestampComponent
-          = new KeyComponentProfile<>(ChangeEvent.class, ChangeEvent.Timestamp.class);
-  private final KeyComponentProfile<ChangeEvent> entityComponent
-          = new KeyComponentProfile<>(ChangeEvent.class, ChangeEvent.Entity.class);
-  private final KeyComponentProfile<ChangeEvent> attributeNameComponent
-          = new KeyComponentProfile<>(ChangeEvent.class, ChangeEvent.AttributeName.class);
-  private final KeyComponentProfile<ChangeEvent> userNameComponent
-          = new KeyComponentProfile<>(ChangeEvent.class, ChangeEvent.UserName.class);
-  private final OrderedSet<ChangeEvent> timestampIndex
-          = new OrderedSet<>(timestampComponent, entityComponent, attributeNameComponent);
-  private final OrderedSet<ChangeEvent> userIndex
-          = new OrderedSet<>(userNameComponent, timestampComponent, entityComponent, attributeNameComponent);
-  private OrderedSet<ChangeEvent> entityIndex
-          = new OrderedSet<>(entityComponent, timestampComponent, attributeNameComponent);
+  private Set<ChangeEvent.Entity> entitySet = new TreeSet<>();
+  private final Set<ChangeEvent> changeEventsByTimestamp = new TreeSet<>();
+  private final Set<ChangeEvent> changeEventsByUser = new TreeSet<>(
+          new Comparator<ChangeEvent>() {
+            @Override
+            public int compare(ChangeEvent ce1, ChangeEvent ce2) {
+              int result = ce1.getUserNameObject().compareTo(ce2.getUserNameObject());
+              if (result == 0) {
+                result = ce1.getTimestampObject().compareTo(ce2.getTimestampObject());
+              }
+              if (result == 0) {
+                result = ce1.getEntity().compareTo(ce2.getEntity());
+              }
+              if (result == 0) {
+                result = ce1.getAttributeNameObject().compareTo(ce2.getAttributeNameObject());
+              }
+              if (result == 0) {
+                result = ce1.getAttributeValueObject().compareTo(ce2.getAttributeValueObject());
+              }
+              return result;
+            }
+          }
+  );
+  private Set<ChangeEvent> changeEventsByEntity = new TreeSet<>(
+          new Comparator<ChangeEvent>() {
+            @Override
+            public int compare(ChangeEvent ce1, ChangeEvent ce2) {
+              int result = ce1.getEntity().compareTo(ce2.getEntity());
+              if (result == 0) {
+                result = ce1.getTimestampObject().compareTo(ce2.getTimestampObject());
+              }
+              if (result == 0) {
+                result = ce1.getAttributeNameObject().compareTo(ce2.getAttributeNameObject());
+              }
+              if (result == 0) {
+                result = ce1.getAttributeValueObject().compareTo(ce2.getAttributeValueObject());
+              }
+              return result;
+            }
+          }
+  );
   private final static Charset ENCODING = StandardCharsets.UTF_8;
 
   ChangeEventMonitor() {
   }
 
   void add(ChangeEvent changeEvent) {
-    entityIndex.add(changeEvent);
+    changeEventsByEntity.add(changeEvent);
+    entitySet.add(changeEvent.getEntity());
   }
 
   ChangeEventMonitor denormalize() {
-    // retrieve complete list of Entities and build entityForeignKeyMap
+    // use complete list of Entities to build entityForeignKeyMap for subsequent "look-ups"
     Map<byte[], ChangeEvent.Entity> entityForeignKeyMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
-    for (Object entityObject : entityIndex.keyComponentSet(entityComponent)) {
-      ChangeEvent.Entity entity = (ChangeEvent.Entity) entityObject;
+    for (ChangeEvent.Entity entity : entitySet) {
       entityForeignKeyMap.put(entity.getEntityForeignKey().getBytes(), entity);
     }
 
     // "denormalize" each ChangeEvent by adding namespace, table, etc. to each one
-    OrderedSet<ChangeEvent> denormalizedEntityIndex
-            = new OrderedSet<>(entityComponent, timestampComponent, attributeNameComponent);
+    Set<ChangeEvent> denormalizedChangeEventsByEntity
+            = new TreeSet<>(((TreeSet<ChangeEvent>)changeEventsByEntity).comparator());
+    Set<ChangeEvent.Entity> denormalizedEntitySet = new TreeSet<>();
     ChangeEvent.Entity denormalizedEntity
             = ChangeEvent.createEntity((byte) ' ', null, null);
-    for (ChangeEvent event : entityIndex.values()) {
+    for (ChangeEvent event : changeEventsByEntity) {
       ChangeEvent.Entity entity = event.getEntity();
       if (entity.compareTo(denormalizedEntity) != 0) {
         byte[] namespaceForeignKey = {(byte) ' '};
@@ -117,34 +146,36 @@ public class ChangeEventMonitor {
         entity.setColumnQualifierEntity(entityForeignKeyMap.get(colQualifierForeignKey));
 
         denormalizedEntity = entity;
+        denormalizedEntitySet.add(denormalizedEntity);
       }
       event.setEntity(denormalizedEntity);
-      timestampIndex.add(event);
-      userIndex.add(event);
-      denormalizedEntityIndex.add(event);
+      changeEventsByTimestamp.add(event);
+      changeEventsByUser.add(event);
+      denormalizedChangeEventsByEntity.add(event);
     }
-    entityIndex = denormalizedEntityIndex;
+    changeEventsByEntity = denormalizedChangeEventsByEntity;
+    entitySet = denormalizedEntitySet;
     return this;
   }
 
   /**
-   * Get a list of all {@link ChangeEvent}s in the ColumnManager repository in the default (timestamp)
+   * Get a Set of all {@link ChangeEvent}s in the ColumnManager repository in the default (timestamp)
    * order.
    *
    * @return complete list of {@link ChangeEvent}s in timestamp order
    */
-  public List<ChangeEvent> getAllChangeEvents() {
-    return timestampIndex.values();
+  public Set<ChangeEvent> getAllChangeEvents() {
+    return changeEventsByTimestamp;
   }
 
   /**
-   * Get a list of all {@link ChangeEvent}s in the ColumnManager repository, ordered by user name (as
+   * Get a Set of all {@link ChangeEvent}s in the ColumnManager repository, ordered by user name (as
    * designated by the Java "user.name" property in effect within a session as a change was made).
    *
    * @return complete list of {@link ChangeEvent}s in user-name and timestamp order
    */
-  public List<ChangeEvent> getAllChangeEventsByUserName() {
-    return userIndex.values();
+  public Set<ChangeEvent> getAllChangeEventsByUserName() {
+    return changeEventsByUser;
   }
 
   /**
@@ -155,8 +186,19 @@ public class ChangeEventMonitor {
    * @param userName value of Java "user.name" property in effect when change was made
    * @return list of {@link ChangeEvent}s pertaining to the user name, in timestamp order
    */
-  public List<ChangeEvent> getChangeEventsForUserName(String userName) {
-    return userIndex.values(ChangeEvent.createUserName(userName));
+  public Set<ChangeEvent> getChangeEventsForUserName(String userName) {
+    Set<ChangeEvent> changeEventsForUser = new LinkedHashSet<>();
+    boolean userFound = false;
+    ChangeEvent.UserName userNameObject = ChangeEvent.createUserName(userName);
+    for (ChangeEvent ce : changeEventsByUser) {
+      if (ce.getUserNameObject().equals(userNameObject)) {
+        userFound = true;
+        changeEventsForUser.add(ce);
+      } else if (userFound) {
+        break;
+      }
+    }
+    return changeEventsForUser;
   }
 
   /**
@@ -167,7 +209,7 @@ public class ChangeEventMonitor {
    * @return list of {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.NamespaceDescriptor Namespace}
    */
-  public List<ChangeEvent> getChangeEventsForNamespace(byte[] namespaceName) {
+  public Set<ChangeEvent> getChangeEventsForNamespace(byte[] namespaceName) {
     return getChangeEventsForEntity(SchemaEntityType.NAMESPACE, namespaceName, null, null, null);
   }
 
@@ -179,7 +221,7 @@ public class ChangeEventMonitor {
    * @return list of {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.HTableDescriptor Table}
    */
-  public List<ChangeEvent> getChangeEventsForTable(TableName tableName) {
+  public Set<ChangeEvent> getChangeEventsForTable(TableName tableName) {
     return getChangeEventsForEntity(
             SchemaEntityType.TABLE, tableName.getNamespace(), tableName.getName(), null, null);
   }
@@ -193,10 +235,10 @@ public class ChangeEventMonitor {
    * @return list of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
    * {@link org.apache.hadoop.hbase.HTableDescriptor Table}
    */
-  public List<ChangeEvent> getChangeEventsForTableAttribute(
+  public Set<ChangeEvent> getChangeEventsForTableAttribute(
           TableName tableName, String attributeName) {
-    List<ChangeEvent> tableEvents = getChangeEventsForTable(tableName);
-    List<ChangeEvent> attributeEvents = new ArrayList<>();
+    Set<ChangeEvent> tableEvents = getChangeEventsForTable(tableName);
+    Set<ChangeEvent> attributeEvents = new LinkedHashSet<>();
     for (ChangeEvent changeEvent : tableEvents) {
       if (attributeName.equals(changeEvent.getAttributeNameAsString())) {
         attributeEvents.add(changeEvent);
@@ -214,7 +256,7 @@ public class ChangeEventMonitor {
    * @return list of {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}
    */
-  public List<ChangeEvent> getChangeEventsForColumnFamily(
+  public Set<ChangeEvent> getChangeEventsForColumnFamily(
           TableName tableName, byte[] columnFamily) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_FAMILY, tableName.getNamespace(),
             tableName.getName(), columnFamily, null);
@@ -230,10 +272,10 @@ public class ChangeEventMonitor {
    * @return list of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
    * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}
    */
-  public List<ChangeEvent> getChangeEventsForColumnFamilyAttribute(
+  public Set<ChangeEvent> getChangeEventsForColumnFamilyAttribute(
           TableName tableName, byte[] columnFamily, String attributeName) {
-    List<ChangeEvent> cfEvents = getChangeEventsForColumnFamily(tableName, columnFamily);
-    List<ChangeEvent> attributeEvents = new ArrayList<>();
+    Set<ChangeEvent> cfEvents = getChangeEventsForColumnFamily(tableName, columnFamily);
+    Set<ChangeEvent> attributeEvents = new LinkedHashSet<>();
     for (ChangeEvent changeEvent : cfEvents) {
       if (attributeName.equals(changeEvent.getAttributeNameAsString())) {
         attributeEvents.add(changeEvent);
@@ -251,7 +293,7 @@ public class ChangeEventMonitor {
    * @param columnQualifier qualifier that identifies the {@link ColumnDefinition}
    * @return list of {@link ChangeEvent}s pertaining to the specified {@link ColumnDefinition}
    */
-  public List<ChangeEvent> getChangeEventsForColumnDefinition(
+  public Set<ChangeEvent> getChangeEventsForColumnDefinition(
           TableName tableName, byte[] columnFamily, byte[] columnQualifier) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_DEFINITION, tableName.getNamespace(),
             tableName.getName(), columnFamily, columnQualifier);
@@ -266,7 +308,7 @@ public class ChangeEventMonitor {
    * @param columnQualifier qualifier that identifies the {@link ColumnAuditor}
    * @return list of {@link ChangeEvent}s pertaining to the specified {@link ColumnAuditor}
    */
-  public List<ChangeEvent> getChangeEventsForColumnAuditor(
+  public Set<ChangeEvent> getChangeEventsForColumnAuditor(
           TableName tableName, byte[] columnFamily, byte[] columnQualifier) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_AUDITOR, tableName.getNamespace(),
             tableName.getName(), columnFamily, columnQualifier);
@@ -285,11 +327,10 @@ public class ChangeEventMonitor {
    * @param columnQualifier <i>Column Qualifier</i> which pertains to the Entity (if applicable)
    * @return list of ChangeEvents pertaining to the specified Entity, in timestamp order
    */
-  private List<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
+  private Set<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
           byte[] namespaceName, byte[] tableName,
           byte[] columnFamily, byte[] columnQualifier) {
-    Object[] entityArray = entityIndex.keyComponentSet(entityComponent).toArray();
-
+    Object[] entityArray = entitySet.toArray();
     int namespaceIndex
             = Arrays.binarySearch(entityArray,
                     ChangeEvent.createEntity(SchemaEntityType.NAMESPACE.getRecordType(),
@@ -299,8 +340,9 @@ public class ChangeEventMonitor {
       return null;
     }
     if (entityType.equals(SchemaEntityType.NAMESPACE)) {
-      return entityIndex.values(ChangeEvent.createEntity(SchemaEntityType.NAMESPACE.getRecordType(),
-              Repository.NAMESPACE_PARENT_FOREIGN_KEY, namespaceName));
+      return getChangeEventsForEntity(
+              ChangeEvent.createEntity(SchemaEntityType.NAMESPACE.getRecordType(),
+                      Repository.NAMESPACE_PARENT_FOREIGN_KEY, namespaceName));
     }
 
     byte[] namespaceForeignKey
@@ -313,8 +355,9 @@ public class ChangeEventMonitor {
       return null;
     }
     if (entityType.equals(SchemaEntityType.TABLE)) {
-      return entityIndex.values(ChangeEvent.createEntity(
-              SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName));
+      return getChangeEventsForEntity(
+              ChangeEvent.createEntity(SchemaEntityType.TABLE.getRecordType(),
+                      namespaceForeignKey, tableName));
     }
 
     byte[] tableForeignKey
@@ -328,8 +371,9 @@ public class ChangeEventMonitor {
       return null;
     }
     if (entityType.equals(SchemaEntityType.COLUMN_FAMILY)) {
-      return entityIndex.values(ChangeEvent.createEntity(
-              SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily));
+      return getChangeEventsForEntity(
+              ChangeEvent.createEntity(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+                      tableForeignKey, columnFamily));
     }
     byte[] colFamilyForeignKey
             = ((ChangeEvent.Entity)entityArray[colFamilyIndex])
@@ -343,26 +387,40 @@ public class ChangeEventMonitor {
     }
     if (entityType.equals(SchemaEntityType.COLUMN_AUDITOR)
             || entityType.equals(SchemaEntityType.COLUMN_DEFINITION)) {
-      return entityIndex.values(
-              ChangeEvent.createEntity(
-                      entityType.getRecordType(), colFamilyForeignKey, columnQualifier));
+      return getChangeEventsForEntity(
+              ChangeEvent.createEntity(entityType.getRecordType(),
+                      colFamilyForeignKey, columnQualifier));
     }
     return null;
+  }
+
+  private Set<ChangeEvent> getChangeEventsForEntity(ChangeEvent.Entity entity) {
+    Set<ChangeEvent> changeEventsForEntity = new LinkedHashSet<>();
+    boolean entityFound = false;
+    for (ChangeEvent ce : changeEventsByEntity) {
+      if (ce.getEntity().equals(entity)) {
+        entityFound = true;
+        changeEventsForEntity.add(ce);
+      } else if (entityFound) {
+        break;
+      }
+    }
+    return changeEventsForEntity;
   }
 
   /**
    * Export the submitted list of ChangeEvent objects to a comma-separated-value (CSV) file, one
    * line per ChangeEvent, with the first line of the file consisting of column headers.
    *
-   * @param changeEventList list of ChangeEvent objects returned by one of the "get" methods of the
+   * @param changeEvents list of ChangeEvent objects returned by one of the "get" methods of the
    * {@code ChangeEventMonitor} class.
    * @param targetFile target file
    * @throws IOException if a remote or network exception occurs
    */
   public static void exportChangeEventListToCsvFile(
-          List<ChangeEvent> changeEventList, File targetFile) throws IOException {
+          Collection<ChangeEvent> changeEvents, File targetFile) throws IOException {
     try (BufferedWriter writer = Files.newBufferedWriter(targetFile.toPath(), ENCODING)) {
-      if (changeEventList == null || changeEventList.isEmpty()) {
+      if (changeEvents == null || changeEvents.isEmpty()) {
         return;
       }
       writer.write(buildCommaDelimitedString(
@@ -370,7 +428,7 @@ public class ChangeEventMonitor {
               "Namespace", "Table", "Column_Family", "Column_Qualifier",
               "Attribute_Name", "Attribute_Value"));
       writer.newLine();
-      for (ChangeEvent ce : changeEventList) {
+      for (ChangeEvent ce : changeEvents) {
         writer.write(buildCommaDelimitedString(
                 ce.getTimestampAsString(), ce.getUserNameAsString(),
                 ce.getEntityType().toString(),
