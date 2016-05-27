@@ -63,18 +63,6 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
   private ChangeEvent() {
   }
 
-  static UserName createUserName(String userName) {
-    ChangeEvent changeEvent = new ChangeEvent();
-    changeEvent.setUserName(Bytes.toBytes(userName));
-    return changeEvent.getUserNameObject();
-  }
-
-  static Entity createEntity(byte entityType, byte[] parentForeignKey, byte[] entityName) {
-    ChangeEvent changeEvent = new ChangeEvent();
-    changeEvent.setEntity(entityType, parentForeignKey, entityName, null);
-    return changeEvent.getEntity();
-  }
-
   Entity getEntity() {
     return entity;
   }
@@ -329,7 +317,7 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
     return result;
   }
 
-  class Entity implements Comparable<Entity> {
+  static class Entity implements Comparable<Entity> {
 
     private final EntityType entityType; // part of Entity unique identifier (rowId)
     private final ParentForeignKey parentForeignKey; // part of Entity unique identifier (rowId)
@@ -430,7 +418,7 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
     }
   }
 
-  private class BytesContainer implements Comparable<BytesContainer> {
+  private static class BytesContainer implements Comparable<BytesContainer> {
 
     private final byte[] bytes;
 
@@ -460,7 +448,7 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
     }
   }
 
-  class EntityType extends BytesContainer {
+  static class EntityType extends BytesContainer {
 
     EntityType(byte entityRecordType) {
       super(new byte[]{entityRecordType});
@@ -472,14 +460,14 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
     }
   }
 
-  class ParentForeignKey extends BytesContainer {
+  static class ParentForeignKey extends BytesContainer {
 
     ParentForeignKey(byte[] bytes) {
       super(bytes);
     }
   }
 
-  class EntityName extends BytesContainer {
+  static class EntityName extends BytesContainer {
 
     EntityName(byte[] bytes) {
       super(bytes);
@@ -491,21 +479,21 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
     }
   }
 
-  class EntityForeignKey extends BytesContainer {
+  static class EntityForeignKey extends BytesContainer {
 
     EntityForeignKey(byte[] bytes) {
       super(bytes);
     }
   }
 
-  class AttributeName extends BytesContainer {
+  static class AttributeName extends BytesContainer {
 
     AttributeName(byte[] bytes) {
       super(bytes);
     }
   }
 
-  class Timestamp extends BytesContainer {
+  static class Timestamp extends BytesContainer {
 
     Timestamp(long timestamp) {
       super(Bytes.toBytes(timestamp));
@@ -516,14 +504,14 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
     }
   }
 
-  class AttributeValue extends BytesContainer {
+  static class AttributeValue extends BytesContainer {
 
     AttributeValue(byte[] bytes) {
       super(bytes);
     }
   }
 
-  class UserName extends BytesContainer {
+  static class UserName extends BytesContainer {
 
     UserName(byte[] bytes) {
       super(bytes);

@@ -107,11 +107,10 @@ public class ChangeEventMonitor {
     Set<ChangeEvent> denormalizedChangeEventsByEntity
             = new TreeSet<>(((TreeSet<ChangeEvent>)changeEventsByEntity).comparator());
     Set<ChangeEvent.Entity> denormalizedEntitySet = new TreeSet<>();
-    ChangeEvent.Entity denormalizedEntity
-            = ChangeEvent.createEntity((byte) ' ', null, null);
+    ChangeEvent.Entity denormalizedEntity = null;
     for (ChangeEvent event : changeEventsByEntity) {
       ChangeEvent.Entity entity = event.getEntity();
-      if (entity.compareTo(denormalizedEntity) != 0) {
+      if (denormalizedEntity == null || entity.compareTo(denormalizedEntity) != 0) {
         byte[] namespaceForeignKey = {(byte) ' '};
         byte[] tableForeignKey = {(byte) ' '};
         byte[] colFamilyForeignKey = {(byte) ' '};
@@ -189,7 +188,7 @@ public class ChangeEventMonitor {
   public Set<ChangeEvent> getChangeEventsForUserName(String userName) {
     Set<ChangeEvent> changeEventsForUser = new LinkedHashSet<>();
     boolean userFound = false;
-    ChangeEvent.UserName userNameObject = ChangeEvent.createUserName(userName);
+    ChangeEvent.UserName userNameObject = new ChangeEvent.UserName(userName);
     for (ChangeEvent ce : changeEventsByUser) {
       if (ce.getUserNameObject().equals(userNameObject)) {
         userFound = true;
@@ -330,66 +329,52 @@ public class ChangeEventMonitor {
   private Set<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
           byte[] namespaceName, byte[] tableName,
           byte[] columnFamily, byte[] columnQualifier) {
-    Object[] entityArray = entitySet.toArray();
-    int namespaceIndex
-            = Arrays.binarySearch(entityArray,
-                    ChangeEvent.createEntity(SchemaEntityType.NAMESPACE.getRecordType(),
-                            Repository.NAMESPACE_PARENT_FOREIGN_KEY,
-                            namespaceName));
+    
+    ChangeEvent.Entity[] entityArray = entitySet.toArray(new ChangeEvent.Entity[entitySet.size()]);
+
+    ChangeEvent.Entity namespaceEntity = new ChangeEvent.Entity(
+            SchemaEntityType.NAMESPACE.getRecordType(),
+            Repository.NAMESPACE_PARENT_FOREIGN_KEY, namespaceName);
+    int namespaceIndex = Arrays.binarySearch(entityArray, namespaceEntity);
     if (namespaceIndex < 0) {
       return null;
     }
     if (entityType.equals(SchemaEntityType.NAMESPACE)) {
-      return getChangeEventsForEntity(
-              ChangeEvent.createEntity(SchemaEntityType.NAMESPACE.getRecordType(),
-                      Repository.NAMESPACE_PARENT_FOREIGN_KEY, namespaceName));
+      return getChangeEventsForEntity(namespaceEntity);
     }
 
-    byte[] namespaceForeignKey
-            = ((ChangeEvent.Entity) entityArray[namespaceIndex]).getEntityForeignKey().getBytes();
-    int tableIndex
-            = Arrays.binarySearch(entityArray,
-                    ChangeEvent.createEntity(SchemaEntityType.TABLE.getRecordType(),
-                            namespaceForeignKey, tableName));
+    byte[] namespaceForeignKey = entityArray[namespaceIndex].getEntityForeignKey().getBytes();
+    ChangeEvent.Entity tableEntity = new ChangeEvent.Entity(
+            SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tableName);
+    int tableIndex = Arrays.binarySearch(entityArray, tableEntity);
     if (tableIndex < 0) {
       return null;
     }
     if (entityType.equals(SchemaEntityType.TABLE)) {
-      return getChangeEventsForEntity(
-              ChangeEvent.createEntity(SchemaEntityType.TABLE.getRecordType(),
-                      namespaceForeignKey, tableName));
+      return getChangeEventsForEntity(tableEntity);
     }
 
-    byte[] tableForeignKey
-            = ((ChangeEvent.Entity) entityArray[tableIndex]).getEntityForeignKey().getBytes();
-    int colFamilyIndex
-            = Arrays.binarySearch(entityArray,
-                    ChangeEvent.createEntity(
-                            SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey,
-                            columnFamily));
+    byte[] tableForeignKey = entityArray[tableIndex].getEntityForeignKey().getBytes();
+    ChangeEvent.Entity colFamilyEntity = new ChangeEvent.Entity(
+            SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, columnFamily);
+    int colFamilyIndex = Arrays.binarySearch(entityArray, colFamilyEntity);
     if (colFamilyIndex < 0) {
       return null;
     }
     if (entityType.equals(SchemaEntityType.COLUMN_FAMILY)) {
-      return getChangeEventsForEntity(
-              ChangeEvent.createEntity(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
-                      tableForeignKey, columnFamily));
+      return getChangeEventsForEntity(colFamilyEntity);
     }
-    byte[] colFamilyForeignKey
-            = ((ChangeEvent.Entity)entityArray[colFamilyIndex])
-                    .getEntityForeignKey().getBytes();
-    int colQualifierIndex
-            = Arrays.binarySearch(entityArray,
-                    ChangeEvent.createEntity(
-                            entityType.getRecordType(), colFamilyForeignKey, columnQualifier));
+
+    byte[] colFamilyForeignKey = entityArray[colFamilyIndex].getEntityForeignKey().getBytes();
+    ChangeEvent.Entity colQualifierEntity = new ChangeEvent.Entity(
+            entityType.getRecordType(), colFamilyForeignKey, columnQualifier);
+    int colQualifierIndex = Arrays.binarySearch(entityArray, colQualifierEntity);
     if (colQualifierIndex < 0) {
       return null;
     }
     if (entityType.equals(SchemaEntityType.COLUMN_AUDITOR)
             || entityType.equals(SchemaEntityType.COLUMN_DEFINITION)) {
-      return getChangeEventsForEntity(
-              ChangeEvent.createEntity(entityType.getRecordType(),
-                      colFamilyForeignKey, columnQualifier));
+      return getChangeEventsForEntity(colQualifierEntity);
     }
     return null;
   }
