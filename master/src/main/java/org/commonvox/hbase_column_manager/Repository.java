@@ -1920,8 +1920,9 @@ class Repository {
     return changeEventMonitor.denormalize();
   }
 
-  boolean generateReportOnInvalidColumnQualifiers (TableName tableName, byte[] colFamily,
-          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+  boolean generateReportOnInvalidColumns (InvalidColumnReport.ReportType reportType,
+          TableName tableName, byte[] colFamily, File targetFile, boolean verbose,
+          boolean useMapreduce) throws IOException {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -1930,9 +1931,8 @@ class Repository {
       throw new ColumnDefinitionNotFoundException(tableName.getName(), colFamily, null,
               "No ColumnDefinitions found for table/columnFamily");
     }
-    try (InvalidColumnReport invalidColumnReport
-            = new InvalidColumnReport(
-                    hbaseConnection, mtd, colFamily, targetFile, verbose, useMapreduce)) {
+    try (InvalidColumnReport invalidColumnReport = new InvalidColumnReport(
+            reportType, hbaseConnection, mtd, colFamily, targetFile, verbose, useMapreduce)) {
       return !invalidColumnReport.isEmpty();
     }
   }

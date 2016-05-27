@@ -21,8 +21,7 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 /**
- * Enum for all the types of metadata entities tracked and managed in the ColumnManager repository;
- * used publicly in {@link ChangeEvent} reporting.
+ * Enum for all the types of metadata entities tracked and managed in the ColumnManager repository.
  */
 enum SchemaEntityType {
 

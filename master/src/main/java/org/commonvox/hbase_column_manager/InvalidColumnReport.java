@@ -67,10 +67,13 @@ class InvalidColumnReport implements Closeable {
   private final File targetFile;
   private final boolean verboseReport;
   private final boolean mapreduceSlave;
+  private final ReportType reportType;
+  enum ReportType {QUALIFIER, LENGTH, VALUE};
 
-  InvalidColumnReport(Connection connection, MTableDescriptor userTableDescriptor,
+  InvalidColumnReport(ReportType reportType, Connection connection, MTableDescriptor userTableDescriptor,
           byte[] userColFamily, File targetFile, boolean verbose, boolean useMapreduce)
           throws IOException {
+    this.reportType = reportType;
     this.targetFile = targetFile;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
       this.standardConnection = ((MConnection)connection).getStandardConnection();
@@ -98,9 +101,11 @@ class InvalidColumnReport implements Closeable {
     }
   }
 
-  public InvalidColumnReport(Connection connection, MTableDescriptor userTableDescriptor,
-          byte[] userColFamily, TableName tempReportTableName, boolean verbose)
+  public InvalidColumnReport(ReportType reportType, Connection connection,
+          MTableDescriptor userTableDescriptor, byte[] userColFamily,
+          TableName tempReportTableName, boolean verbose)
           throws IOException {
+    this.reportType = reportType;
     this.targetFile = null;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
       this.standardConnection = ((MConnection)connection).getStandardConnection();
@@ -125,7 +130,7 @@ class InvalidColumnReport implements Closeable {
   private void collectInvalidColumnMetadataViaScan() throws IOException {
     // perform full scan (w/ KeyOnlyFilter(true) if summary report)
     Scan columnScan = new Scan();
-    if (!verboseReport) {
+    if (!verboseReport && !reportType.equals(ReportType.VALUE)) {
       columnScan.setFilter(new KeyOnlyFilter(true));
     }
     if (userColFamily != null) {
@@ -139,63 +144,55 @@ class InvalidColumnReport implements Closeable {
           if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no def? everything's valid!
             continue;
           }
-          for (Entry<byte[],byte[]> entry : familyToColumnsMapEntry.getValue().entrySet()) {
-            byte[] colQualifier = entry.getKey();
-            if (mcd.getColumnDefinition(colQualifier) == null) {
-              addEntry(mcd.getName(), colQualifier, row.getRow(), entry.getValue());
+          for (Entry<byte[],byte[]> colEntry : familyToColumnsMapEntry.getValue().entrySet()) {
+            byte[] colQualifier = colEntry.getKey();
+            byte[] colValue = colEntry.getValue();
+            ColumnDefinition colDef = mcd.getColumnDefinition(colQualifier);
+            boolean invalidRow = false;
+            switch (reportType) {
+              case QUALIFIER:
+                if (colDef == null) {
+                  invalidRow = true;
+                }
+                break;
+              case LENGTH:
+                if (colDef != null && colDef.getColumnLength() > 0) {
+                  if (verboseReport) {
+                    if (colValue.length > colDef.getColumnLength()) {
+                      invalidRow = true;
+                    }
+                  } else {
+                    if (Bytes.toInt(colValue) > colDef.getColumnLength()) {
+                      invalidRow = true;
+                    }
+                  }
+                }
+                break;
+              case VALUE:
+                if (colDef != null && !colDef.getColumnValidationRegex().isEmpty()) {
+                  if (!Bytes.toString(colValue).matches(colDef.getColumnValidationRegex())) {
+                    invalidRow = true;
+                  }
+                }
+                break;
             }
-//            if (colDefinition.getColumnLength() > 0
-//                    && cell.getValueLength() > colDefinition.getColumnLength()) {
-//              throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
-//                      "Value length of <" + cell.getValueLength()
-//                      + "> is longer than defined maximum length of <"
-//                      + colDefinition.getColumnLength() + ">.");
-//            }
-//            String colValidationRegex = colDefinition.getColumnValidationRegex();
-//            if (colValidationRegex != null && colValidationRegex.length() > 0) {
-//              byte[] colValue = Bytes.getBytes(CellUtil.getValueBufferShallowCopy(cell));
-//              if (!Bytes.toString(colValue).matches(colValidationRegex)) {
-//                throw new InvalidColumnValueException(mtd.getTableName().getName(), mcd.getName(),
-//                        colQualifier, colValue,
-//                        "Value does not match the regular expression defined for column: <"
-//                        + colValidationRegex + ">");
-//              }
-//            }
+            if (invalidRow) {
+              // upserts a user-column-specific report row with invalid user-column metadata
+              tempReportTable.put(new Put(buildRowId(mcd.getName(), colQualifier))
+                      .addColumn(TEMP_REPORT_CF, row.getRow(),
+                              (colValue.length < 200 ? colValue :
+                                      Bytes.add(Bytes.head(colValue, 200),
+                                              Bytes.toBytes("[value-truncated]")))));
+            }
           }
         }
       }
     }
   }
 
-  private void collectInvalidColumnMetadataViaMapreduce() {
-    throw new UnsupportedOperationException("Not supported yet.");
-  }
-
-  public boolean isEmpty() {
-    boolean reportIsEmpty;
-    try (ResultScanner pingScan = tempReportTable.getScanner(new Scan().setMaxResultSize(1))) {
-      reportIsEmpty = (pingScan.next() == null);
-    } catch (IOException e) {
-      reportIsEmpty = true;
-    }
-    return reportIsEmpty;
-  }
-
-  public TableName getTempReportTableName() {
-    return tempReportTable.getName();
-  }
-
-  private String getTempReportTableNameSuffix() {
-    return new Timestamp(System.currentTimeMillis()).toString().replaceAll("[\\.: ]", "_");
-  }
-
-  private void addEntry(byte[] colFamily, byte[] colQualifier, byte[] userTableRowId, byte[] value)
-          throws IOException {
-    byte[] rowId = buildRowId(colFamily, colQualifier); // namespace:table:cf:colQualifier
-    tempReportTable.put(new Put(rowId).addColumn(
-            TEMP_REPORT_CF, userTableRowId, (value.length < 200 ? value : Bytes.head(value, 200))));
-  }
-
+  /**
+   * RowId layout: <namespace:table:colFamily:colQualifier>
+   */
   private byte[] buildRowId(byte[] colFamily, byte[] colQualifier) {
     ByteBuffer rowId = ByteBuffer.allocate(3 + userTable.getName().getNamespace().length
             + userTable.getName().getQualifier().length + colFamily.length + colQualifier.length);
@@ -209,10 +206,24 @@ class InvalidColumnReport implements Closeable {
     return Bytes.toString(rowId).split(ROW_ID_DELIMITER_STRING, 4);
   }
 
-  public enum SummaryReportHeader {
-    NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, OCCURRENCES}
+  private void collectInvalidColumnMetadataViaMapreduce() {
+    throw new UnsupportedOperationException("Not supported yet.");
+  }
 
-  public enum VerboseReportHeader {
+  boolean isEmpty() {
+    boolean reportIsEmpty;
+    try (ResultScanner pingScan = tempReportTable.getScanner(new Scan().setMaxResultSize(1))) {
+      reportIsEmpty = (pingScan.next() == null);
+    } catch (IOException e) {
+      reportIsEmpty = true;
+    }
+    return reportIsEmpty;
+  }
+
+  enum SummaryReportHeader {
+    NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, INVALID_OCCURRENCE_COUNT}
+
+  enum VerboseReportHeader {
      NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, ROW_ID, COLUMN_VALUE}
 
   private void outputReport() throws IOException {
@@ -220,7 +231,7 @@ class InvalidColumnReport implements Closeable {
     try (ResultScanner rows = tempReportTable.getScanner(new Scan());
             CSVPrinter csvPrinter = csvFormat.withHeaderComments(
                     (verboseReport ? "VERBOSE" : "SUMMARY")
-                            + " Report on Invalid Columns in Table <"
+                            + " Report on Invalid Column " + this.reportType + "S in Table <"
                             + userTable.getName().getNameAsString()
                             + (userColFamily == null ? "" :
                                     ">, ColumnFamily <" + Bytes.toString (userColFamily))

@@ -28,7 +28,6 @@ import javax.xml.bind.JAXBException;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
-import org.apache.hadoop.hbase.NamespaceNotFoundException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
@@ -666,11 +665,7 @@ public class RepositoryAdmin implements Closeable {
    * Generates and outputs a CSV-formatted report of all invalid column qualifiers stored in a
    * Table, as stipulated by the Table's {@link ColumnDefinition}s.
    * If no {@link ColumnDefinition}s exist for any of the Table's Column Families, a
-   * {@link ColumnManagerIOException} will be thrown.
-   * Note that enforcement of the {@link ColumnDefinition}s of any of the Table's Column
-   * Families need not be
-   * {@link #setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
-   * enabled} in order for this report to be produced.
+   * {@link ColumnDefinitionNotFoundException} will be thrown.
    *
    * @param tableName name of the Table to be reported on
    * @param targetFile file to which the CSV file is to be outputted
@@ -693,10 +688,7 @@ public class RepositoryAdmin implements Closeable {
    * Generates and outputs a CSV-formatted report of all invalid column qualifiers stored in a
    * Column Family, as stipulated by the Column Family's {@link ColumnDefinition}s.
    * If no {@link ColumnDefinition}s exist for the Column Family, a
-   * {@link ColumnManagerIOException} will be thrown.
-   * Note that enforcement of the {@link ColumnDefinition}s of the Column Family need not be
-   * {@link #setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
-   * enabled} in order for this report to be produced.
+   * {@link ColumnDefinitionNotFoundException} will be thrown.
    *
    * @param targetFile file to which the CSV file is to be outputted
    * @param tableName name of the Table containing the Column Family to be reported on
@@ -712,7 +704,108 @@ public class RepositoryAdmin implements Closeable {
    */
   public boolean generateReportOnInvalidColumnQualifiers(TableName tableName, byte[] colFamily,
           File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
-    return repository.generateReportOnInvalidColumnQualifiers(
+    return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
+            tableName, colFamily, targetFile, verbose, useMapreduce);
+  }
+
+  /**
+   * Generates and outputs a CSV-formatted report of all invalid lengths of column values stored
+   * in a Table, as stipulated by the {@link ColumnDefinition#setColumnLength(long) ColumnLength}
+   * settings in the Table's {@link ColumnDefinition}s.
+   * If no {@link ColumnDefinition}s exist for any of the Table's Column Families, a
+   * {@link ColumnDefinitionNotFoundException} will be thrown.
+   *
+   * @param tableName name of the Table to be reported on
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
+   * the fully-qualified column name and rowId) for each explicit invalid column length that is
+   * found; otherwise the report will contain a summary, with one line for each column found
+   * to contain at least a single instance of an invalid column length, along with a count of the
+   * number of rows in which that column contains an invalid column length.
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   */
+  public boolean generateReportOnInvalidColumnLengths(TableName tableName, File targetFile,
+          boolean verbose, boolean useMapreduce) throws IOException {
+    return generateReportOnInvalidColumnLengths(
+            tableName, null, targetFile, verbose, useMapreduce);
+  }
+
+  /**
+   * Generates and outputs a CSV-formatted report of all invalid lengths of column values stored
+   * in a Column Family, as stipulated by the
+   * {@link ColumnDefinition#setColumnLength(long) ColumnLength}
+   * settings in the Column Family's {@link ColumnDefinition}s.
+   * If no {@link ColumnDefinition}s exist for the Column Family, a
+   * {@link ColumnDefinitionNotFoundException} will be thrown.
+   *
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table containing the Column Family to be reported on
+   * @param colFamily name of the Column Family to be reported on
+   * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
+   * the fully-qualified column name and rowId) for each explicit invalid column length that is
+   * found; otherwise the report will contain a summary, with one line for each column found
+   * to contain at least a single instance of an invalid column length, along with a count of the
+   * number of rows in which that column contains an invalid column length.
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   */
+  public boolean generateReportOnInvalidColumnLengths(TableName tableName, byte[] colFamily,
+          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+    return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
+            tableName, colFamily, targetFile, verbose, useMapreduce);
+  }
+
+  /**
+   * Generates and outputs a CSV-formatted report of all invalid column values stored
+   * in a Table, as stipulated by the
+   * {@link ColumnDefinition#setColumnValidationRegex(java.lang.String)
+   * ValidationRegex} settings in the Table's {@link ColumnDefinition}s.
+   * If no {@link ColumnDefinition}s exist for any of the Table's Column Families, a
+   * {@link ColumnDefinitionNotFoundException} will be thrown.
+   *
+   * @param tableName name of the Table to be reported on
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
+   * the fully-qualified column name and rowId) for each explicit invalid column value that is
+   * found; otherwise the report will contain a summary, with one line for each column found
+   * to contain at least a single instance of an invalid column value, along with a count of the
+   * number of rows in which that column contains an invalid column value.
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   */
+  public boolean generateReportOnInvalidColumnValues(TableName tableName, File targetFile,
+          boolean verbose, boolean useMapreduce) throws IOException {
+    return generateReportOnInvalidColumnValues(
+            tableName, null, targetFile, verbose, useMapreduce);
+  }
+
+  /**
+   * Generates and outputs a CSV-formatted report of all invalid column values stored
+   * in a Column Family, as stipulated by the
+   * {@link ColumnDefinition#setColumnValidationRegex(java.lang.String)
+   * ValidationRegex} settings in the Column Family's {@link ColumnDefinition}s.
+   * If no {@link ColumnDefinition}s exist for the Column Family, a
+   * {@link ColumnDefinitionNotFoundException} will be thrown.
+   *
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table containing the Column Family to be reported on
+   * @param colFamily name of the Column Family to be reported on
+   * @param verbose if {@code true} the outputted CSV file will include an entry (identified by
+   * the fully-qualified column name and rowId) for each explicit invalid column value that is
+   * found; otherwise the report will contain a summary, with one line for each column found
+   * to contain at least a single instance of an invalid column value, along with a count of the
+   * number of rows in which that column contains an invalid column value.
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   */
+  public boolean generateReportOnInvalidColumnValues(TableName tableName, byte[] colFamily,
+          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+    return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
