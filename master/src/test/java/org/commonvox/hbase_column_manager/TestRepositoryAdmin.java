@@ -43,7 +43,6 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.NamespaceNotFoundException;
@@ -77,7 +76,7 @@ import org.xml.sax.SAXException;
 public class TestRepositoryAdmin {
 
   private static final List<String> TEST_NAMESPACE_LIST
-          = new ArrayList<>(Arrays.asList("testNamespace01", "testNamespace02", "testNamespace03"));
+          = new ArrayList<>(Arrays.asList("testNamespace01", "testNamespace02", ""));
   private static final List<String> TEST_TABLE_NAME_LIST
           = new ArrayList<>(
                   Arrays.asList("testTable01", "testTable02", "testTable03", "testTable04"));
@@ -436,6 +435,9 @@ public class TestRepositoryAdmin {
       standardAdmin.deleteTable(tableName);
     }
     for (String namespaceName : testNamespacesAndDescriptors.keySet()) {
+      if (namespaceName.isEmpty() || namespaceName.equals("default")) {
+        continue;
+      }
       try { standardAdmin.deleteNamespace(namespaceName);
       } catch (NamespaceNotFoundException e) {}
     }
@@ -469,6 +471,9 @@ public class TestRepositoryAdmin {
     try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin();
             Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
       for (NamespaceDescriptor nd : testNamespacesAndDescriptors.values()) {
+        if (nd.getName().isEmpty() || nd.getName().equals("default")) {
+          continue;
+        }
         nd.setConfiguration("NamespaceConfigTest", "value=" + nd.getName());
         if (bypassColumnManager) {
           standardAdmin.createNamespace(nd);
@@ -1070,14 +1075,27 @@ public class TestRepositoryAdmin {
     Path resourcePath = Paths.get(ClassLoader.getSystemResource(resourceFileString).toURI());
     assertEquals(CHANGE_EVENT_FAILURE + "unexpected item count from " + methodName + " method",
             Files.lines(resourcePath).count(), Files.lines(exportedFile.toPath()).count());
+    // NOTE: timestamps on sequential events can sometimes be equal (if processing is TOO quick!)
+    // so reliable comparison requires stripping initial timestamp from each line and reordering
+    // remainder via TreeSets, then doing comparison.
+    TreeSet<String> resourceLinesTruncated = new TreeSet<>();
+    TreeSet<String> exportedLinesTruncated = new TreeSet<>();
     Iterator<String> resourceLinesIterator = Files.lines(resourcePath).iterator();
     Iterator<String> exportedLinesIterator = Files.lines(exportedFile.toPath()).iterator();
     resourceLinesIterator.next(); // skip first header line in both files
     exportedLinesIterator.next(); // skip first header line in both files
     while (resourceLinesIterator.hasNext()) {
+//      assertEquals(CHANGE_EVENT_FAILURE + "unexpected content returned by " + methodName,
+//              resourceLinesIterator.next().substring(14), // bypass timestamp at start of line
+//              exportedLinesIterator.next().substring(14)); // bypass timestamp at start of line
+      resourceLinesTruncated.add(resourceLinesIterator.next().substring(14)); // strip timestamp
+      exportedLinesTruncated.add(exportedLinesIterator.next().substring(14)); // strip timestamp
+    }
+    Iterator<String> resourceLinesTruncatedIterator = resourceLinesTruncated.iterator();
+    Iterator<String> exportedLinesTruncatedIterator = exportedLinesTruncated.iterator();
+    while (resourceLinesTruncatedIterator.hasNext()) {
       assertEquals(CHANGE_EVENT_FAILURE + "unexpected content returned by " + methodName,
-              resourceLinesIterator.next().substring(14), // bypass timestamp at start of line
-              exportedLinesIterator.next().substring(14)); // bypass timestamp at start of line
+              resourceLinesTruncatedIterator.next(), exportedLinesTruncatedIterator.next());
     }
   }
 
@@ -1184,7 +1202,7 @@ public class TestRepositoryAdmin {
         }
       }
       assertEquals("Unexpected loggingEvent count for Namespace OUT OF SYNC conditions",
-              2, outOfSyncWarningCount);
+              1, outOfSyncWarningCount);
     }
     clearTestingEnvironment();
     System.out.println("#testRepositorySyncCheckForMissingNamespaces has run to completion.");
@@ -2331,6 +2349,20 @@ public class TestRepositoryAdmin {
     System.out.println("#testGenerateReportOnInvalidColumnQualifiers has run to completion.");
   }
 
+  private void showAllNamespacesAndTables() throws IOException {
+    try (Connection standardConnection = ConnectionFactory.createConnection();
+            Admin standardAdmin = standardConnection.getAdmin() ) {
+
+      for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
+        System.out.println(nd.getName());
+        for (HTableDescriptor htd : standardAdmin.listTableDescriptorsByNamespace(nd.getName())) {
+          System.out.println("  " + htd.getNameAsString());
+        }
+      }
+    }
+
+  }
+
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
@@ -2346,5 +2378,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
+    // new TestRepositoryAdmin().showAllNamespacesAndTables();
   }
 }

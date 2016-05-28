@@ -27,6 +27,7 @@
     </property>
     <property>
         <name>column_manager.excludedTables</name>
-        <value>default:*,testNamespace02:*,testNamespace03:testTable02,testNamespace03:testTable04</value>
+        <!-- exclude ALL tables in testNamespace02, and 2 tables in default namespace -->
+        <value>testNamespace02:*,default:testTable02,testTable04</value>
     </property>
 </configuration>
