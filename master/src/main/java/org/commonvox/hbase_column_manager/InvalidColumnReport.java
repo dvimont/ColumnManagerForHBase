@@ -45,7 +45,7 @@ import org.apache.log4j.Logger;
  *
  * @author Daniel Vimont
  */
-class InvalidColumnReport implements Closeable {
+class InvalidColumnReport implements Closeable, AutoCloseable {
 
   public static final CSVFormat SUMMARY_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
           .withCommentMarker('#').withHeader(SummaryReportHeader.class);

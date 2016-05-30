@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 /**
  * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities, as
  * well as schema metadata {@link #discoverSchema() discovery},
- * {@link #exportNamespaceSchema(java.lang.String, java.io.File, boolean) export}, and
+ * {@link #exportSchema(java.io.File, boolean) export}, and
  * {@link #importSchema(boolean, java.io.File) import}
  * facilities; it is used as a complement to the standard {@code Admin} interface, with an
  * {@code Admin} instance (provided by an {@link MConnectionFactory#createConnection()
@@ -49,7 +49,7 @@ import org.apache.log4j.Logger;
  *
  * @author Daniel Vimont
  */
-public class RepositoryAdmin implements Closeable {
+public class RepositoryAdmin {
 
   private final Logger logger;
   private final Connection hbaseConnection;
@@ -512,11 +512,12 @@ public class RepositoryAdmin implements Closeable {
 
   /**
    * Creates an external HBaseSchemaArchive (HSA) file in XML format* containing the complete
-   * metadata contents (i.e., all <i>Namespace</i>, <i>Table</i>, <i>Column Family</i>,
-   * {@link ColumnAuditor}, and {@link ColumnDefinition} metadata) of the ColumnManager metadata
-   * repository. In effect, this is an XML-formatted serialization of objects of the following
-   * classes: {@code NamespaceDescriptor}, {@link MTableDescriptor}, {@link MColumnDescriptor},
-   * {@link ColumnAuditor}, and {@link ColumnDefinition}.
+   * metadata contents (i.e., all <i>{@link NamespaceDescriptor Namespace}</i>,
+   * <i>{@link HTableDescriptor Table}</i>, <i>{@link HColumnDescriptor Column Family}</i>,
+   * <i>{@link ColumnAuditor}</i>, and <i>{@link ColumnDefinition}</i> metadata) of the
+   * ColumnManager metadata repository. This constitutes an XML-formatted serialization of
+   * objects of the following classes: {@link NamespaceDescriptor}, {@link HTableDescriptor},
+   * {@link HColumnDescriptor}, {@link ColumnAuditor}, and {@link ColumnDefinition}.
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -526,125 +527,206 @@ public class RepositoryAdmin implements Closeable {
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportRepository(File targetFile,
-          boolean formatted)
+  public void exportSchema(File targetFile, boolean formatted)
           throws IOException, JAXBException {
     repository.exportSchema(null, null, targetFile, formatted);
   }
 
   /**
    * Creates an external HBaseSchemaArchive (HSA) file in XML format* containing the complete
-   * schema contents (i.e., the <i>Namespace</i>, <i>Table</i>, <i>Column Family</i>,
-   * {@link ColumnAuditor}, and {@link ColumnDefinition} metadata) of the specified HBase
-   * <i>Namespace</i>. In effect, this is an XML-formatted serialization of objects of the following
-   * classes: NamespaceDescriptor, {@link MTableDescriptor}, {@link MColumnDescriptor},
+   * schema contents of the specified HBase <i>Namespace</i>. This constitutes an XML-formatted
+   * serialization of objects of the following
+   * classes: {@link NamespaceDescriptor}, {@link HTableDescriptor}, {@link HColumnDescriptor},
    * {@link ColumnAuditor}, and {@link ColumnDefinition}.
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceNamespaceName namespace from which to export schema
+   * @param sourceNamespaceName namespace from which to export schema entities
    * @param targetFile target file
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportNamespaceSchema(
-          String sourceNamespaceName, File targetFile, boolean formatted)
+  public void exportSchema(String sourceNamespaceName, File targetFile, boolean formatted)
           throws IOException, JAXBException {
     repository.exportSchema(sourceNamespaceName, null, targetFile, formatted);
   }
 
   /**
    * Creates an external HBaseSchemaArchive (HSA) file in XML format* containing the complete
-   * schema contents (i.e., the <i>Table</i>, <i>Column Family</i>, {@link ColumnAuditor}, and
-   * {@link ColumnDefinition} metadata) of the specified HBase <i>Table</i>. In effect, this is an
+   * schema contents of the specified HBase <i>Table</i>. This constitutes an
    * XML-formatted serialization of objects of the following classes:
-   * {@link MTableDescriptor}, {@link MColumnDescriptor}, {@link ColumnAuditor}, and
+   * {@link HTableDescriptor}, {@link HColumnDescriptor}, {@link ColumnAuditor}, and
    * {@link ColumnDefinition}.
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceTableName table to exportSchema
+   * @param sourceTableName table to export (along with its component schema-entities)
    * @param targetFile target File
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportTableSchema(TableName sourceTableName, File targetFile, boolean formatted)
+  public void exportSchema(TableName sourceTableName, File targetFile, boolean formatted)
           throws IOException, JAXBException {
     repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName,
             targetFile, formatted);
   }
 
   /**
-   * Import into HBase the complete contents of an external HBaseSchemaArchive (HSA) XML file*. This
-   * process will NOT overlay any existing Namespace and Table structures in HBase. For any
-   * Namespace definition in the external file which does NOT correspond to an existing HBase
-   * Namespace, a new Namespace will be added to HBase along with any Tables and table components
-   * belonging to the Namespace. For any Namespace definition in the external file which corresponds
-   * to an existing HBase Namespace, any of its Table and table components will only be added to
-   * HBase if the Table does NOT already exist in HBase.
-   * <br><br>*An HSA file adheres to the XML Schema layout in
-   * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
+   * Import into HBase the complete contents of an external HBaseSchemaArchive (HSA) XML file*;
+   * this process will NOT overlay any <b>existing</b> Namespace and Table structures in HBase. Only
+   * Tables which are <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * will be imported.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
    *
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
-   * @param sourceFile source file
+   * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importSchema(boolean includeColumnAuditors, File sourceFile)
+  public void importSchema(boolean includeColumnAuditors, File sourceHsaFile)
           throws IOException, JAXBException {
-    repository.importSchema(includeColumnAuditors, null, null, sourceFile);
+    repository.importSchema(includeColumnAuditors, false, null, null, null, sourceHsaFile);
   }
 
   /**
-   * Import into HBase a Namespace and all its component objects as represented in an external
-   * HBaseSchemaArchive (HSA) XML file*. This process will NOT overlay any existing Namespace and
-   * Table structures in HBase. If the Namespace definition in the external file does NOT correspond
-   * to an existing HBase Namespace, a new Namespace will be added to HBase along with any Tables
-   * and table components belonging to the Namespace. If the Namespace definition in the external
-   * file corresponds to an existing HBase Namespace, any of its Table and table components will
-   * only be added to HBase if the Table does NOT already exist in HBase.
-   * <br><br>*An HSA file adheres to the XML Schema layout in
-   * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
+   * Import a Namespace into HBase with all its component schema-objects as serialized in an
+   * external HBaseSchemaArchive (HSA) XML file*; this process will NOT overlay any <b>existing</b>
+   * Namespace and Table structures in HBase. Only Tables which are
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * will be imported.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
    *
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
    * @param namespaceName namespace to import.
-   * @param sourceFile source file
+   * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importNamespaceSchema(boolean includeColumnAuditors,
-          String namespaceName, File sourceFile)
+  public void importSchema(boolean includeColumnAuditors, String namespaceName, File sourceHsaFile)
           throws IOException, JAXBException {
-    repository.importSchema(includeColumnAuditors, namespaceName, null, sourceFile);
+    repository.importSchema(includeColumnAuditors, false, namespaceName, null, null, sourceHsaFile);
   }
 
   /**
-   * Import into HBase a Table and all its component objects as represented in an external
-   * HBaseSchemaArchive (HSA) XML file*. This process will NOT overlay any existing Namespace and
-   * Table structures in HBase. If the Table's parent Namespace does NOT correspond to an existing
-   * HBase Namespace, a new Namespace will be added to HBase. The Table and table components will
-   * only be added to HBase if the Table does NOT already exist in HBase.
-   * <br><br>*An HSA file adheres to the XML Schema layout in
-   * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
+   * Import a Table into HBase with all its component schema-objects as serialized in an external
+   * HBaseSchemaArchive (HSA) XML file*; this process will NOT overlay an <b>existing</b> Table
+   * (and its component structures) in HBase. Only a Table which is
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * will be imported.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
    *
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
    * @param tableName Name of table to be imported.
-   * @param sourceFile source file
+   * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importTableSchema(
-          boolean includeColumnAuditors, TableName tableName, File sourceFile)
+  public void importSchema(boolean includeColumnAuditors, TableName tableName, File sourceHsaFile)
+          throws IOException, JAXBException {
+    repository.importSchema(includeColumnAuditors, false, tableName.getNamespaceAsString(),
+            tableName, null, sourceHsaFile);
+  }
+
+  /**
+   * Import into the ColumnManager repository all {@link ColumnDefinition}s that are found in the
+   * submitted HBaseSchemaArchive (HSA) XML file*;
+   * for a {@link ColumnDefinition} to be imported, it must belong to an existing
+   * Table/ColumnFamily which is
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
+   *
+   * @param sourceHsaFile source file
+   * @throws IOException if a remote or network exception occurs
+   * @throws JAXBException if an exception occurs in the context of JAXB processing
+    */
+  public void importColumnDefinitions(File sourceHsaFile)
+          throws IOException, JAXBException {
+    repository.importSchema(false, true, null, null, null, sourceHsaFile);
+  }
+
+  /**
+   * Import into the ColumnManager repository all of a specified Namespace's
+   * {@link ColumnDefinition}s that are found in the submitted HBaseSchemaArchive (HSA) XML file*;
+   * for a {@link ColumnDefinition} to be imported, it must belong to an existing
+   * Table/ColumnFamily which is
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
+   *
+   * @param namespaceName namespace for which {@link ColumnDefinition}s are to be imported
+   * @param sourceHsaFile source file
+   * @throws IOException if a remote or network exception occurs
+   * @throws JAXBException if an exception occurs in the context of JAXB processing
+    */
+  public void importColumnDefinitions(String namespaceName, File sourceHsaFile)
+          throws IOException, JAXBException {
+    repository.importSchema(false, true, namespaceName, null, null, sourceHsaFile);
+  }
+
+  /**
+   * Import into the ColumnManager repository all of a specified Table's
+   * {@link ColumnDefinition}s that are found in the submitted HBaseSchemaArchive (HSA) XML file*;
+   * for a {@link ColumnDefinition} to be imported, it must belong to an existing
+   * Table/ColumnFamily which is
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
+   *
+   * @param tableName table for which {@link ColumnDefinition}s are to be imported
+   * @param sourceHsaFile source file
+   * @throws IOException if a remote or network exception occurs
+   * @throws JAXBException if an exception occurs in the context of JAXB processing
+    */
+  public void importColumnDefinitions(TableName tableName, File sourceHsaFile)
           throws IOException, JAXBException {
     repository.importSchema(
-            includeColumnAuditors, tableName.getNamespaceAsString(), tableName, sourceFile);
+            false, true, tableName.getNamespaceAsString(), tableName, null, sourceHsaFile);
+  }
+
+  /**
+   * Import into the ColumnManager repository all of a specified ColumnFamily's
+   * {@link ColumnDefinition}s that are found in the submitted HBaseSchemaArchive (HSA) XML file*;
+   * for a {@link ColumnDefinition} to be imported, it must belong to an existing
+   * Table/ColumnFamily which is
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>.
+   * <br><br>*An HSA file is created with the one of the
+   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
+   * HBaseSchemaArchive.xsd.xml</a>.
+   *
+   * @param tableName table of ColumnFamily for which {@link ColumnDefinition}s are to be imported
+   * @param colFamily ColumnFamily for which {@link ColumnDefinition}s are to be imported
+   * @param sourceHsaFile source file
+   * @throws IOException if a remote or network exception occurs
+   * @throws JAXBException if an exception occurs in the context of JAXB processing
+    */
+  public void importColumnDefinitions(TableName tableName, byte[] colFamily, File sourceHsaFile)
+          throws IOException, JAXBException {
+    repository.importSchema(
+            false, true, tableName.getNamespaceAsString(), tableName, colFamily, sourceHsaFile);
   }
 
   /**
@@ -829,10 +911,5 @@ public class RepositoryAdmin implements Closeable {
    */
   public boolean namespaceExists(String namespaceName) throws IOException {
     return repository.namespaceExists(namespaceName);
-  }
-
-  @Override
-  public void close() throws IOException {
-    // hbaseConnection NOT closed here (Connection instantiated externally; is presumably shared)
   }
 }

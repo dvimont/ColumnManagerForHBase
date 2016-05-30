@@ -559,17 +559,13 @@ public class TestRepositoryAdmin {
   }
 
   private void doColumnDiscovery(Configuration configuration) throws IOException {
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
-      repositoryAdmin.discoverSchema();
-    }
+    new RepositoryAdmin(MConnectionFactory.createConnection(configuration)).discoverSchema();
   }
 
   private void verifyColumnAuditing(Configuration configuration) throws IOException {
 
-    try (Connection mConnection = MConnectionFactory.createConnection(configuration);
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection)) {
-
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection);
       // Test #getColumnQualifiers
       Set<byte[]> returnedColQualifiersForNamespace1Table1Cf1
               = repositoryAdmin.getColumnQualifiers(
@@ -723,9 +719,8 @@ public class TestRepositoryAdmin {
 
     createColumnDefinitions(configuration);
 
-    try (Connection connection = MConnectionFactory.createConnection(configuration);
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection)) {
-
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF02);
        // next def not enforced, since namespace02 tables not included for CM processing!
@@ -786,8 +781,8 @@ public class TestRepositoryAdmin {
     ColumnDefinition col04Definition
             = new ColumnDefinition(COLQUALIFIER04).setColumnLength(8L);
 
-    try (Connection connection = MConnectionFactory.createConnection(configuration);
-            RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection)) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF01, col01Definition);
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF01, col02Definition);
       repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE01, CF02, col03Definition);
@@ -838,24 +833,24 @@ public class TestRepositoryAdmin {
     loadColumnData(configuration, false);
 
     // extract schema into external HBase Schema Archive files
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
-      repositoryAdmin.exportRepository(exportAllFile, true);
-      repositoryAdmin.exportNamespaceSchema(
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.exportSchema(exportAllFile, true);
+      repositoryAdmin.exportSchema(
               TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX), exportNamespaceFile, true);
       try {
-        repositoryAdmin.exportNamespaceSchema(
+        repositoryAdmin.exportSchema(
                 TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX), exportInvalidNamespaceFile, true);
         fail(TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
-      repositoryAdmin.exportTableSchema(NAMESPACE01_TABLE01, exportTableFile, true);
+      repositoryAdmin.exportSchema(NAMESPACE01_TABLE01, exportTableFile, true);
     }
     clearTestingEnvironment();
 
     // NOW restore full schema from external HSA file and verify that all structures restored
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importSchema(true, exportAllFile);
     }
     verifyColumnAuditing(configuration);
@@ -997,8 +992,8 @@ public class TestRepositoryAdmin {
       eventsForColumnAuditorFile = new File(TARGET_DIRECTORY + EVENTS_FOR_COL_AUDITOR_FILE);
     }
     // create and test ChangeEventMonitor
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       ChangeEventMonitor monitor = repositoryAdmin.getChangeEventMonitor();
 
       ChangeEventMonitor.exportChangeEventListToCsvFile(
@@ -1073,8 +1068,6 @@ public class TestRepositoryAdmin {
   private void compareResourceFileToExportedFile(String resourceFileString, File exportedFile,
           String methodName) throws IOException, URISyntaxException {
     Path resourcePath = Paths.get(ClassLoader.getSystemResource(resourceFileString).toURI());
-    assertEquals(CHANGE_EVENT_FAILURE + "unexpected item count from " + methodName + " method",
-            Files.lines(resourcePath).count(), Files.lines(exportedFile.toPath()).count());
     // NOTE: timestamps on sequential events can sometimes be equal (if processing is TOO quick!)
     // so reliable comparison requires stripping initial timestamp from each line and reordering
     // remainder via TreeSets, then doing comparison.
@@ -1097,6 +1090,8 @@ public class TestRepositoryAdmin {
       assertEquals(CHANGE_EVENT_FAILURE + "unexpected content returned by " + methodName,
               resourceLinesTruncatedIterator.next(), exportedLinesTruncatedIterator.next());
     }
+    assertEquals(CHANGE_EVENT_FAILURE + "unexpected item count from " + methodName + " method",
+            Files.lines(resourcePath).count(), Files.lines(exportedFile.toPath()).count());
   }
 
   private void changeJavaUsername() {
@@ -1160,8 +1155,8 @@ public class TestRepositoryAdmin {
     }
     // Confirm that the first 5 changes have NOT been retained due to maxVersions limitation.
     final String ATTRIBUTE_NAME = "Value__MEMSTORE_FLUSHSIZE";
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       ChangeEventMonitor monitor = repositoryAdmin.getChangeEventMonitor();
       assertEquals(CHANGE_EVENT_FAILURE
               + "unexpected attribute value found when testing maxVersions processing",
@@ -1190,8 +1185,8 @@ public class TestRepositoryAdmin {
     // out-of-sync logger message should be generated upon Repository startup
     TestAppender testAppender = new TestAppender();
     Logger.getRootLogger().addAppender(testAppender);
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       int outOfSyncWarningCount = 0;
       for (LoggingEvent loggingEvent : testAppender.events) {
         if (loggingEvent.getMessage().toString().startsWith(
@@ -1233,8 +1228,8 @@ public class TestRepositoryAdmin {
     // out-of-sync logger message should be generated upon Repository startup
     TestAppender testAppender = new TestAppender();
     Logger.getRootLogger().addAppender(testAppender);
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       int outOfSyncWarningCount = 0;
       for (LoggingEvent loggingEvent : testAppender.events) {
         if (loggingEvent.getMessage().toString().startsWith(
@@ -1297,8 +1292,8 @@ public class TestRepositoryAdmin {
     // out-of-sync logger message should be generated upon Repository startup
     TestAppender testAppender = new TestAppender();
     Logger.getRootLogger().addAppender(testAppender);
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(MConnectionFactory.createConnection(configuration))) {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       int tableAttributesOutOfSyncWarningCount = 0;
       int colDescriptorAttributesOutOfSyncWarningCount = 0;
       for (LoggingEvent loggingEvent : testAppender.events) {
@@ -1432,8 +1427,8 @@ public class TestRepositoryAdmin {
             + "returned unexpected boolean value";
 
     // generate InvalidColumnQualifier reports
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(ConnectionFactory.createConnection())) {
+    try (Connection connection = ConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
                       NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));
@@ -1852,8 +1847,8 @@ public class TestRepositoryAdmin {
     }
 
     // generate InvalidColumnLengths reports
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(ConnectionFactory.createConnection())) {
+    try (Connection connection = ConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnLengths(
                       NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));
@@ -2094,8 +2089,8 @@ public class TestRepositoryAdmin {
     }
 
     // generate InvalidColumnValue reports
-    try (RepositoryAdmin repositoryAdmin
-            = new RepositoryAdmin(ConnectionFactory.createConnection())) {
+    try (Connection connection = ConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnValues(
                       NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));

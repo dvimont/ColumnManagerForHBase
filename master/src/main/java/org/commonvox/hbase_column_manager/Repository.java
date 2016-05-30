@@ -1700,19 +1700,24 @@ class Repository {
     logger.info("EXPORT of ColumnManager repository schema has been completed.");
   }
 
-  void importSchema(
-          boolean includeColumnAuditors, String namespaceName, TableName tableName, File sourceFile)
+  void importSchema(boolean includeColumnAuditors, boolean bypassNamespacesTablesAndCFs,
+          String namespaceName, TableName tableName, byte[] colFamily, File sourceFile)
           throws IOException, JAXBException {
     validateNamespaceTableNameCombination(namespaceName, tableName);
-    submitImportMessagesToLogger(includeColumnAuditors, namespaceName, tableName, sourceFile);
+    submitImportMessagesToLogger(includeColumnAuditors, bypassNamespacesTablesAndCFs,
+            namespaceName, tableName, sourceFile);
     Set<Object> importedDescriptors = deserializeHBaseSchemaArchive(
             includeColumnAuditors, namespaceName, tableName, sourceFile);
-    createImportedStructures(includeColumnAuditors, importedDescriptors);
+    createImportedStructures(
+            includeColumnAuditors, bypassNamespacesTablesAndCFs, importedDescriptors);
   }
 
   private void submitImportMessagesToLogger(boolean includeColumnAuditors,
+          boolean bypassNamespacesTablesAndCFs,
           String namespaceName, TableName tableName, File sourceFile) {
-    logger.info("IMPORT of schema "
+    logger.info("IMPORT of "
+            + ((bypassNamespacesTablesAndCFs) ? "<COLUMN DEFINITION> " : "")
+            + "schema "
             + ((includeColumnAuditors) ? "<INCLUDING COLUMN AUDITOR METADATA> " : "")
             + "from external HBaseSchemaArchive (XML) file has been requested.");
     if (namespaceName != null && !namespaceName.isEmpty()
@@ -1726,7 +1731,7 @@ class Repository {
   }
 
   private void createImportedStructures(boolean includeColumnAuditors,
-          Set<Object> importedDescriptors)
+          boolean bypassNamespacesTablesAndCFs, Set<Object> importedDescriptors)
           throws IOException {
     for (Object descriptor : importedDescriptors) {
       if (MNamespaceDescriptor.class.isAssignableFrom(descriptor.getClass())) {
