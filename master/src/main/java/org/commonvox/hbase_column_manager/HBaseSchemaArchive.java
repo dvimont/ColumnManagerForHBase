@@ -40,6 +40,9 @@ import javax.xml.bind.annotation.XmlTransient;
 @XmlRootElement(name = "hBaseSchemaArchive")
 class HBaseSchemaArchive {
 
+  private static final String BLANKS = "                    ";
+  private static final int TAB = 3;
+
   @XmlAttribute
   private final String fileTimestamp;
   @XmlElement(name = "hBaseSchemaEntity")
@@ -81,5 +84,33 @@ class HBaseSchemaArchive {
           throws JAXBException {
     return (HBaseSchemaArchive)JAXBContext.newInstance(HBaseSchemaArchive.class)
                     .createUnmarshaller().unmarshal(sourceFile);
+  }
+
+  static String getSummaryReport(File sourceFile) throws JAXBException {
+    HBaseSchemaArchive schemaArchive = HBaseSchemaArchive.deserializeXmlFile(sourceFile);
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append("SUMMARY OF external HBase Schema Archive file*\n")
+            .append(BLANKS, 0, TAB).append("SOURCE FILE: ")
+            .append(sourceFile.getAbsolutePath()).append("\n")
+            .append(BLANKS, 0, TAB).append("FILE TIMESTAMP: ")
+            .append(schemaArchive.getArchiveFileTimestampString()).append("\n")
+            .append(BLANKS, 0, TAB).append("FILE CONTENTS:\n");
+    for (SchemaEntity entity : schemaArchive.getSchemaEntities()) {
+      stringBuilder.append(appendSchemaEntityDescription(entity, TAB + TAB));
+    }
+    stringBuilder.append("\n").append(BLANKS, 0, TAB).append("*To examine the XML-formatted"
+            + " HBase Schema Archive file in detail, simply open it in a browser or XML editor.");
+    return stringBuilder.toString();
+  }
+
+  private static StringBuilder appendSchemaEntityDescription(SchemaEntity entity, int indentSpaces) {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append(BLANKS, 0, indentSpaces).append(entity).append("\n");
+    if (entity.getChildren() != null) {
+      for (SchemaEntity childEntity : entity.getChildren()) {
+        stringBuilder.append(appendSchemaEntityDescription(childEntity, indentSpaces + TAB));
+      }
+    }
+    return stringBuilder;
   }
 }

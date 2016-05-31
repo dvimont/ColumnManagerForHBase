@@ -110,6 +110,9 @@ public class TestRepositoryAdmin {
   private static final int CF01_INDEX = 0;
   private static final int CF02_INDEX = 1;
 
+  private static final String NAMESPACE01 = TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX);
+  private static final String NAMESPACE02 = TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX);
+  private static final String NAMESPACE03 = TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX);
   private static final TableName NAMESPACE01_TABLE01
           = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
                   TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
@@ -152,6 +155,10 @@ public class TestRepositoryAdmin {
   private static final byte[] COLQUALIFIER02 = TEST_COLUMN_QUALIFIER_LIST.get(1);
   private static final byte[] COLQUALIFIER03 = TEST_COLUMN_QUALIFIER_LIST.get(2);
   private static final byte[] COLQUALIFIER04 = TEST_COLUMN_QUALIFIER_LIST.get(3);
+  private static final byte[] COLQUALIFIER_A = Bytes.toBytes("columnQualifierA");
+  private static final byte[] COLQUALIFIER_B = Bytes.toBytes("columnQualifierB");
+  private static final byte[] COLQUALIFIER_C = Bytes.toBytes("columnQualifierC");
+  private static final byte[] COLQUALIFIER_D = Bytes.toBytes("columnQualifierD");
 
   private static final Set<byte[]> expectedColQualifiersForNamespace1Table1Cf1
             = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
@@ -217,6 +224,8 @@ public class TestRepositoryAdmin {
           = "FAILURE IN InvalidColumnReport PROCESSING!! ==>> ";
   private static final String TABLE_NOT_INCLUDED_EXCEPTION_FAILURE
           = TableNotIncludedForProcessingException.class.getSimpleName() + " failed to be thrown ";
+  private static final String IMPORT_COLDEFINITIONS_FAILURE
+          = "FAILURE IN #importColumnDefinitions PROCESSING!! ==>> ";
 
 
   // non-static fields
@@ -795,6 +804,23 @@ public class TestRepositoryAdmin {
     }
   }
 
+  private void createAdditionalColumnDefinitions(Configuration configuration) throws IOException {
+    ColumnDefinition colADefinition = new ColumnDefinition(COLQUALIFIER_A);
+    ColumnDefinition colBDefinition = new ColumnDefinition(COLQUALIFIER_B).setColumnLength(20L);
+    ColumnDefinition colCDefinition
+            = new ColumnDefinition(COLQUALIFIER_C).setColumnValidationRegex("https?://.*");
+    ColumnDefinition colDDefinition
+            = new ColumnDefinition(COLQUALIFIER_D).setColumnLength(8L);
+
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.addColumnDefinition(NAMESPACE01_TABLE02, CF01, colADefinition);
+      repositoryAdmin.addColumnDefinition(NAMESPACE03_TABLE01, CF01, colBDefinition);
+      repositoryAdmin.addColumnDefinition(NAMESPACE03_TABLE03, CF02, colCDefinition);
+      repositoryAdmin.addColumnDefinition(NAMESPACE03_TABLE03, CF02, colDDefinition);
+    }
+  }
+
   @Rule
   public TemporaryFolder tempTestFolder = new TemporaryFolder();
 
@@ -917,6 +943,127 @@ public class TestRepositoryAdmin {
       fail(REPOSITORY_ADMIN_FAILURE + " exported HSA file is invalid with respect to "
               + "XML schema: " + se.getMessage());
     }
+  }
+
+  /**
+   * First, create fully populated repository, and export all metadata to HSA file.
+   * Use HSA file as basis for various #importColumnDefinition runs and verify results.
+   *
+   * @throws IOException
+   * @throws JAXBException
+   */
+  @Test
+  public void testImportColumnDefinitions() throws IOException, JAXBException {
+    System.out.println("#testImportColumnDefinitions has been invoked.");
+    // file setup
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
+    final String TARGET_EXPORT_ALL_FILE = "temp.export.repository.hsa.xml";
+    final String TARGET_EXPORT_ALL_COMPARISON_FILE = "temp.export.repository.compare.hsa.xml";
+    final String TARGET_EXPORT_NAMESPACE_COMPARISON_FILE
+            = "temp.export.repository.namespace.compare.hsa.xml";
+    final String TARGET_EXPORT_TABLE_COMPARISON_FILE
+            = "temp.export.repository.table.compare.hsa.xml";
+    final String TARGET_EXPORT_COLFAMILY_COMPARISON_FILE
+            = "temp.export.repository.colfamily.compare.hsa.xml";
+    File exportAllFile;
+    File exportAllComparisonFile;
+    File exportNamespaceColDefsComparisonFile;
+    File exportTableColDefsComparisonFile;
+    File exportColFamilyColDefsComparisonFile;
+    try {
+      exportAllFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_FILE);
+      exportAllComparisonFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_COMPARISON_FILE);
+      exportNamespaceColDefsComparisonFile
+               = tempTestFolder.newFile(TARGET_EXPORT_NAMESPACE_COMPARISON_FILE);
+      exportTableColDefsComparisonFile
+               = tempTestFolder.newFile(TARGET_EXPORT_TABLE_COMPARISON_FILE);
+      exportColFamilyColDefsComparisonFile
+               = tempTestFolder.newFile(TARGET_EXPORT_COLFAMILY_COMPARISON_FILE);
+    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
+      exportAllFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_FILE);
+      exportAllComparisonFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_COMPARISON_FILE);
+      exportNamespaceColDefsComparisonFile
+              = new File(TARGET_DIRECTORY + TARGET_EXPORT_NAMESPACE_COMPARISON_FILE);
+      exportTableColDefsComparisonFile
+              = new File(TARGET_DIRECTORY + TARGET_EXPORT_TABLE_COMPARISON_FILE);
+      exportColFamilyColDefsComparisonFile
+              = new File(TARGET_DIRECTORY + TARGET_EXPORT_COLFAMILY_COMPARISON_FILE);
+    }
+
+    // environment cleanup before testing
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // add schema and data to HBase
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false);
+    createColumnDefinitions(configuration);
+    createAdditionalColumnDefinitions(configuration);
+    // extract schema into external HBase Schema Archive files
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      new RepositoryAdmin(connection).exportSchema(exportAllFile, false);
+    }
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // Recreate test environment without ColumnDefinitions, and import ColumnDefinitions
+    createSchemaStructuresInHBase(configuration, false);
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.importColumnDefinitions(exportAllFile);
+      repositoryAdmin.exportSchema(exportAllComparisonFile, false);
+    }
+    // both export files should be identical, except for timestamp attribute
+    final String TIMESTAMP_ATTR_REGEX = "fileTimestamp=\".......................?\"";
+    String originalHsaXmlContent = new String(Files.readAllBytes(exportAllFile.toPath()))
+            .replaceFirst(TIMESTAMP_ATTR_REGEX, "");
+    String comparisonHsaXmlContent = new String(Files.readAllBytes(exportAllComparisonFile.toPath()))
+            .replaceFirst(TIMESTAMP_ATTR_REGEX, "");
+    assertEquals(IMPORT_COLDEFINITIONS_FAILURE
+            + "Import of ALL ColumnDefinitions failed to produce expected results",
+            originalHsaXmlContent, comparisonHsaXmlContent);
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // Recreate test environment without ColumnDefinitions, and import NAMESPACE ColumnDefinitions
+    createSchemaStructuresInHBase(configuration, false);
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.importColumnDefinitions(NAMESPACE01, exportAllFile);
+      repositoryAdmin.exportSchema(exportNamespaceColDefsComparisonFile, false);
+    }
+    // comparison logic here!!
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // Recreate test environment without ColumnDefinitions, and import TABLE ColumnDefinitions
+    createSchemaStructuresInHBase(configuration, false);
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.importColumnDefinitions(NAMESPACE03_TABLE03, exportAllFile);
+      repositoryAdmin.exportSchema(exportTableColDefsComparisonFile, false);
+    }
+    // comparison logic here!!
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // Recreate test environment without ColumnDefinitions, and import COLFAMILY ColumnDefinitions
+    createSchemaStructuresInHBase(configuration, false);
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.importColumnDefinitions(NAMESPACE01_TABLE01, CF01, exportAllFile);
+      repositoryAdmin.exportSchema(exportColFamilyColDefsComparisonFile, false);
+    }
+    // comparison logic here!!
+    String testItOut = RepositoryAdmin.generateHsaFileSummary(exportAllFile);
+
+    clearTestingEnvironment();
+    System.out.println("#testImportColumnDefinitions has run to completion.");
   }
 
   @Test
@@ -1460,13 +1607,6 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.SummaryReportHeader.OCCURRENCES.toString() + "="
-//                + record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES)
-//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -1529,15 +1669,6 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.VerboseReportHeader.ROW_ID.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID) + " "
-//                + InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE)
-//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -1880,13 +2011,6 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.SummaryReportHeader.OCCURRENCES.toString() + "="
-//                + record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES)
-//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -1921,15 +2045,6 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.VerboseReportHeader.ROW_ID.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID) + " "
-//                + InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE)
-//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -2122,13 +2237,6 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.SummaryReportHeader.OCCURRENCES.toString() + "="
-//                + record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES)
-//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -2159,15 +2267,6 @@ public class TestRepositoryAdmin {
             InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.VerboseReportHeader.ROW_ID.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID) + " "
-//                + InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE)
-//                );
         recordCount++;
         assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
@@ -2367,12 +2466,13 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
-     new TestRepositoryAdmin().testChangeEventMonitor();
+    // new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
+    new TestRepositoryAdmin().testImportColumnDefinitions();
   }
 }

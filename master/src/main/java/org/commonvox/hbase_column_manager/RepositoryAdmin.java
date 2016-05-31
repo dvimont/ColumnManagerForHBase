@@ -739,8 +739,8 @@ public class RepositoryAdmin {
    * @return A String containing a summary report suitable for printing/viewing.
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public String generateHsaFileSummary(File sourceFile) throws JAXBException {
-    return repository.getHBaseSchemaArchiveSummary(sourceFile);
+  public static String generateHsaFileSummary(File sourceFile) throws JAXBException {
+    return HBaseSchemaArchive.getSummaryReport(sourceFile);
   }
 
   /**

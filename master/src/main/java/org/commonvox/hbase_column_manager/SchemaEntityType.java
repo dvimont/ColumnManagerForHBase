@@ -50,11 +50,16 @@ enum SchemaEntityType {
   static final Map<String, Byte> ENTITY_TYPE_LABEL_TO_BYTE_MAP = new TreeMap<>();
 
   static {
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.NAMESPACE.getRecordType(), SchemaEntityType.NAMESPACE);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.TABLE.getRecordType(), SchemaEntityType.TABLE);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.COLUMN_FAMILY.getRecordType(), SchemaEntityType.COLUMN_FAMILY);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), SchemaEntityType.COLUMN_AUDITOR);
-    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), SchemaEntityType.COLUMN_DEFINITION);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(
+            SchemaEntityType.NAMESPACE.getRecordType(), SchemaEntityType.NAMESPACE);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(
+            SchemaEntityType.TABLE.getRecordType(), SchemaEntityType.TABLE);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(
+            SchemaEntityType.COLUMN_FAMILY.getRecordType(), SchemaEntityType.COLUMN_FAMILY);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(
+            SchemaEntityType.COLUMN_AUDITOR.getRecordType(), SchemaEntityType.COLUMN_AUDITOR);
+    ENTITY_TYPE_BYTE_TO_ENUM_MAP.put(
+            SchemaEntityType.COLUMN_DEFINITION.getRecordType(), SchemaEntityType.COLUMN_DEFINITION);
 
     for (Entry<Byte, SchemaEntityType> entry : ENTITY_TYPE_BYTE_TO_ENUM_MAP.entrySet()) {
       ENTITY_TYPE_LABEL_TO_BYTE_MAP.put(entry.getValue().toString(), entry.getKey());

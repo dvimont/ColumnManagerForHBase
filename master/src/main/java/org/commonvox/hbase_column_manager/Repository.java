@@ -140,8 +140,6 @@ class Repository {
           SCHEMA_ENTITY_ATTRIBUTE_SYNC_ERROR_MSG, HTableDescriptor.class.getSimpleName());
   static final String COLDESCRIPTOR_ATTRIBUTE_SYNC_ERROR_MSG = String.format(
           SCHEMA_ENTITY_ATTRIBUTE_SYNC_ERROR_MSG, HColumnDescriptor.class.getSimpleName());
-  private static final String BLANKS = "                    ";
-  private static final int TAB = 3;
   private static final byte[] ENTITY_STATUS_COLUMN = Bytes.toBytes("_Status");
   private static final byte[] ACTIVE_STATUS = Bytes.toBytes("A");
   private static final byte[] DELETED_STATUS = Bytes.toBytes("D");
@@ -877,14 +875,14 @@ class Repository {
   }
 
   /**
-   * Invoked during serialization process, when fully-formed MTableDescriptor is submitted for
-   * persistence (e.g., during importation of schema from external source).
+   * Invoked during importation (from external source) process, when fully-formed MTableDescriptor
+   * is submitted for persistence.
    *
    * @param mtd MTableDescriptor
    * @return true if all serializations complete successfully
    * @throws IOException if a remote or network exception occurs
    */
-  boolean putColumnDefinitionSchemaEntities(MTableDescriptor mtd) throws IOException {
+  private boolean putColumnDefinitionSchemaEntities(MTableDescriptor mtd) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       throw new TableNotIncludedForProcessingException(mtd.getTableName().getName(), null);
     }
@@ -1059,10 +1057,10 @@ class Repository {
       // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so namespace SchemaEntity might not yet have been captured in repository,
       //  or namespaceName may not represent included namespace (and so not stored in repository).
-      //return new MNamespaceDescriptor(standardAdmin.getNamespaceDescriptor(namespaceName));
       if (isIncludedNamespace(namespaceName)) {
         putNamespaceSchemaEntity(standardAdmin.getNamespaceDescriptor(namespaceName));
-        row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
+        row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(),
+                NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
       } else {
         return null;
       }
@@ -1073,7 +1071,8 @@ class Repository {
 
   Set<MNamespaceDescriptor> getMNamespaceDescriptors() throws IOException {
     Set<MNamespaceDescriptor> mNamespaceDescriptors = new TreeSet<>();
-    for (Result row : getActiveRows(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY)) {
+    for (Result row : getActiveRows(
+            SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY)) {
       mNamespaceDescriptors.add(new MNamespaceDescriptor(deserializeSchemaEntity(row)));
     }
     return mNamespaceDescriptors;
@@ -1081,14 +1080,16 @@ class Repository {
 
   MTableDescriptor getMTableDescriptor(TableName tn) throws IOException {
     byte[] namespaceForeignKey = getNamespaceForeignKey(tn.getNamespace());
-    Result row = getActiveRow(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
+    Result row = getActiveRow(
+            SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
     if (row == null || row.isEmpty()) {
       // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so table SchemaEntity might not yet have been captured in repository,
       //  or TableName may not represent included Table (and so not stored in repository).
       if (isIncludedTable(tn)) {
         putTableSchemaEntity(standardAdmin.getTableDescriptor(tn));
-        row = getActiveRow(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
+        row = getActiveRow(
+                SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey, tn.getName(), null);
       } else {
         return null;
       }
@@ -1116,7 +1117,8 @@ class Repository {
   private Set<MColumnDescriptor> getMColumnDescriptors(byte[] tableForeignKey)
           throws IOException {
     Set<MColumnDescriptor> mColumnDescriptors = new TreeSet<>();
-    for (Result row : getActiveRows(SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey)) {
+    for (Result row : getActiveRows(
+            SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey)) {
       MColumnDescriptor mcd = new MColumnDescriptor(deserializeSchemaEntity(row));
       mColumnDescriptors.add(mcd.addColumnAuditors(getColumnAuditors(mcd.getForeignKey()))
               .addColumnDefinitions(getColumnDefinitions(mcd.getForeignKey())));
@@ -1138,7 +1140,8 @@ class Repository {
   private Set<ColumnAuditor> getColumnAuditors(byte[] colFamilyForeignKey)
           throws IOException {
     Set<ColumnAuditor> columnAuditors = new TreeSet<>();
-    Result[] colAuditorRows = getActiveRows(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey);
+    Result[] colAuditorRows = getActiveRows(
+            SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey);
     if (colAuditorRows != null) {
       for (Result row : colAuditorRows) {
         columnAuditors.add(new ColumnAuditor(deserializeSchemaEntity(row)));
@@ -1149,7 +1152,8 @@ class Repository {
 
   private ColumnAuditor getColumnAuditor(byte[] colFamilyForeignKey, byte[] colQualifier)
           throws IOException {
-    Result row = getActiveRow(SchemaEntityType.COLUMN_AUDITOR.getRecordType(), colFamilyForeignKey, colQualifier, null);
+    Result row = getActiveRow(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+            colFamilyForeignKey, colQualifier, null);
     return (row == null) ? null : new ColumnAuditor(deserializeSchemaEntity(row));
   }
 
@@ -1158,14 +1162,15 @@ class Repository {
     if (!isIncludedTable(htd.getTableName())) {
       throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
     }
-    byte[] colFamilyForeignKey
-            = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
+    byte[] colFamilyForeignKey = getForeignKey(
+            SchemaEntityType.COLUMN_FAMILY.getRecordType(), getTableForeignKey(htd), hcd.getName());
     return getColumnDefinitions(colFamilyForeignKey);
   }
 
   private Set<ColumnDefinition> getColumnDefinitions(byte[] colFamilyForeignKey) throws IOException {
     Set<ColumnDefinition> columnDefinitions = new TreeSet<>();
-    for (Result row : getActiveRows(SchemaEntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey)) {
+    for (Result row : getActiveRows(
+            SchemaEntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey)) {
       columnDefinitions.add(new ColumnDefinition(deserializeSchemaEntity(row)));
     }
     return columnDefinitions;
@@ -1635,7 +1640,8 @@ class Repository {
     }
   }
 
-  private void validateNamespaceTableNameCombination(String namespace, TableName tableName)
+  private void validateNamespaceTableNameIncludedForProcessing(
+          String namespace, TableName tableName)
           throws TableNotIncludedForProcessingException {
     if (tableName == null || tableName.getNameAsString().isEmpty()) {
       if (namespace != null && !namespace.isEmpty()
@@ -1654,7 +1660,7 @@ class Repository {
   void exportSchema(String sourceNamespace, TableName sourceTableName,
           File targetFile, boolean formatted)
           throws IOException, JAXBException {
-    validateNamespaceTableNameCombination(sourceNamespace, sourceTableName);
+    validateNamespaceTableNameIncludedForProcessing(sourceNamespace, sourceTableName);
     String allLiteral = "";
     if ((sourceNamespace == null || sourceNamespace.isEmpty())
             && (sourceTableName == null || sourceTableName.getNameAsString().isEmpty())) {
@@ -1703,18 +1709,23 @@ class Repository {
   void importSchema(boolean includeColumnAuditors, boolean bypassNamespacesTablesAndCFs,
           String namespaceName, TableName tableName, byte[] colFamily, File sourceFile)
           throws IOException, JAXBException {
-    validateNamespaceTableNameCombination(namespaceName, tableName);
+    validateNamespaceTableNameIncludedForProcessing(namespaceName, tableName);
     submitImportMessagesToLogger(includeColumnAuditors, bypassNamespacesTablesAndCFs,
-            namespaceName, tableName, sourceFile);
-    Set<Object> importedDescriptors = deserializeHBaseSchemaArchive(
-            includeColumnAuditors, namespaceName, tableName, sourceFile);
+            namespaceName, tableName, colFamily, sourceFile);
+
+    Set<Object> importedDescriptors =  new LinkedHashSet<>();
+    for (SchemaEntity entity :
+            HBaseSchemaArchive.deserializeXmlFile(sourceFile).getSchemaEntities()) {
+      importedDescriptors.addAll(convertSchemaEntityToDescriptorSet(
+              entity, includeColumnAuditors, namespaceName, tableName, colFamily));
+    }
     createImportedStructures(
             includeColumnAuditors, bypassNamespacesTablesAndCFs, importedDescriptors);
   }
 
   private void submitImportMessagesToLogger(boolean includeColumnAuditors,
           boolean bypassNamespacesTablesAndCFs,
-          String namespaceName, TableName tableName, File sourceFile) {
+          String namespaceName, TableName tableName, byte[] colFamily, File sourceFile) {
     logger.info("IMPORT of "
             + ((bypassNamespacesTablesAndCFs) ? "<COLUMN DEFINITION> " : "")
             + "schema "
@@ -1727,6 +1738,9 @@ class Repository {
     if (tableName != null && !tableName.getNameAsString().isEmpty()) {
       logger.info("IMPORT TABLE: " + tableName.getNameAsString());
     }
+    if (colFamily != null && colFamily.length > 0) {
+      logger.info("IMPORT COLUMN FAMILY: " + Bytes.toString(colFamily));
+    }
     logger.info("IMPORT source PATH/FILE-NAME: " + sourceFile.getAbsolutePath());
   }
 
@@ -1737,14 +1751,22 @@ class Repository {
       if (MNamespaceDescriptor.class.isAssignableFrom(descriptor.getClass())) {
         NamespaceDescriptor nd
                 = ((MNamespaceDescriptor) descriptor).getNamespaceDescriptor();
-        if (!namespaceExists(nd.getName())) {
-          getAdmin().createNamespace(nd);
-          putNamespaceSchemaEntity(nd);
-          logger.info("IMPORT COMPLETED FOR NAMESPACE: " + nd.getName());
+        if (!isIncludedNamespace(nd.getName()) || namespaceExists(nd.getName())) {
+          continue;
         }
+        getAdmin().createNamespace(nd);
+        putNamespaceSchemaEntity(nd);
+        logger.info("IMPORT COMPLETED FOR NAMESPACE: " + nd.getName());
       } else if (MTableDescriptor.class.isAssignableFrom(descriptor.getClass())) {
         MTableDescriptor mtd = (MTableDescriptor) descriptor;
-        if (!getAdmin().tableExists(mtd.getTableName())) {
+        if (!isIncludedTable(mtd.getTableName())) {
+          continue;
+        }
+        if (getAdmin().tableExists(mtd.getTableName())) {
+          if (bypassNamespacesTablesAndCFs) {
+            putColumnDefinitionSchemaEntities(mtd);
+          }
+        } else {
           getAdmin().createTable(mtd); // includes creation of Column Families
           putTableSchemaEntity(mtd);
           putColumnDefinitionSchemaEntities(mtd);
@@ -1758,26 +1780,12 @@ class Repository {
     }
   }
 
-  Set<Object> deserializeHBaseSchemaArchive(boolean includeColumnAuditors,
-          String namespace, TableName tableName, File sourceFile)
-          throws JAXBException {
-
-    Set<SchemaEntity> deserializedObjects
-            = HBaseSchemaArchive.deserializeXmlFile(sourceFile).getSchemaEntities();
-    Set<Object> returnedObjects = new LinkedHashSet<>();
-    for (SchemaEntity entity : deserializedObjects) {
-      returnedObjects.addAll(convertSchemaEntityToDescriptorSet(
-              entity, includeColumnAuditors, namespace, tableName));
-    }
-    return returnedObjects;
-  }
-
   /**
    * Used exclusively in the deserialization of an HBaseSchemaArchive
    */
   private Set<Object> convertSchemaEntityToDescriptorSet(
           SchemaEntity entity, boolean includeColumnAuditors,
-          String namespace, TableName tableName) {
+          String namespace, TableName tableName, byte[] colFamily) {
     Set<Object> convertedObjects = new LinkedHashSet<>();
     if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
       if (namespace != null && !namespace.equals(entity.getNameAsString())) {
@@ -1786,7 +1794,7 @@ class Repository {
       convertedObjects.add(new MNamespaceDescriptor(entity));
       for (SchemaEntity childEntity : entity.getChildren()) {
         convertedObjects.addAll(convertSchemaEntityToDescriptorSet(
-                childEntity, includeColumnAuditors, namespace, tableName));
+                childEntity, includeColumnAuditors, namespace, tableName, colFamily));
       }
     } else if (entity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
       if (tableName != null && !tableName.getNameAsString().equals(entity.getNameAsString())) {
@@ -1799,7 +1807,8 @@ class Repository {
             continue;
           }
           Set<Object> returnedMcdSet
-                  = convertSchemaEntityToDescriptorSet(childEntity, includeColumnAuditors, namespace, tableName);
+                  = convertSchemaEntityToDescriptorSet(
+                          childEntity, includeColumnAuditors, namespace, tableName, colFamily);
           for (Object returnedMcd : returnedMcdSet) {
             mtd.addFamily((MColumnDescriptor) returnedMcd);
           }
@@ -1807,10 +1816,14 @@ class Repository {
       }
       convertedObjects.add(mtd);
     } else if (entity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+      if (colFamily != null && !Bytes.toString(colFamily).equals(entity.getNameAsString())) {
+        return convertedObjects; // empty set
+      }
       MColumnDescriptor mcd = new MColumnDescriptor(entity);
       if (entity.getChildren() != null) {
         for (SchemaEntity childEntity : entity.getChildren()) {
-          if (childEntity.getEntityRecordType() == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
+          if (childEntity.getEntityRecordType()
+                  == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
             if (includeColumnAuditors) {
               mcd.addColumnAuditor(new ColumnAuditor(childEntity));
             }
@@ -1823,35 +1836,6 @@ class Repository {
       convertedObjects.add(mcd);
     }
     return convertedObjects;
-  }
-
-  String getHBaseSchemaArchiveSummary(File sourceFile)
-          throws JAXBException {
-    HBaseSchemaArchive schemaArchive = HBaseSchemaArchive.deserializeXmlFile(sourceFile);
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append("SUMMARY OF external HBase Schema Archive file*\n")
-            .append(BLANKS, 0, TAB).append("SOURCE FILE: ")
-            .append(sourceFile.getAbsolutePath()).append("\n")
-            .append(BLANKS, 0, TAB).append("FILE TIMESTAMP: ")
-            .append(schemaArchive.getArchiveFileTimestampString()).append("\n")
-            .append(BLANKS, 0, TAB).append("FILE CONTENTS:\n");
-    for (SchemaEntity entity : schemaArchive.getSchemaEntities()) {
-      stringBuilder.append(appendSchemaEntityDescription(entity, TAB + TAB));
-    }
-    stringBuilder.append("\n").append(BLANKS, 0, TAB).append("*To examine the XML-formatted"
-            + " HBase Schema Archive file in detail, simply open it in a browser or XML editor.");
-    return stringBuilder.toString();
-  }
-
-  private StringBuilder appendSchemaEntityDescription(SchemaEntity entity, int indentSpaces) {
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(BLANKS, 0, indentSpaces).append(entity).append("\n");
-    if (entity.getChildren() != null) {
-      for (SchemaEntity childEntity : entity.getChildren()) {
-        stringBuilder.append(appendSchemaEntityDescription(childEntity, indentSpaces + TAB));
-      }
-    }
-    return stringBuilder;
   }
 
   void dumpRepositoryTable() throws IOException {
