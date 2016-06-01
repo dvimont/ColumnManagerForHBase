@@ -39,7 +39,7 @@ import org.apache.log4j.Logger;
  * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities, as
  * well as schema metadata {@link #discoverSchema() discovery},
  * {@link #exportSchema(java.io.File, boolean) export}, and
- * {@link #importSchema(boolean, java.io.File) import}
+ * {@link #importSchema(java.io.File, boolean) import}
  * facilities; it is used as a complement to the standard {@code Admin} interface, with an
  * {@code Admin} instance (provided by an {@link MConnectionFactory#createConnection()
  * MConnectionFactory-created Connection}) being used in a standard manner to maintain
@@ -56,8 +56,9 @@ public class RepositoryAdmin {
   private final Repository repository;
 
   /**
-   * Initialize a RepositoryAdmin object using an already-created Connection. The Connection will
-   * NOT be closed when this RepositoryAdmin object is closed.
+   * Initialize a RepositoryAdmin object using a Connection provided by either a
+   * {@link org.apache.hadoop.hbase.client.ConnectionFactory ConnectionFactory}
+   * or {@link MConnectionFactory}.
    *
    * @param connection An HBase Connection.
    * @throws IOException if a remote or network exception occurs
@@ -541,14 +542,14 @@ public class RepositoryAdmin {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceNamespaceName namespace from which to export schema entities
    * @param targetFile target file
+   * @param sourceNamespaceName namespace from which to export schema entities
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportSchema(String sourceNamespaceName, File targetFile, boolean formatted)
+  public void exportSchema(File targetFile, String sourceNamespaceName, boolean formatted)
           throws IOException, JAXBException {
     repository.exportSchema(sourceNamespaceName, null, targetFile, formatted);
   }
@@ -562,14 +563,14 @@ public class RepositoryAdmin {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceTableName table to export (along with its component schema-entities)
    * @param targetFile target File
+   * @param sourceTableName table to export (along with its component schema-entities)
    * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void exportSchema(TableName sourceTableName, File targetFile, boolean formatted)
+  public void exportSchema(File targetFile, TableName sourceTableName, boolean formatted)
           throws IOException, JAXBException {
     repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName,
             targetFile, formatted);
@@ -585,15 +586,15 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
+   * @param sourceHsaFile source file
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
-   * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importSchema(boolean includeColumnAuditors, File sourceHsaFile)
+  public void importSchema(File sourceHsaFile, boolean includeColumnAuditors)
           throws IOException, JAXBException {
-    repository.importSchema(includeColumnAuditors, false, null, null, null, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, null, null, null, includeColumnAuditors, false);
   }
 
   /**
@@ -607,16 +608,16 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
+   * @param sourceHsaFile source file
+   * @param namespaceName namespace to import.
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
    * HBaseSchemaArchive file into the ColumnManager repository.
-   * @param namespaceName namespace to import.
-   * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importSchema(boolean includeColumnAuditors, String namespaceName, File sourceHsaFile)
+  public void importSchema(File sourceHsaFile, String namespaceName, boolean includeColumnAuditors)
           throws IOException, JAXBException {
-    repository.importSchema(includeColumnAuditors, false, namespaceName, null, null, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, namespaceName, null, null, includeColumnAuditors, false);
   }
 
   /**
@@ -637,10 +638,10 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public void importSchema(boolean includeColumnAuditors, TableName tableName, File sourceHsaFile)
+  public void importSchema(File sourceHsaFile, TableName tableName, boolean includeColumnAuditors)
           throws IOException, JAXBException {
-    repository.importSchema(includeColumnAuditors, false, tableName.getNamespaceAsString(),
-            tableName, null, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, tableName.getNamespaceAsString(), tableName, null,
+            includeColumnAuditors, false);
   }
 
   /**
@@ -660,7 +661,7 @@ public class RepositoryAdmin {
     */
   public void importColumnDefinitions(File sourceHsaFile)
           throws IOException, JAXBException {
-    repository.importSchema(false, true, null, null, null, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, null, null, null, false, true);
   }
 
   /**
@@ -674,14 +675,14 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param namespaceName namespace for which {@link ColumnDefinition}s are to be imported
+   * @param namespaceFilter namespace for which {@link ColumnDefinition}s are to be imported
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
     */
-  public void importColumnDefinitions(String namespaceName, File sourceHsaFile)
+  public void importColumnDefinitions(File sourceHsaFile, String namespaceFilter)
           throws IOException, JAXBException {
-    repository.importSchema(false, true, namespaceName, null, null, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, namespaceFilter, null, null, false, true);
   }
 
   /**
@@ -695,15 +696,15 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param tableName table for which {@link ColumnDefinition}s are to be imported
+   * @param tableNameFilter table for which {@link ColumnDefinition}s are to be imported
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
     */
-  public void importColumnDefinitions(TableName tableName, File sourceHsaFile)
+  public void importColumnDefinitions(File sourceHsaFile, TableName tableNameFilter)
           throws IOException, JAXBException {
-    repository.importSchema(
-            false, true, tableName.getNamespaceAsString(), tableName, null, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, tableNameFilter.getNamespaceAsString(),
+            tableNameFilter, null, false, true);
   }
 
   /**
@@ -717,16 +718,17 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param tableName table of ColumnFamily for which {@link ColumnDefinition}s are to be imported
-   * @param colFamily ColumnFamily for which {@link ColumnDefinition}s are to be imported
+   * @param tableNameFilter table of ColumnFamily for which {@link ColumnDefinition}s are to be imported
+   * @param colFamilyFilter ColumnFamily for which {@link ColumnDefinition}s are to be imported
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
     */
-  public void importColumnDefinitions(TableName tableName, byte[] colFamily, File sourceHsaFile)
+  public void importColumnDefinitions(
+          File sourceHsaFile, TableName tableNameFilter, byte[] colFamilyFilter)
           throws IOException, JAXBException {
-    repository.importSchema(
-            false, true, tableName.getNamespaceAsString(), tableName, colFamily, sourceHsaFile);
+    repository.importSchema(sourceHsaFile, tableNameFilter.getNamespaceAsString(),
+            tableNameFilter, colFamilyFilter, false, true);
   }
 
   /**
@@ -735,12 +737,12 @@ public class RepositoryAdmin {
    * <br><br>*An HSA file adheres to the XML Schema layout in
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param sourceFile source file
+   * @param sourceHsaFile source HBaseSchemaArchive file
    * @return A String containing a summary report suitable for printing/viewing.
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
-  public static String generateHsaFileSummary(File sourceFile) throws JAXBException {
-    return HBaseSchemaArchive.getSummaryReport(sourceFile);
+  public static String generateHsaFileSummary(File sourceHsaFile) throws JAXBException {
+    return HBaseSchemaArchive.getSummaryReport(sourceHsaFile);
   }
 
   /**
@@ -760,10 +762,10 @@ public class RepositoryAdmin {
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean generateReportOnInvalidColumnQualifiers(TableName tableName, File targetFile,
+  public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
           boolean verbose, boolean useMapreduce) throws IOException {
     return generateReportOnInvalidColumnQualifiers(
-            tableName, null, targetFile, verbose, useMapreduce);
+            targetFile, tableName, null, verbose, useMapreduce);
   }
 
   /**
@@ -784,8 +786,8 @@ public class RepositoryAdmin {
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean generateReportOnInvalidColumnQualifiers(TableName tableName, byte[] colFamily,
-          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+  public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
+          byte[] colFamily, boolean verbose, boolean useMapreduce) throws IOException {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
@@ -808,10 +810,10 @@ public class RepositoryAdmin {
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean generateReportOnInvalidColumnLengths(TableName tableName, File targetFile,
+  public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
           boolean verbose, boolean useMapreduce) throws IOException {
     return generateReportOnInvalidColumnLengths(
-            tableName, null, targetFile, verbose, useMapreduce);
+            targetFile, tableName, null, verbose, useMapreduce);
   }
 
   /**
@@ -834,8 +836,8 @@ public class RepositoryAdmin {
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean generateReportOnInvalidColumnLengths(TableName tableName, byte[] colFamily,
-          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+  public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
+          byte[] colFamily, boolean verbose, boolean useMapreduce) throws IOException {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
@@ -859,10 +861,9 @@ public class RepositoryAdmin {
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean generateReportOnInvalidColumnValues(TableName tableName, File targetFile,
+  public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
           boolean verbose, boolean useMapreduce) throws IOException {
-    return generateReportOnInvalidColumnValues(
-            tableName, null, targetFile, verbose, useMapreduce);
+    return generateReportOnInvalidColumnValues(targetFile, tableName, null, verbose, useMapreduce);
   }
 
   /**
@@ -885,8 +886,8 @@ public class RepositoryAdmin {
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    */
-  public boolean generateReportOnInvalidColumnValues(TableName tableName, byte[] colFamily,
-          File targetFile, boolean verbose, boolean useMapreduce) throws IOException {
+  public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
+          byte[] colFamily, boolean verbose, boolean useMapreduce) throws IOException {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }

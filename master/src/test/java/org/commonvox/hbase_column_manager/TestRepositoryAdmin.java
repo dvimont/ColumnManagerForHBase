@@ -25,6 +25,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -863,21 +864,21 @@ public class TestRepositoryAdmin {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.exportSchema(exportAllFile, true);
       repositoryAdmin.exportSchema(
-              TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX), exportNamespaceFile, true);
+              exportNamespaceFile, TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX), true);
       try {
         repositoryAdmin.exportSchema(
-                TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX), exportInvalidNamespaceFile, true);
+                exportInvalidNamespaceFile, TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX), true);
         fail(TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
-      repositoryAdmin.exportSchema(NAMESPACE01_TABLE01, exportTableFile, true);
+      repositoryAdmin.exportSchema(exportTableFile, NAMESPACE01_TABLE01, true);
     }
     clearTestingEnvironment();
 
     // NOW restore full schema from external HSA file and verify that all structures restored
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.importSchema(true, exportAllFile);
+      repositoryAdmin.importSchema(exportAllFile, true);
     }
     verifyColumnAuditing(configuration);
 
@@ -947,7 +948,7 @@ public class TestRepositoryAdmin {
 
   /**
    * First, create fully populated repository, and export all metadata to HSA file.
-   * Use HSA file as basis for various #importColumnDefinition runs and verify results.
+   * Then, use HSA file as basis for various #importColumnDefinition runs and verify results.
    *
    * @throws IOException
    * @throws JAXBException
@@ -967,13 +968,13 @@ public class TestRepositoryAdmin {
             = "temp.export.repository.colfamily.compare.hsa.xml";
     File exportAllFile;
     File exportAllComparisonFile;
-    File exportNamespaceColDefsComparisonFile;
+    File exportNamespaceImportedColDefsFile;
     File exportTableColDefsComparisonFile;
     File exportColFamilyColDefsComparisonFile;
     try {
       exportAllFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_FILE);
       exportAllComparisonFile = tempTestFolder.newFile(TARGET_EXPORT_ALL_COMPARISON_FILE);
-      exportNamespaceColDefsComparisonFile
+      exportNamespaceImportedColDefsFile
                = tempTestFolder.newFile(TARGET_EXPORT_NAMESPACE_COMPARISON_FILE);
       exportTableColDefsComparisonFile
                = tempTestFolder.newFile(TARGET_EXPORT_TABLE_COMPARISON_FILE);
@@ -982,7 +983,7 @@ public class TestRepositoryAdmin {
     } catch (IllegalStateException e) { // standalone (non-JUnit) execution
       exportAllFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_FILE);
       exportAllComparisonFile = new File(TARGET_DIRECTORY + TARGET_EXPORT_ALL_COMPARISON_FILE);
-      exportNamespaceColDefsComparisonFile
+      exportNamespaceImportedColDefsFile
               = new File(TARGET_DIRECTORY + TARGET_EXPORT_NAMESPACE_COMPARISON_FILE);
       exportTableColDefsComparisonFile
               = new File(TARGET_DIRECTORY + TARGET_EXPORT_TABLE_COMPARISON_FILE);
@@ -1016,7 +1017,7 @@ public class TestRepositoryAdmin {
       repositoryAdmin.exportSchema(exportAllComparisonFile, false);
     }
     // both export files should be identical, except for timestamp attribute
-    final String TIMESTAMP_ATTR_REGEX = "fileTimestamp=\".......................?\"";
+    final String TIMESTAMP_ATTR_REGEX = "fileTimestamp=\".....................?.?.?\"";
     String originalHsaXmlContent = new String(Files.readAllBytes(exportAllFile.toPath()))
             .replaceFirst(TIMESTAMP_ATTR_REGEX, "");
     String comparisonHsaXmlContent = new String(Files.readAllBytes(exportAllComparisonFile.toPath()))
@@ -1024,6 +1025,11 @@ public class TestRepositoryAdmin {
     assertEquals(IMPORT_COLDEFINITIONS_FAILURE
             + "Import of ALL ColumnDefinitions failed to produce expected results",
             originalHsaXmlContent, comparisonHsaXmlContent);
+    // alternate comparison assures HBaseSchemaArchive#equals and SchemaEntity#equals working OK
+    assertEquals(IMPORT_COLDEFINITIONS_FAILURE
+            + "Import of ALL ColumnDefinitions failed to produce expected results",
+            HBaseSchemaArchive.deserializeXmlFile(exportAllFile),
+            HBaseSchemaArchive.deserializeXmlFile(exportAllComparisonFile));
 
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
@@ -1032,10 +1038,66 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.importColumnDefinitions(NAMESPACE01, exportAllFile);
-      repositoryAdmin.exportSchema(exportNamespaceColDefsComparisonFile, false);
+      repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01);
+      repositoryAdmin.exportSchema(exportNamespaceImportedColDefsFile, false);
     }
-    // comparison logic here!!
+    // assure that only specified namespace (i.e. NAMESPACE01) has ColumnDefinitions
+    Set<SchemaEntity> completeSchemaEntitySet
+            = HBaseSchemaArchive.deserializeXmlFile(exportAllFile).getSchemaEntities();
+    Set<SchemaEntity> namespaceColDefSchemaEntitySet
+            = HBaseSchemaArchive.deserializeXmlFile(
+                    exportNamespaceImportedColDefsFile).getSchemaEntities();
+    for (SchemaEntity namespaceColDefEntity : namespaceColDefSchemaEntitySet) {
+      if (namespaceColDefEntity.getNameAsString().equals(NAMESPACE01)) {
+        assertTrue(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                + "ColumnDefinitions failed to produce expected results",
+                completeSchemaEntitySet.contains(namespaceColDefEntity));
+      } else {
+        // other namespace should be identical to base EXCEPT should NOT contain ColumnDefinitions
+        for (SchemaEntity baseNamespaceEntity : completeSchemaEntitySet) {
+          if (baseNamespaceEntity.getNameAsString().equals(
+                  namespaceColDefEntity.getNameAsString())) {
+            Set<Object> baseNamespaceDescriptorSet
+                    = SchemaEntity.convertToNamespaceAndTableDescriptorSet(baseNamespaceEntity,
+                            null, null, null);
+            Set<Object> namespaceColDefDescriptorSet
+                    = SchemaEntity.convertToNamespaceAndTableDescriptorSet(namespaceColDefEntity,
+                            null, null, null);
+            assertEquals(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                    + "ColumnDefinitions failed to produce expected DescriptorSet size",
+                    baseNamespaceDescriptorSet.size(), namespaceColDefDescriptorSet.size());
+            Iterator<Object> baseNamespaceDescriptorIterator
+                    = baseNamespaceDescriptorSet.iterator();
+            Iterator<Object> namespaceColDefDescriptorIterator
+                    = namespaceColDefDescriptorSet.iterator();
+            while (baseNamespaceDescriptorIterator.hasNext()) {
+              Object baseNamespaceDescriptorObject = baseNamespaceDescriptorIterator.next();
+              Object namespaceColDefDescriptorObject = namespaceColDefDescriptorIterator.next();
+              if (MNamespaceDescriptor.class.isAssignableFrom(
+                      baseNamespaceDescriptorObject.getClass())) {
+                assertEquals(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                        + "ColumnDefinitions failed to produce expected Namespace object",
+                        baseNamespaceDescriptorObject, namespaceColDefDescriptorObject);
+              } else if (MTableDescriptor.class.isAssignableFrom(
+                      baseNamespaceDescriptorObject.getClass())) {
+                assertEquals(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                        + "ColumnDefinitions failed to produce expected Table object",
+                        baseNamespaceDescriptorObject, namespaceColDefDescriptorObject);
+                MTableDescriptor baseTable = (MTableDescriptor)baseNamespaceDescriptorObject;
+                MTableDescriptor tableWithoutColDefinitions
+                        = (MTableDescriptor)namespaceColDefDescriptorObject;
+                if (baseTable.hasColumnDefinitions()) {
+                  assertTrue(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                          + "ColumnDefinitions failed to produce expected ColumnDefinition content",
+                          !tableWithoutColDefinitions.hasColumnDefinitions());
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
 
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
@@ -1044,10 +1106,29 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.importColumnDefinitions(NAMESPACE03_TABLE03, exportAllFile);
+      repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE03_TABLE03);
       repositoryAdmin.exportSchema(exportTableColDefsComparisonFile, false);
     }
-    // comparison logic here!!
+    // assure that only specified Table (i.e. NAMESPACE03_TABLE03) has ColumnDefinitions
+    Set<SchemaEntity> tableColDefSchemaEntitySet
+            = HBaseSchemaArchive.deserializeXmlFile(
+                    exportTableColDefsComparisonFile).getSchemaEntities();
+    for (SchemaEntity tableColDefEntity : tableColDefSchemaEntitySet) {
+      Set<Object> tableColDefDescriptorSet
+              = SchemaEntity.convertToNamespaceAndTableDescriptorSet(tableColDefEntity,
+                      null, null, null);
+      for (Object descriptorObject : tableColDefDescriptorSet) {
+        if (MTableDescriptor.class.isAssignableFrom(descriptorObject.getClass())) {
+          MTableDescriptor mTableDescriptor = (MTableDescriptor)descriptorObject;
+          assertTrue(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                  + "ColumnDefinitions failed to produce expected ColumnDefinition content "
+                  + "for table " + mTableDescriptor.getTableName().getNameAsString(),
+                  (mTableDescriptor.getTableName().equals(NAMESPACE03_TABLE03)) ?
+                          mTableDescriptor.hasColumnDefinitions()
+                          : !mTableDescriptor.hasColumnDefinitions());
+        }
+      }
+    }
 
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
@@ -1056,11 +1137,33 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.importColumnDefinitions(NAMESPACE01_TABLE01, CF01, exportAllFile);
+      repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.exportSchema(exportColFamilyColDefsComparisonFile, false);
     }
-    // comparison logic here!!
-    String testItOut = RepositoryAdmin.generateHsaFileSummary(exportAllFile);
+    // assure that only specified ColFamily (i.e. NAMESPACE01_TABLE01, CF01) has ColumnDefinitions
+    Set<SchemaEntity> colFamilyColDefSchemaEntitySet
+            = HBaseSchemaArchive.deserializeXmlFile(
+                    exportColFamilyColDefsComparisonFile).getSchemaEntities();
+    for (SchemaEntity colFamilyColDefEntity : colFamilyColDefSchemaEntitySet) {
+      Set<Object> colFamilyColDefDescriptorSet
+              = SchemaEntity.convertToNamespaceAndTableDescriptorSet(colFamilyColDefEntity,
+                      null, null, null);
+      for (Object descriptorObject : colFamilyColDefDescriptorSet) {
+        if (MTableDescriptor.class.isAssignableFrom(descriptorObject.getClass())) {
+          MTableDescriptor mTableDescriptor = (MTableDescriptor)descriptorObject;
+          for (MColumnDescriptor mColumnDescriptor : mTableDescriptor.getMColumnDescriptors()) {
+            assertTrue(IMPORT_COLDEFINITIONS_FAILURE + "Import of Namespace-specific "
+                    + "ColumnDefinitions failed to produce expected ColumnDefinition content "
+                    + "for table " + mTableDescriptor.getTableName().getNameAsString()
+                    + " colFamily " + mColumnDescriptor.getNameAsString(),
+                    (mTableDescriptor.getTableName().equals(NAMESPACE01_TABLE01)
+                            && Bytes.equals(mColumnDescriptor.getName(), CF01)) ?
+                            !mColumnDescriptor.getColumnDefinitions().isEmpty()
+                            : mColumnDescriptor.getColumnDefinitions().isEmpty());
+          }
+        }
+      }
+    }
 
     clearTestingEnvironment();
     System.out.println("#testImportColumnDefinitions has run to completion.");
@@ -1578,25 +1681,25 @@ public class TestRepositoryAdmin {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));
+                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE01_TABLE01, fileForVerboseTable01, true, false));
+                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE01_TABLE01, CF01, fileForSummaryTable01Cf01, false, false));
+                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE01_TABLE01, CF01, fileForVerboseTable01Cf01, true, false));
+                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE01_TABLE01, CF02, fileForSummaryTable01Cf02, false, false));
+                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE01_TABLE01, CF02, fileForVerboseTable01Cf02, true, false));
+                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, false));
       try {
         repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE02_TABLE03, fileForSummaryOfEmptyTable, false, false);
+                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, false);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
@@ -1982,25 +2085,25 @@ public class TestRepositoryAdmin {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));
+                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE01_TABLE01, fileForVerboseTable01, true, false));
+                      fileForVerboseTable01,NAMESPACE01_TABLE01,  true, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE01_TABLE01, CF01, fileForSummaryTable01Cf01, false, false));
+                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE01_TABLE01, CF01, fileForVerboseTable01Cf01, true, false));
+                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, false));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE01_TABLE01, CF02, fileForSummaryTable01Cf02, false, false));
+                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, false));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE01_TABLE01, CF02, fileForVerboseTable01Cf02, true, false));
+                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, false));
       try {
         repositoryAdmin.generateReportOnInvalidColumnLengths(
-                      NAMESPACE02_TABLE03, fileForSummaryOfEmptyTable, false, false);
+                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, false);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
@@ -2208,25 +2311,25 @@ public class TestRepositoryAdmin {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnValues(
-                      NAMESPACE01_TABLE01, fileForSummaryTable01, false, false));
+                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnValues(
-                      NAMESPACE01_TABLE01, fileForVerboseTable01, true, false));
+                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, false));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.generateReportOnInvalidColumnValues(
-                      NAMESPACE01_TABLE01, CF01, fileForSummaryTable01Cf01, false, false));
+                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, false));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.generateReportOnInvalidColumnValues(
-                      NAMESPACE01_TABLE01, CF01, fileForVerboseTable01Cf01, true, false));
+                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnValues(
-                      NAMESPACE01_TABLE01, CF02, fileForSummaryTable01Cf02, false, false));
+                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, false));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.generateReportOnInvalidColumnValues(
-                      NAMESPACE01_TABLE01, CF02, fileForVerboseTable01Cf02, true, false));
+                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, false));
       try {
         repositoryAdmin.generateReportOnInvalidColumnQualifiers(
-                      NAMESPACE02_TABLE03, fileForSummaryOfEmptyTable, false, false);
+                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, false);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }

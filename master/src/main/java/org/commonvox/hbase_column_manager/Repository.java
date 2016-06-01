@@ -1706,46 +1706,47 @@ class Repository {
     logger.info("EXPORT of ColumnManager repository schema has been completed.");
   }
 
-  void importSchema(boolean includeColumnAuditors, boolean bypassNamespacesTablesAndCFs,
-          String namespaceName, TableName tableName, byte[] colFamily, File sourceFile)
+  void importSchema(File sourceHsaFile, String namespaceFilter, TableName tableNameFilter,
+          byte[] colFamilyFilter, boolean includeColumnAuditors,
+          boolean bypassNamespacesTablesAndCFs)
           throws IOException, JAXBException {
-    validateNamespaceTableNameIncludedForProcessing(namespaceName, tableName);
-    submitImportMessagesToLogger(includeColumnAuditors, bypassNamespacesTablesAndCFs,
-            namespaceName, tableName, colFamily, sourceFile);
+    validateNamespaceTableNameIncludedForProcessing(namespaceFilter, tableNameFilter);
+    submitImportMessagesToLogger(sourceHsaFile, namespaceFilter, tableNameFilter,
+            colFamilyFilter, includeColumnAuditors, bypassNamespacesTablesAndCFs);
 
     Set<Object> importedDescriptors =  new LinkedHashSet<>();
     for (SchemaEntity entity :
-            HBaseSchemaArchive.deserializeXmlFile(sourceFile).getSchemaEntities()) {
-      importedDescriptors.addAll(convertSchemaEntityToDescriptorSet(
-              entity, includeColumnAuditors, namespaceName, tableName, colFamily));
+            HBaseSchemaArchive.deserializeXmlFile(sourceHsaFile).getSchemaEntities()) {
+      importedDescriptors.addAll(SchemaEntity.convertToNamespaceAndTableDescriptorSet(
+              entity, namespaceFilter, tableNameFilter, colFamilyFilter));
     }
-    createImportedStructures(
-            includeColumnAuditors, bypassNamespacesTablesAndCFs, importedDescriptors);
+    createImportedStructures(importedDescriptors,
+            includeColumnAuditors, bypassNamespacesTablesAndCFs);
   }
 
-  private void submitImportMessagesToLogger(boolean includeColumnAuditors,
-          boolean bypassNamespacesTablesAndCFs,
-          String namespaceName, TableName tableName, byte[] colFamily, File sourceFile) {
+  private void submitImportMessagesToLogger(File sourceHsaFile, String namespaceFilter,
+          TableName tableNameFilter, byte[] colFamilyFilter, boolean includeColumnAuditors,
+          boolean bypassNamespacesTablesAndCFs) {
     logger.info("IMPORT of "
             + ((bypassNamespacesTablesAndCFs) ? "<COLUMN DEFINITION> " : "")
             + "schema "
             + ((includeColumnAuditors) ? "<INCLUDING COLUMN AUDITOR METADATA> " : "")
             + "from external HBaseSchemaArchive (XML) file has been requested.");
-    if (namespaceName != null && !namespaceName.isEmpty()
-            && (tableName == null || tableName.getNameAsString().isEmpty())) {
-      logger.info("IMPORT NAMESPACE: " + namespaceName);
+    if (namespaceFilter != null && !namespaceFilter.isEmpty()
+            && (tableNameFilter == null || tableNameFilter.getNameAsString().isEmpty())) {
+      logger.info("IMPORT NAMESPACE: " + namespaceFilter);
     }
-    if (tableName != null && !tableName.getNameAsString().isEmpty()) {
-      logger.info("IMPORT TABLE: " + tableName.getNameAsString());
+    if (tableNameFilter != null && !tableNameFilter.getNameAsString().isEmpty()) {
+      logger.info("IMPORT TABLE: " + tableNameFilter.getNameAsString());
     }
-    if (colFamily != null && colFamily.length > 0) {
-      logger.info("IMPORT COLUMN FAMILY: " + Bytes.toString(colFamily));
+    if (colFamilyFilter != null && colFamilyFilter.length > 0) {
+      logger.info("IMPORT COLUMN FAMILY: " + Bytes.toString(colFamilyFilter));
     }
-    logger.info("IMPORT source PATH/FILE-NAME: " + sourceFile.getAbsolutePath());
+    logger.info("IMPORT source PATH/FILE-NAME: " + sourceHsaFile.getAbsolutePath());
   }
 
-  private void createImportedStructures(boolean includeColumnAuditors,
-          boolean bypassNamespacesTablesAndCFs, Set<Object> importedDescriptors)
+  private void createImportedStructures(Set<Object> importedDescriptors,
+          boolean includeColumnAuditors, boolean bypassNamespacesTablesAndCFs)
           throws IOException {
     for (Object descriptor : importedDescriptors) {
       if (MNamespaceDescriptor.class.isAssignableFrom(descriptor.getClass())) {
@@ -1780,63 +1781,63 @@ class Repository {
     }
   }
 
-  /**
-   * Used exclusively in the deserialization of an HBaseSchemaArchive
-   */
-  private Set<Object> convertSchemaEntityToDescriptorSet(
-          SchemaEntity entity, boolean includeColumnAuditors,
-          String namespace, TableName tableName, byte[] colFamily) {
-    Set<Object> convertedObjects = new LinkedHashSet<>();
-    if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
-      if (namespace != null && !namespace.equals(entity.getNameAsString())) {
-        return convertedObjects; // empty set
-      }
-      convertedObjects.add(new MNamespaceDescriptor(entity));
-      for (SchemaEntity childEntity : entity.getChildren()) {
-        convertedObjects.addAll(convertSchemaEntityToDescriptorSet(
-                childEntity, includeColumnAuditors, namespace, tableName, colFamily));
-      }
-    } else if (entity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
-      if (tableName != null && !tableName.getNameAsString().equals(entity.getNameAsString())) {
-        return convertedObjects; // empty set
-      }
-      MTableDescriptor mtd = new MTableDescriptor(entity);
-      if (entity.getChildren() != null) {
-        for (SchemaEntity childEntity : entity.getChildren()) {
-          if (childEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
-            continue;
-          }
-          Set<Object> returnedMcdSet
-                  = convertSchemaEntityToDescriptorSet(
-                          childEntity, includeColumnAuditors, namespace, tableName, colFamily);
-          for (Object returnedMcd : returnedMcdSet) {
-            mtd.addFamily((MColumnDescriptor) returnedMcd);
-          }
-        }
-      }
-      convertedObjects.add(mtd);
-    } else if (entity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
-      if (colFamily != null && !Bytes.toString(colFamily).equals(entity.getNameAsString())) {
-        return convertedObjects; // empty set
-      }
-      MColumnDescriptor mcd = new MColumnDescriptor(entity);
-      if (entity.getChildren() != null) {
-        for (SchemaEntity childEntity : entity.getChildren()) {
-          if (childEntity.getEntityRecordType()
-                  == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
-            if (includeColumnAuditors) {
-              mcd.addColumnAuditor(new ColumnAuditor(childEntity));
-            }
-          } else if (childEntity.getEntityRecordType()
-                  == SchemaEntityType.COLUMN_DEFINITION.getRecordType()) {
-            mcd.addColumnDefinition(new ColumnDefinition(childEntity));
-          }
-        }
-      }
-      convertedObjects.add(mcd);
-    }
-    return convertedObjects;
-  }
+//  /**
+//   * Used exclusively in the deserialization of an HBaseSchemaArchive
+//   */
+//  private Set<Object> convertSchemaEntityToDescriptorSet(
+//          SchemaEntity entity, boolean includeColumnAuditors,
+//          String namespace, TableName tableName, byte[] colFamily) {
+//    Set<Object> convertedObjects = new LinkedHashSet<>();
+//    if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
+//      if (namespace != null && !namespace.equals(entity.getNameAsString())) {
+//        return convertedObjects; // empty set
+//      }
+//      convertedObjects.add(new MNamespaceDescriptor(entity));
+//      for (SchemaEntity childEntity : entity.getChildren()) {
+//        convertedObjects.addAll(convertSchemaEntityToDescriptorSet(
+//                childEntity, includeColumnAuditors, namespace, tableName, colFamily));
+//      }
+//    } else if (entity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
+//      if (tableName != null && !tableName.getNameAsString().equals(entity.getNameAsString())) {
+//        return convertedObjects; // empty set
+//      }
+//      MTableDescriptor mtd = new MTableDescriptor(entity);
+//      if (entity.getChildren() != null) {
+//        for (SchemaEntity childEntity : entity.getChildren()) {
+//          if (childEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+//            continue;
+//          }
+//          Set<Object> returnedMcdSet
+//                  = convertSchemaEntityToDescriptorSet(
+//                          childEntity, includeColumnAuditors, namespace, tableName, colFamily);
+//          for (Object returnedMcd : returnedMcdSet) {
+//            mtd.addFamily((MColumnDescriptor) returnedMcd);
+//          }
+//        }
+//      }
+//      convertedObjects.add(mtd);
+//    } else if (entity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+//      if (colFamily != null && !Bytes.toString(colFamily).equals(entity.getNameAsString())) {
+//        return convertedObjects; // empty set
+//      }
+//      MColumnDescriptor mcd = new MColumnDescriptor(entity);
+//      if (entity.getChildren() != null) {
+//        for (SchemaEntity childEntity : entity.getChildren()) {
+//          if (childEntity.getEntityRecordType()
+//                  == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
+//            if (includeColumnAuditors) {
+//              mcd.addColumnAuditor(new ColumnAuditor(childEntity));
+//            }
+//          } else if (childEntity.getEntityRecordType()
+//                  == SchemaEntityType.COLUMN_DEFINITION.getRecordType()) {
+//            mcd.addColumnDefinition(new ColumnDefinition(childEntity));
+//          }
+//        }
+//      }
+//      convertedObjects.add(mcd);
+//    }
+//    return convertedObjects;
+//  }
 
   void dumpRepositoryTable() throws IOException {
     logger.info("DUMP of ColumnManager repository table has been requested.");

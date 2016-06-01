@@ -18,7 +18,9 @@ package org.commonvox.hbase_column_manager;
 
 import java.io.File;
 import java.sql.Timestamp;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -47,8 +49,8 @@ class HBaseSchemaArchive {
   private final String fileTimestamp;
   @XmlElement(name = "hBaseSchemaEntity")
   private final Set<SchemaEntity> hBaseSchemaEntities = new LinkedHashSet<>();
-  @XmlTransient
-  private final String ROOT_ELEMENT = "hBaseSchemaArchive";
+//  @XmlTransient
+//  private final String ROOT_ELEMENT = "hBaseSchemaArchive";
 
   HBaseSchemaArchive() {
     this.fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
@@ -70,28 +72,28 @@ class HBaseSchemaArchive {
     return fileTimestamp;
   }
 
-  static void exportToXmlFile(HBaseSchemaArchive archiveSet, File targetFile, boolean formatted)
+  static void exportToXmlFile(HBaseSchemaArchive hsa, File targetFile, boolean formatted)
           throws JAXBException {
     Marshaller marshaller
             = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
     if (formatted) {
       marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
     }
-    marshaller.marshal(archiveSet, targetFile);
+    marshaller.marshal(hsa, targetFile);
   }
 
-  static HBaseSchemaArchive deserializeXmlFile(File sourceFile)
+  static HBaseSchemaArchive deserializeXmlFile(File sourceHsaFile)
           throws JAXBException {
     return (HBaseSchemaArchive)JAXBContext.newInstance(HBaseSchemaArchive.class)
-                    .createUnmarshaller().unmarshal(sourceFile);
+                    .createUnmarshaller().unmarshal(sourceHsaFile);
   }
 
-  static String getSummaryReport(File sourceFile) throws JAXBException {
-    HBaseSchemaArchive schemaArchive = HBaseSchemaArchive.deserializeXmlFile(sourceFile);
+  static String getSummaryReport(File sourceHsaFile) throws JAXBException {
+    HBaseSchemaArchive schemaArchive = HBaseSchemaArchive.deserializeXmlFile(sourceHsaFile);
     StringBuilder stringBuilder = new StringBuilder();
     stringBuilder.append("SUMMARY OF external HBase Schema Archive file*\n")
             .append(BLANKS, 0, TAB).append("SOURCE FILE: ")
-            .append(sourceFile.getAbsolutePath()).append("\n")
+            .append(sourceHsaFile.getAbsolutePath()).append("\n")
             .append(BLANKS, 0, TAB).append("FILE TIMESTAMP: ")
             .append(schemaArchive.getArchiveFileTimestampString()).append("\n")
             .append(BLANKS, 0, TAB).append("FILE CONTENTS:\n");
@@ -112,5 +114,26 @@ class HBaseSchemaArchive {
       }
     }
     return stringBuilder;
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (other == null) {
+      return false;
+    }
+    if (!(other instanceof HBaseSchemaArchive)) {
+      return false;
+    }
+    return this.hBaseSchemaEntities.equals(((HBaseSchemaArchive)other).hBaseSchemaEntities);
+  }
+
+  @Override
+  public int hashCode() {
+    int hash = 7;
+    hash = 97 * hash + Objects.hashCode(this.hBaseSchemaEntities);
+    return hash;
   }
 }

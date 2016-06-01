@@ -26,7 +26,8 @@ import org.apache.hadoop.hbase.security.User;
 
 /**
  * The <b>MConnectionFactory</b> provides exactly the same static methods as those provided by the
- * standard HBase {@code ConnectionFactory}, but a {@code Connection} object
+ * standard HBase {@link org.apache.hadoop.hbase.client.ConnectionFactory ConnectionFactory},
+ * but a {@code Connection} object
  * {@link #createConnection() created} by the {@code MConnectionFactory} generates special
  * {@code Admin}, {@code Table}, and {@code BufferedMutator} objects which, in addition to providing
  * all standard HBase API functionality, also: (a) transparently interface with the ColumnManager

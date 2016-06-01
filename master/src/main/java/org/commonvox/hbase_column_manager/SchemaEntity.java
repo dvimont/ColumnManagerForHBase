@@ -18,8 +18,10 @@ package org.commonvox.hbase_column_manager;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.xml.bind.annotation.XmlAccessType;
@@ -29,6 +31,7 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
+import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -74,9 +77,9 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     shallowClone(namespaceDescriptor);
   }
 
-  SchemaEntity(SchemaEntity metadataEntity) {
-    this(metadataEntity.getEntityRecordType(), metadataEntity.getName());
-    shallowClone(metadataEntity);
+  SchemaEntity(SchemaEntity schemaEntity) {
+    this(schemaEntity.getEntityRecordType(), schemaEntity.getName());
+    shallowClone(schemaEntity);
   }
 
   private void shallowClone(SchemaEntity entity) {
@@ -278,6 +281,65 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     return children;
   }
 
+  /**
+   * Contents of returned Set are MNamespaceDescriptor objects and MTableDescriptor objects; note
+   * that MTableDescriptor objects contain MColumnDescriptor objects, which in turn contain
+   * ColumnAuditor objects and ColumnDefinition objects.
+   */
+  static Set<Object> convertToNamespaceAndTableDescriptorSet(SchemaEntity entity,
+          String namespaceFilter, TableName tableNameFilter, byte[] colFamilyFilter) {
+    Set<Object> convertedObjects = new LinkedHashSet<>();
+    if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
+      if (namespaceFilter != null && !namespaceFilter.equals(entity.getNameAsString())) {
+        return convertedObjects; // empty set
+      }
+      convertedObjects.add(new MNamespaceDescriptor(entity));
+      for (SchemaEntity childEntity : entity.getChildren()) {
+        convertedObjects.addAll(convertToNamespaceAndTableDescriptorSet(
+                childEntity, namespaceFilter, tableNameFilter, colFamilyFilter));
+      }
+    } else if (entity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
+      if (tableNameFilter != null
+              && !tableNameFilter.getNameAsString().equals(entity.getNameAsString())) {
+        return convertedObjects; // empty set
+      }
+      MTableDescriptor mtd = new MTableDescriptor(entity);
+      if (entity.getChildren() != null) {
+        for (SchemaEntity childEntity : entity.getChildren()) {
+          if (childEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+            continue;
+          }
+          Set<Object> returnedMcdSet
+                  = convertToNamespaceAndTableDescriptorSet(
+                          childEntity, namespaceFilter, tableNameFilter, colFamilyFilter);
+          for (Object returnedMcd : returnedMcdSet) {
+            mtd.addFamily((MColumnDescriptor) returnedMcd);
+          }
+        }
+      }
+      convertedObjects.add(mtd);
+    } else if (entity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
+      if (colFamilyFilter != null && !Bytes.toString(colFamilyFilter).equals(entity.getNameAsString())) {
+        return convertedObjects; // empty set
+      }
+      MColumnDescriptor mcd = new MColumnDescriptor(entity);
+      if (entity.getChildren() != null) {
+        for (SchemaEntity childEntity : entity.getChildren()) {
+          if (childEntity.getEntityRecordType()
+                  == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
+            mcd.addColumnAuditor(new ColumnAuditor(childEntity));
+          } else if (childEntity.getEntityRecordType()
+                  == SchemaEntityType.COLUMN_DEFINITION.getRecordType()) {
+            mcd.addColumnDefinition(new ColumnDefinition(childEntity));
+          }
+        }
+      }
+      convertedObjects.add(mcd);
+    }
+    return convertedObjects;
+  }
+
+
   @Override
   public int compareTo(SchemaEntity other) {
     int result = this.schemaEntityType.compareTo(other.schemaEntityType);
@@ -329,6 +391,18 @@ class SchemaEntity implements Comparable<SchemaEntity> {
       return false;
     }
     return compareTo((SchemaEntity)obj) == 0;
+  }
+
+  @Override
+  public int hashCode() {
+    int hash = 3;
+    hash = 41 * hash + Objects.hashCode(this.schemaEntityType);
+    hash = 41 * hash + Objects.hashCode(this.name);
+    hash = 41 * hash + Objects.hashCode(this.columnDefinitionsEnforced);
+    hash = 41 * hash + Objects.hashCode(this.values);
+    hash = 41 * hash + Objects.hashCode(this.configurations);
+    hash = 41 * hash + Objects.hashCode(this.children);
+    return hash;
   }
 
   /**

@@ -86,8 +86,8 @@ class MColumnDescriptor extends HColumnDescriptor {
 
   /**
    * This constructor accessed during deserialization process (a row of column family type is read
- from repository table and deserialized into a SchemaEntity object, which is then passed to
- this constructor to complete the deserialization into an MColumnDescriptor object).
+   * from repository table and deserialized into a SchemaEntity object, which is then passed to
+   * this constructor to complete the deserialization into an MColumnDescriptor object).
    *
    * @param entity
    */
