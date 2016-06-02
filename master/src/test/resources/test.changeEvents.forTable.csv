@@ -1,6 +1,8 @@
-Timestamp,Java_Username,Entity_Type,Namespace,Table,Column_Family,Column_Qualifier,Attribute_Name,Attribute_Value
-1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__DURABILITY,SKIP_WAL
-1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__IS_META,false
-1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__MEMSTORE_FLUSHSIZE,60000000
-1462776113068,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,_Status,A
-1462776116850,userfalse,Table,testNamespace01,testNamespace01:testTable01,,,_Status,D
+# List of ChangeEvents in ColumnManagerAPI repository  -- Exported to CSV by ColumnManagerAPI:ChangeEventMonitor
+# Thu Jun 02 12:30:51 JST 2016
+TIMESTAMP,JAVA_USERNAME,ENTITY_TYPE,NAMESPACE,TABLE,COLUMN_FAMILY,COLUMN_QUALIFIER,ATTRIBUTE_NAME,ATTRIBUTE_VALUE
+1464838245111,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__DURABILITY,SKIP_WAL
+1464838245111,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__IS_META,false
+1464838245111,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,Value__MEMSTORE_FLUSHSIZE,60000000
+1464838245111,usertrue,Table,testNamespace01,testNamespace01:testTable01,,,_Status,A
+1464838250508,userfalse,Table,testNamespace01,testNamespace01:testTable01,,,_Status,D

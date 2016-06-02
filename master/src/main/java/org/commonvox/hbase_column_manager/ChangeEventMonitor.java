@@ -16,20 +16,22 @@
  */
 package org.commonvox.hbase_column_manager;
 
-import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -329,7 +331,7 @@ public class ChangeEventMonitor {
   private Set<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
           byte[] namespaceName, byte[] tableName,
           byte[] columnFamily, byte[] columnQualifier) {
-    
+
     ChangeEvent.Entity[] entityArray = entitySet.toArray(new ChangeEvent.Entity[entitySet.size()]);
 
     ChangeEvent.Entity namespaceEntity = new ChangeEvent.Entity(
@@ -393,6 +395,10 @@ public class ChangeEventMonitor {
     return changeEventsForEntity;
   }
 
+  enum ReportHeader {
+    TIMESTAMP, JAVA_USERNAME, ENTITY_TYPE, NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER,
+    ATTRIBUTE_NAME, ATTRIBUTE_VALUE }
+
   /**
    * Export the submitted list of ChangeEvent objects to a comma-separated-value (CSV) file, one
    * line per ChangeEvent, with the first line of the file consisting of column headers.
@@ -404,23 +410,27 @@ public class ChangeEventMonitor {
    */
   public static void exportChangeEventListToCsvFile(
           Collection<ChangeEvent> changeEvents, File targetFile) throws IOException {
-    try (BufferedWriter writer = Files.newBufferedWriter(targetFile.toPath(), ENCODING)) {
-      if (changeEvents == null || changeEvents.isEmpty()) {
+    CSVFormat csvFormat = CSVFormat.DEFAULT.withRecordSeparator("\n").withCommentMarker('#')
+            .withHeader(ReportHeader.class);
+    try (CSVPrinter csvPrinter = csvFormat.withHeaderComments(
+            "List of ChangeEvents in " + Repository.PRODUCT_NAME
+                    + " repository  -- Exported to CSV by " + Repository.PRODUCT_NAME + ":"
+                    + ChangeEventMonitor.class.getSimpleName(),
+            new Date()).print(new FileWriter(targetFile))) {
+      if (changeEvents == null) {
         return;
       }
-      writer.write(buildCommaDelimitedString(
-              "Timestamp", "Java_Username", "Entity_Type",
-              "Namespace", "Table", "Column_Family", "Column_Qualifier",
-              "Attribute_Name", "Attribute_Value"));
-      writer.newLine();
       for (ChangeEvent ce : changeEvents) {
-        writer.write(buildCommaDelimitedString(
-                ce.getTimestampAsString(), ce.getUserNameAsString(),
-                ce.getEntityType().toString(),
-                ce.getNamespaceAsString(), ce.getTableNameAsString(),
-                ce.getColumnFamilyAsString(), ce.getColumnQualifierAsString(),
-                ce.getAttributeNameAsString(), ce.getAttributeValueAsString()));
-        writer.newLine();
+        csvPrinter.print(ce.getTimestampAsString());
+        csvPrinter.print(ce.getUserNameAsString());
+        csvPrinter.print(ce.getEntityType().toString());
+        csvPrinter.print(ce.getNamespaceAsString());
+        csvPrinter.print(ce.getTableNameAsString());
+        csvPrinter.print(ce.getColumnFamilyAsString());
+        csvPrinter.print(ce.getColumnQualifierAsString());
+        csvPrinter.print(ce.getAttributeNameAsString());
+        csvPrinter.print(ce.getAttributeValueAsString());
+        csvPrinter.println();
       }
     }
   }

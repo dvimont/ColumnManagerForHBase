@@ -1,13 +1,15 @@
-Timestamp,Java_Username,Entity_Type,Namespace,Table,Column_Family,Column_Qualifier,Attribute_Name,Attribute_Value
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__BLOCKCACHE,true
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__BLOCKSIZE,65536
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__BLOOMFILTER,ROW
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__COMPRESSION,NONE
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__DATA_BLOCK_ENCODING,NONE
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__IN_MEMORY,false
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__KEEP_DELETED_CELLS,FALSE
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__MIN_VERSIONS,0
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__REPLICATION_SCOPE,0
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__TTL,2147483647
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__VERSIONS,11
-1462776113274,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,_Status,A
+# List of ChangeEvents in ColumnManagerAPI repository  -- Exported to CSV by ColumnManagerAPI:ChangeEventMonitor
+# Thu Jun 02 12:30:51 JST 2016
+TIMESTAMP,JAVA_USERNAME,ENTITY_TYPE,NAMESPACE,TABLE,COLUMN_FAMILY,COLUMN_QUALIFIER,ATTRIBUTE_NAME,ATTRIBUTE_VALUE
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__BLOCKCACHE,true
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__BLOCKSIZE,65536
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__BLOOMFILTER,ROW
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__COMPRESSION,NONE
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__DATA_BLOCK_ENCODING,NONE
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__IN_MEMORY,false
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__KEEP_DELETED_CELLS,FALSE
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__MIN_VERSIONS,0
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__REPLICATION_SCOPE,0
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__TTL,2147483647
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,Value__VERSIONS,11
+1464838245364,usertrue,ColumnFamily,testNamespace01,testNamespace01:testTable02,CF2,,_Status,A

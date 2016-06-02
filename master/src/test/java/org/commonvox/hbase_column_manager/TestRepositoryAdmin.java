@@ -1318,6 +1318,8 @@ public class TestRepositoryAdmin {
   private void compareResourceFileToExportedFile(String resourceFileString, File exportedFile,
           String methodName) throws IOException, URISyntaxException {
     Path resourcePath = Paths.get(ClassLoader.getSystemResource(resourceFileString).toURI());
+    assertEquals(CHANGE_EVENT_FAILURE + "unexpected item count from " + methodName + " method",
+            Files.lines(resourcePath).count(), Files.lines(exportedFile.toPath()).count());
     // NOTE: timestamps on sequential events can sometimes be equal (if processing is TOO quick!)
     // so reliable comparison requires stripping initial timestamp from each line and reordering
     // remainder via TreeSets, then doing comparison.
@@ -1325,12 +1327,13 @@ public class TestRepositoryAdmin {
     TreeSet<String> exportedLinesTruncated = new TreeSet<>();
     Iterator<String> resourceLinesIterator = Files.lines(resourcePath).iterator();
     Iterator<String> exportedLinesIterator = Files.lines(exportedFile.toPath()).iterator();
-    resourceLinesIterator.next(); // skip first header line in both files
-    exportedLinesIterator.next(); // skip first header line in both files
+    int skipCount = 0;
     while (resourceLinesIterator.hasNext()) {
-//      assertEquals(CHANGE_EVENT_FAILURE + "unexpected content returned by " + methodName,
-//              resourceLinesIterator.next().substring(14), // bypass timestamp at start of line
-//              exportedLinesIterator.next().substring(14)); // bypass timestamp at start of line
+      if (skipCount++ < 3) {
+        resourceLinesIterator.next(); // skip comment and header lines in both files
+        exportedLinesIterator.next(); // skip comment and header lines in both files
+        continue;
+      }
       resourceLinesTruncated.add(resourceLinesIterator.next().substring(14)); // strip timestamp
       exportedLinesTruncated.add(exportedLinesIterator.next().substring(14)); // strip timestamp
     }
@@ -1340,8 +1343,6 @@ public class TestRepositoryAdmin {
       assertEquals(CHANGE_EVENT_FAILURE + "unexpected content returned by " + methodName,
               resourceLinesTruncatedIterator.next(), exportedLinesTruncatedIterator.next());
     }
-    assertEquals(CHANGE_EVENT_FAILURE + "unexpected item count from " + methodName + " method",
-            Files.lines(resourcePath).count(), Files.lines(exportedFile.toPath()).count());
   }
 
   private void changeJavaUsername() {
@@ -2569,13 +2570,13 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
-    // new TestRepositoryAdmin().testChangeEventMonitor();
+    new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
-    new TestRepositoryAdmin().testImportColumnDefinitions();
+    // new TestRepositoryAdmin().testImportColumnDefinitions();
   }
 }

@@ -1,3 +1,5 @@
-Timestamp,Java_Username,Entity_Type,Namespace,Table,Column_Family,Column_Qualifier,Attribute_Name,Attribute_Value
-1462776115352,userfalse,ColumnAuditor,testNamespace01,testNamespace01:testTable01,CF1,column01,_Status,A
-1462776116865,userfalse,ColumnAuditor,testNamespace01,testNamespace01:testTable01,CF1,column01,_Status,D
+# List of ChangeEvents in ColumnManagerAPI repository  -- Exported to CSV by ColumnManagerAPI:ChangeEventMonitor
+# Thu Jun 02 12:30:51 JST 2016
+TIMESTAMP,JAVA_USERNAME,ENTITY_TYPE,NAMESPACE,TABLE,COLUMN_FAMILY,COLUMN_QUALIFIER,ATTRIBUTE_NAME,ATTRIBUTE_VALUE
+1464838248637,userfalse,ColumnAuditor,testNamespace01,testNamespace01:testTable01,CF1,column01,_Status,A
+1464838250563,userfalse,ColumnAuditor,testNamespace01,testNamespace01:testTable01,CF1,column01,_Status,D
