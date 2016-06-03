@@ -1578,6 +1578,26 @@ class Repository {
     }
   }
 
+  void discoverSchema(boolean includeColumnQualifiers) throws IOException {
+    for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
+      if (!isIncludedNamespace(nd.getName())) {
+        continue;
+      }
+      putNamespaceSchemaEntity(nd);
+      for (HTableDescriptor htd : standardAdmin.listTableDescriptorsByNamespace(nd.getName())) {
+        if (!isIncludedTable(htd.getTableName())
+                || standardAdmin.isTableDisabled(htd.getTableName())) {
+          continue;
+        }
+        discoverSchema(htd.getTableName(), includeColumnQualifiers);
+//        putTableSchemaEntity(htd);
+//        if (includeColumnQualifiers) {
+//          discoverColumnMetadata(htd.getTableName());
+//        }
+      }
+    }
+  }
+
   void discoverSchema(TableName tableName, boolean includeColumnQualifiers)
           throws IOException {
     if (!isIncludedTable(tableName)) {
@@ -1586,24 +1606,6 @@ class Repository {
     putTableSchemaEntity(standardAdmin.getTableDescriptor(tableName));
     if (includeColumnQualifiers) {
       discoverColumnMetadata(tableName);
-    }
-  }
-
-  void discoverSchema(boolean includeColumnQualifiers) throws IOException {
-    for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
-      if (!isIncludedNamespace(nd.getName())) {
-        continue;
-      }
-      putNamespaceSchemaEntity(nd);
-      for (HTableDescriptor htd : standardAdmin.listTableDescriptorsByNamespace(nd.getName())) {
-        if (!isIncludedTable(htd.getTableName())) {
-          continue;
-        }
-        putTableSchemaEntity(htd);
-      }
-    }
-    if (includeColumnQualifiers) {
-      discoverColumnMetadata();
     }
   }
 
@@ -1622,23 +1624,23 @@ class Repository {
     }
   }
 
-  private void discoverColumnMetadata() throws IOException {
-    for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
-      for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
-        if (!isIncludedTable(mtd.getTableName())) {
-          continue;
-        }
-        // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
-        Table table = hbaseConnection.getTable(mtd.getTableName());
-        try (ResultScanner rows
-                = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
-          for (Result row : rows) {
-            putColumnAuditorSchemaEntities(mtd, row, true);
-          }
-        }
-      }
-    }
-  }
+//  private void discoverColumnMetadata() throws IOException {
+//    for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
+//      for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
+//        if (!isIncludedTable(mtd.getTableName())) {
+//          continue;
+//        }
+//        // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
+//        Table table = hbaseConnection.getTable(mtd.getTableName());
+//        try (ResultScanner rows
+//                = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
+//          for (Result row : rows) {
+//            putColumnAuditorSchemaEntities(mtd, row, true);
+//          }
+//        }
+//      }
+//    }
+//  }
 
   private void validateNamespaceTableNameIncludedForProcessing(
           String namespace, TableName tableName)

@@ -156,5 +156,10 @@
       <artifactId>hbase-client</artifactId>
       <version>${hbaseVersion}</version>
     </dependency>
+    <dependency>
+        <groupId>org.apache.hbase</groupId>
+        <artifactId>hbase-server</artifactId>
+        <version>${hbaseVersion}</version>
+    </dependency>
   </dependencies>
 </project>

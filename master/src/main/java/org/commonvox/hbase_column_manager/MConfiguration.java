@@ -35,6 +35,8 @@ public class MConfiguration {
   public static Configuration create() {
     Configuration conf = HBaseConfiguration.create(); // get standard HBase configuration
     conf.addResource(MConnectionFactory.COLUMN_MANAGER_CONFIG_FILE); // column-manager conf
+    conf.setBoolean("mapreduce.map.speculative", false);
+    conf.setBoolean("mapreduce.reduce.speculative", false);
     return conf;
   }
 
@@ -47,8 +49,8 @@ public class MConfiguration {
    * resources, and ColumnManager resources.
    */
   public static Configuration create(Configuration addedConfiguration) {
-    Configuration conf = HBaseConfiguration.create(addedConfiguration);
-    conf.addResource(MConnectionFactory.COLUMN_MANAGER_CONFIG_FILE); // column-manager conf
+    Configuration conf = create();
+    conf.addResource(addedConfiguration);
     return conf;
   }
 }

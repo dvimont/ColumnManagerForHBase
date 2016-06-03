@@ -395,7 +395,7 @@ public class ChangeEventMonitor {
     return changeEventsForEntity;
   }
 
-  enum ReportHeader {
+  private enum ReportHeader {
     TIMESTAMP, JAVA_USERNAME, ENTITY_TYPE, NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER,
     ATTRIBUTE_NAME, ATTRIBUTE_VALUE }
 
