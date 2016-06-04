@@ -38,7 +38,7 @@ import org.apache.hadoop.util.ToolRunner;
  *
  * @author Daniel Vimont
  */
-public class ColumnDiscoveryTool extends Configured implements Tool  {
+class ColumnDiscoveryTool extends Configured implements Tool  {
 
   private static final Log LOG = LogFactory.getLog(ColumnDiscoveryTool.class);
   private static final String JOB_NAME_CONF_KEY = "mapreduce.job.name";
