@@ -58,6 +58,7 @@ import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 
 /**
@@ -747,13 +748,14 @@ class Repository {
   }
 
   /**
-   * Invoked as part of discovery process.
+   * Invoked as part of discovery process. This method also invoked directly from mapreduce
+   * discovery.
    *
    * @param mtd table descriptor for parent table of columns found in row
    * @param row Result object from which {@link ColumnAuditor} SchemaEntity is extracted
    * @throws IOException if a remote or network exception occurs
    */
-  private void putColumnAuditorSchemaEntities(
+  void putColumnAuditorSchemaEntities(
           MTableDescriptor mtd, Result row, boolean keyOnlyFilterUsed) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
@@ -1578,7 +1580,7 @@ class Repository {
     }
   }
 
-  void discoverSchema(boolean includeColumnQualifiers) throws IOException {
+  void discoverSchema(boolean includeColumnQualifiers, boolean useMapReduce) throws Exception {
     for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
@@ -1589,58 +1591,42 @@ class Repository {
                 || standardAdmin.isTableDisabled(htd.getTableName())) {
           continue;
         }
-        discoverSchema(htd.getTableName(), includeColumnQualifiers);
-//        putTableSchemaEntity(htd);
-//        if (includeColumnQualifiers) {
-//          discoverColumnMetadata(htd.getTableName());
-//        }
+        discoverSchema(htd.getTableName(), includeColumnQualifiers, useMapReduce);
       }
     }
   }
 
-  void discoverSchema(TableName tableName, boolean includeColumnQualifiers)
-          throws IOException {
+  void discoverSchema(TableName tableName, boolean includeColumnQualifiers, boolean useMapReduce)
+          throws Exception {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
     putTableSchemaEntity(standardAdmin.getTableDescriptor(tableName));
     if (includeColumnQualifiers) {
-      discoverColumnMetadata(tableName);
+      discoverColumnMetadata(tableName, useMapReduce);
     }
   }
 
-  private void discoverColumnMetadata(TableName tableName) throws IOException {
+  private void discoverColumnMetadata(TableName tableName, boolean useMapReduce) throws Exception {
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     if (mtd == null) {
       return;
     }
     // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
-    Table table = hbaseConnection.getTable(tableName);
-    try (ResultScanner rows
-            = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
-      for (Result row : rows) {
-        putColumnAuditorSchemaEntities(mtd, row, true);
+    if (useMapReduce) {
+      int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
+                new String[]{"--sourceTable=" + tableName.getNameAsString()});
+
+    } else {
+      Table table = hbaseConnection.getTable(tableName);
+      try (ResultScanner rows
+              = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
+        for (Result row : rows) {
+          putColumnAuditorSchemaEntities(mtd, row, true);
+        }
       }
     }
   }
-
-//  private void discoverColumnMetadata() throws IOException {
-//    for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
-//      for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
-//        if (!isIncludedTable(mtd.getTableName())) {
-//          continue;
-//        }
-//        // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
-//        Table table = hbaseConnection.getTable(mtd.getTableName());
-//        try (ResultScanner rows
-//                = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
-//          for (Result row : rows) {
-//            putColumnAuditorSchemaEntities(mtd, row, true);
-//          }
-//        }
-//      }
-//    }
-//  }
 
   private void validateNamespaceTableNameIncludedForProcessing(
           String namespace, TableName tableName)

@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
 
 /**
  * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities, as
- * well as schema metadata {@link #discoverSchema() discovery},
+ * well as schema metadata {@link #discoverSchema(boolean) discovery},
  * {@link #exportSchema(java.io.File, boolean) export}, and
  * {@link #importSchema(java.io.File, boolean) import}
  * facilities; it is used as a complement to the standard {@code Admin} interface, with an
@@ -483,10 +483,11 @@ public class RepositoryAdmin {
    * (performing full scan [with KeyOnlyFilter] of all <i>Table</i>s that are
    * <a href="package-summary.html#config">included in ColumnManager processing</a>).
    *
+   * @param useMapReduce if {@code true} discovery done via mapreduce
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverSchema() throws IOException {
-    repository.discoverSchema(true);
+  public void discoverSchema(boolean useMapReduce) throws Exception {
+    repository.discoverSchema(true, useMapReduce);
   }
 
   /**
@@ -500,10 +501,11 @@ public class RepositoryAdmin {
    * @param tableName <i>Table</i> for which schema metadata is to be discovered; submitted
    * <i>Table</i>
    * must be <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * @param useMapReduce if {@code true} discovery done via mapreduce
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverSchema(TableName tableName) throws IOException {
-    repository.discoverSchema(tableName, true);
+  public void discoverSchema(TableName tableName, boolean useMapReduce) throws Exception {
+    repository.discoverSchema(tableName, true, useMapReduce);
   }
 
   // make this method public if needs dictate

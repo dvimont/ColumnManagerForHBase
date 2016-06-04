@@ -31,7 +31,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
  * <a href="package-summary.html#config">ColumnManager-included</a> <i>Table</i>.
  * <br><br> **{@code ColumnAuditor} metadata may also be gathered for already-existing
  * <i>Column</i>s via the {@link RepositoryAdmin} method
- * {@link RepositoryAdmin#discoverSchema() discoverSchema}.
+ * {@link RepositoryAdmin#discoverSchema(boolean) discoverSchema}.
  */
 public class ColumnAuditor extends Column {
 
@@ -133,7 +133,7 @@ public class ColumnAuditor extends Column {
    * MaxValueLengthFound for a given column is incremented upward only when a value longer than that
    * of any previously submitted/discovered value is found (either in the context of real-time
    * metadata capture from a submitted Table {@code Mutation}, or in the process of
-   * {@link RepositoryAdmin#discoverSchema() schema discovery}). MaxValueLengthFound is never
+   * {@link RepositoryAdmin#discoverSchema(boolean) schema discovery}). MaxValueLengthFound is never
    * decremented, even when the longest value for the column is deleted from HBase, so the
    * MaxValueLengthFound actually represents the maximum length EVER recorded for the value of a
    * specific column, not necessarily the longest value CURRENTLY stored in HBase for the column.

@@ -19,9 +19,18 @@ import java.io.IOException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper.Context;
+import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -40,14 +49,22 @@ public class ColumnDiscoveryTool extends Configured implements Tool  {
     if (!parseArguments(args)) {
       return null;
     }
-
     Job job = Job.getInstance(getConf(),
             getConf().get(JOB_NAME_CONF_KEY, "columnDiscovery_for_table_" + sourceTableNameString));
     TableMapReduceUtil.addDependencyJars(job);
-
+    job.setJobName(sourceTableNameString); // pass tableName to Mapper via JobName
     Scan scan = new Scan();
     scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
     scan.setCacheBlocks(false);  // don't set to true for MapReduce jobs
+    scan.setFilter(new KeyOnlyFilter(true));
+    TableMapReduceUtil.initTableMapperJob(
+            sourceTableNameString,
+            scan,
+            ColumnDiscoveryMapper.class,
+            null,  // mapper output key is null
+            null,  // mapper output value is null
+            job);
+    job.setOutputFormatClass(NullOutputFormat.class);   // no Mapper output, no Reducer
 
     return job;
   }
@@ -94,5 +111,44 @@ public class ColumnDiscoveryTool extends Configured implements Tool  {
       return 1;
     }
     return 0;
+  }
+
+  static class ColumnDiscoveryMapper extends TableMapper<Text, Text> {
+
+    private static final Log LOG = LogFactory.getLog(ColumnDiscoveryMapper.class);
+    private Repository repository = null;
+    private MTableDescriptor mtd;
+    private MConnection columnManagerConnection = null;
+
+    @Override
+    protected void setup(Context context) {
+      try {
+        columnManagerConnection = (MConnection)MConnectionFactory.createConnection();
+        repository = columnManagerConnection.getRepository();
+        mtd = repository.getMTableDescriptor(TableName.valueOf(context.getJobName()));
+      } catch (IOException e) {
+        columnManagerConnection = null;
+        repository = null;
+        LOG.info(ColumnDiscoveryMapper.class.getSimpleName() + "mapper failed to get connection!");
+      }
+    }
+    @Override
+    protected void cleanup(Context context) {
+      if (columnManagerConnection != null) {
+        try {
+          columnManagerConnection.close();
+        } catch (IOException e) { }
+      }
+    }
+
+    @Override
+    protected void map(ImmutableBytesWritable row, Result value, Context context)
+            throws InterruptedException, IOException {
+      if (columnManagerConnection == null || columnManagerConnection.isClosed()
+              || columnManagerConnection.isAborted() || repository == null || mtd == null) {
+        return;
+      }
+      repository.putColumnAuditorSchemaEntities(mtd, value, true);
+    }
   }
 }

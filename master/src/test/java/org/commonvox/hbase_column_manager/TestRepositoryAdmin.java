@@ -387,7 +387,7 @@ public class TestRepositoryAdmin {
   }
 
   @Test
-  public void testColumnDiscoveryWithWildcardedExcludes() throws IOException {
+  public void testColumnDiscoveryWithWildcardedExcludes() throws Exception {
     System.out.println("#testColumnDiscovery has been invoked using WILDCARDED "
             + "EXCLUDE config properties.");
 
@@ -398,10 +398,28 @@ public class TestRepositoryAdmin {
     Configuration configuration = MConfiguration.create();
     createSchemaStructuresInHBase(configuration, true);
     loadColumnData(configuration, true);
-    doColumnDiscovery(configuration);
+    doColumnDiscovery(configuration, false);
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
+  }
+
+  @Test
+  public void testColumnDiscoveryWithWildcardedExcludesUsingMapReduce() throws Exception {
+    System.out.println("#testColumnDiscovery has been invoked using WILDCARDED "
+            + "EXCLUDE config properties WITH MAPREDUCE.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+    loadColumnData(configuration, true);
+    doColumnDiscovery(configuration, true);
+    verifyColumnAuditing(configuration);
+    System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties "
+            + "WITH MAPREDUCE has run to completion.");
   }
 
   @Test
@@ -568,8 +586,10 @@ public class TestRepositoryAdmin {
     }
   }
 
-  private void doColumnDiscovery(Configuration configuration) throws IOException {
-    new RepositoryAdmin(MConnectionFactory.createConnection(configuration)).discoverSchema();
+  private void doColumnDiscovery(Configuration configuration, boolean useMapReduce)
+          throws Exception {
+    new RepositoryAdmin(MConnectionFactory.createConnection(configuration))
+            .discoverSchema(useMapReduce);
   }
 
   private void verifyColumnAuditing(Configuration configuration) throws IOException {
@@ -2563,7 +2583,7 @@ public class TestRepositoryAdmin {
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
-     new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
@@ -2578,5 +2598,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
+    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
   }
 }
