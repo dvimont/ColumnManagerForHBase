@@ -765,7 +765,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce) throws IOException {
+          boolean verbose, boolean useMapreduce) throws Exception {
     return generateReportOnInvalidColumnQualifiers(
             targetFile, tableName, null, verbose, useMapreduce);
   }
@@ -789,7 +789,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce) throws IOException {
+          byte[] colFamily, boolean verbose, boolean useMapreduce) throws Exception {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
@@ -813,7 +813,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce) throws IOException {
+          boolean verbose, boolean useMapreduce) throws Exception {
     return generateReportOnInvalidColumnLengths(
             targetFile, tableName, null, verbose, useMapreduce);
   }
@@ -839,7 +839,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce) throws IOException {
+          byte[] colFamily, boolean verbose, boolean useMapreduce) throws Exception {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
@@ -864,7 +864,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce) throws IOException {
+          boolean verbose, boolean useMapreduce) throws Exception {
     return generateReportOnInvalidColumnValues(targetFile, tableName, null, verbose, useMapreduce);
   }
 
@@ -889,7 +889,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce) throws IOException {
+          byte[] colFamily, boolean verbose, boolean useMapreduce) throws Exception {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }

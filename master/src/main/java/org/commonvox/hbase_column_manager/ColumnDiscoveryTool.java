@@ -26,7 +26,6 @@ import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper.Context;
@@ -49,8 +48,7 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
     if (!parseArguments(args)) {
       return null;
     }
-    Job job = Job.getInstance(getConf(),
-            getConf().get(JOB_NAME_CONF_KEY, "columnDiscovery_for_table_" + sourceTableNameString));
+    Job job = Job.getInstance(getConf(), getConf().get(JOB_NAME_CONF_KEY, sourceTableNameString));
     TableMapReduceUtil.addDependencyJars(job);
     job.setJobName(sourceTableNameString); // pass tableName to Mapper via JobName
     Scan scan = new Scan();

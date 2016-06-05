@@ -1603,7 +1603,7 @@ public class TestRepositoryAdmin {
   }
 
   @Test
-  public void testGenerateReportOnInvalidColumnQualifiers() throws IOException {
+  public void testGenerateReportOnInvalidColumnQualifiers() throws Exception {
     System.out.println("#testGenerateReportOnInvalidColumnQualifiers has been invoked.");
 
     // environment cleanup before testing
@@ -2595,9 +2595,9 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
-    // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
+    new TestRepositoryAdmin().testGenerateReportOnInvalidColumnQualifiers();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
-    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
   }
 }

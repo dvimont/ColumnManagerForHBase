@@ -333,8 +333,8 @@ class Repository {
   static int getRepositoryMaxVersions(Admin hbaseAdmin)
           throws IOException {
     HColumnDescriptor repositoryHcd
-            = getStandardAdmin(hbaseAdmin).getTableDescriptor(REPOSITORY_TABLENAME)
-            .getFamily(REPOSITORY_CF);
+            = getStandardAdmin(hbaseAdmin).
+                    getTableDescriptor(REPOSITORY_TABLENAME).getFamily(REPOSITORY_CF);
     return repositoryHcd.getMaxVersions();
   }
 
@@ -689,7 +689,8 @@ class Repository {
     putColumnAuditorSchemaEntities(getMTableDescriptor(tableName), mutation);
   }
 
-  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, RowMutations mutations) throws IOException {
+  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, RowMutations mutations)
+          throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
@@ -698,7 +699,8 @@ class Repository {
     }
   }
 
-  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, List<? extends Mutation> mutations) throws IOException {
+  void putColumnAuditorSchemaEntities(MTableDescriptor mtd, List<? extends Mutation> mutations)
+          throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
@@ -724,14 +726,15 @@ class Repository {
     for (Entry<byte[], List<Cell>> colFamilyCellList : mutation.getFamilyCellMap().entrySet()) {
       MColumnDescriptor mcd = mtd.getMColumnDescriptor(colFamilyCellList.getKey());
       for (Cell cell : colFamilyCellList.getValue()) {
-        byte[] colQualifier
-                = Bytes.copy(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
+        byte[] colQualifier = Bytes.copy(
+                cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ColumnAuditor oldColAuditor = getColumnAuditor(mcd.getForeignKey(), colQualifier);
         if (oldColAuditor != null && cell.getValueLength() <= oldColAuditor.getMaxValueLengthFound()) {
           continue;
         }
         ColumnAuditor newColAuditor = new ColumnAuditor(colQualifier);
-        if (oldColAuditor == null || cell.getValueLength() > oldColAuditor.getMaxValueLengthFound()) {
+        if (oldColAuditor == null ||
+                cell.getValueLength() > oldColAuditor.getMaxValueLengthFound()) {
           newColAuditor.setMaxValueLengthFound(cell.getValueLength());
         } else {
           newColAuditor.setMaxValueLengthFound(oldColAuditor.getMaxValueLengthFound());
@@ -785,7 +788,8 @@ class Repository {
           suppressUserName = true;
         }
         Map<byte[], byte[]> entityAttributeMap
-                = buildEntityAttributeMap(newColAuditor.getValues(), newColAuditor.getConfiguration());
+                = buildEntityAttributeMap(newColAuditor.getValues(),
+                        newColAuditor.getConfiguration());
         putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
                 mcd.getForeignKey(), colQualifier),
                 entityAttributeMap, suppressUserName);
@@ -796,7 +800,7 @@ class Repository {
   void validateColumns(MTableDescriptor mtd, Mutation mutation) throws IOException {
     if (!isIncludedTable(mtd.getTableName())
             || !mtd.hasColDescriptorWithColDefinitionsEnforced()
-            || Delete.class.isAssignableFrom(mutation.getClass())) { // column-cell Deletes not validated
+            || Delete.class.isAssignableFrom(mutation.getClass())) { // Deletes not validated
       return;
     }
     for (Entry<byte[], List<Cell>> colFamilyCellList : mutation.getFamilyCellMap().entrySet()) {
@@ -805,8 +809,8 @@ class Repository {
         continue;
       }
       for (Cell cell : colFamilyCellList.getValue()) {
-        byte[] colQualifier
-                = Bytes.copy(cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
+        byte[] colQualifier = Bytes.copy(
+                cell.getQualifierArray(), cell.getQualifierOffset(), cell.getQualifierLength());
         ColumnDefinition colDefinition = mcd.getColumnDefinition(colQualifier);
         if (colDefinition == null) {
           throw new ColumnDefinitionNotFoundException(mtd.getTableName().getName(),
@@ -814,7 +818,8 @@ class Repository {
         }
         if (colDefinition.getColumnLength() > 0
                 && cell.getValueLength() > colDefinition.getColumnLength()) {
-          throw new ColumnValueInvalidException(mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
+          throw new ColumnValueInvalidException(
+                  mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
                   "Value length of <" + cell.getValueLength()
                   + "> is longer than defined maximum length of <"
                   + colDefinition.getColumnLength() + ">.");
@@ -1054,7 +1059,8 @@ class Repository {
 
   MNamespaceDescriptor getMNamespaceDescriptor(String namespaceName)
           throws IOException {
-    Result row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
+    Result row = getActiveRow(SchemaEntityType.NAMESPACE.getRecordType(),
+            NAMESPACE_PARENT_FOREIGN_KEY, Bytes.toBytes(namespaceName), null);
     if (row == null || row.isEmpty()) {
       // Note that ColumnManager can be installed atop an already-existing HBase
       //  installation, so namespace SchemaEntity might not yet have been captured in repository,
@@ -1169,7 +1175,8 @@ class Repository {
     return getColumnDefinitions(colFamilyForeignKey);
   }
 
-  private Set<ColumnDefinition> getColumnDefinitions(byte[] colFamilyForeignKey) throws IOException {
+  private Set<ColumnDefinition> getColumnDefinitions(byte[] colFamilyForeignKey)
+          throws IOException {
     Set<ColumnDefinition> columnDefinitions = new TreeSet<>();
     for (Result row : getActiveRows(
             SchemaEntityType.COLUMN_DEFINITION.getRecordType(), colFamilyForeignKey)) {
@@ -1265,16 +1272,16 @@ class Repository {
     SingleColumnValueFilter activeRowsOnlyFilter = new SingleColumnValueFilter(
             REPOSITORY_CF, ENTITY_STATUS_COLUMN, CompareFilter.CompareOp.EQUAL, ACTIVE_STATUS);
     activeRowsOnlyFilter.setFilterIfMissing(true);
-    return getRows(getRowIdAndStatusOnly, recordType, parentForeignKey, entityName,
+    return getRepositoryRows(getRowIdAndStatusOnly, recordType, parentForeignKey, entityName,
             columnToGet, activeRowsOnlyFilter);
   }
 
-  private Result[] getRows(byte recordType, byte[] parentForeignKey, byte[] columnToGet)
+  private Result[] getRepositoryRows(byte recordType, byte[] parentForeignKey, byte[] columnToGet)
           throws IOException {
-    return getRows(false, recordType, parentForeignKey, null, columnToGet, null);
+    return getRepositoryRows(false, recordType, parentForeignKey, null, columnToGet, null);
   }
 
-  private Result[] getRows(boolean getRowIdAndStatusOnly, byte recordType,
+  private Result[] getRepositoryRows(boolean getRowIdAndStatusOnly, byte recordType,
           byte[] parentForeignKey, byte[] entityName, byte[] columnToGet, Filter filter)
           throws IOException {
     if (parentForeignKey == null) {
@@ -1390,9 +1397,11 @@ class Repository {
             getTableForeignKey(tableName), colFamily);
   }
 
-  private boolean columnDefinitionsEnforced(byte recordType, byte[] parentForeignKey, byte[] entityName)
+  private boolean columnDefinitionsEnforced(
+          byte recordType, byte[] parentForeignKey, byte[] entityName)
           throws IOException {
-    Result row = getActiveRow(recordType, parentForeignKey, entityName, COL_DEFINITIONS_ENFORCED_COLUMN);
+    Result row = getActiveRow(
+            recordType, parentForeignKey, entityName, COL_DEFINITIONS_ENFORCED_COLUMN);
     if (row == null || row.isEmpty()) {
       return false;
     }
@@ -1539,7 +1548,8 @@ class Repository {
     if (parentForeignKey == null) {
       return;
     }
-    for (Result row : getRows(true, recordType, parentForeignKey, entityName, null, null)) {
+    for (Result row :
+            getRepositoryRows(true, recordType, parentForeignKey, entityName, null, null)) {
       if (!truncateColumns || (truncateColumns &&
               recordType == SchemaEntityType.COLUMN_AUDITOR.getRecordType())) {
         if (purge) {
@@ -1769,64 +1779,6 @@ class Repository {
     }
   }
 
-//  /**
-//   * Used exclusively in the deserialization of an HBaseSchemaArchive
-//   */
-//  private Set<Object> convertSchemaEntityToDescriptorSet(
-//          SchemaEntity entity, boolean includeColumnAuditors,
-//          String namespace, TableName tableName, byte[] colFamily) {
-//    Set<Object> convertedObjects = new LinkedHashSet<>();
-//    if (entity.getEntityRecordType() == SchemaEntityType.NAMESPACE.getRecordType()) {
-//      if (namespace != null && !namespace.equals(entity.getNameAsString())) {
-//        return convertedObjects; // empty set
-//      }
-//      convertedObjects.add(new MNamespaceDescriptor(entity));
-//      for (SchemaEntity childEntity : entity.getChildren()) {
-//        convertedObjects.addAll(convertSchemaEntityToDescriptorSet(
-//                childEntity, includeColumnAuditors, namespace, tableName, colFamily));
-//      }
-//    } else if (entity.getEntityRecordType() == SchemaEntityType.TABLE.getRecordType()) {
-//      if (tableName != null && !tableName.getNameAsString().equals(entity.getNameAsString())) {
-//        return convertedObjects; // empty set
-//      }
-//      MTableDescriptor mtd = new MTableDescriptor(entity);
-//      if (entity.getChildren() != null) {
-//        for (SchemaEntity childEntity : entity.getChildren()) {
-//          if (childEntity.getEntityRecordType() != SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
-//            continue;
-//          }
-//          Set<Object> returnedMcdSet
-//                  = convertSchemaEntityToDescriptorSet(
-//                          childEntity, includeColumnAuditors, namespace, tableName, colFamily);
-//          for (Object returnedMcd : returnedMcdSet) {
-//            mtd.addFamily((MColumnDescriptor) returnedMcd);
-//          }
-//        }
-//      }
-//      convertedObjects.add(mtd);
-//    } else if (entity.getEntityRecordType() == SchemaEntityType.COLUMN_FAMILY.getRecordType()) {
-//      if (colFamily != null && !Bytes.toString(colFamily).equals(entity.getNameAsString())) {
-//        return convertedObjects; // empty set
-//      }
-//      MColumnDescriptor mcd = new MColumnDescriptor(entity);
-//      if (entity.getChildren() != null) {
-//        for (SchemaEntity childEntity : entity.getChildren()) {
-//          if (childEntity.getEntityRecordType()
-//                  == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
-//            if (includeColumnAuditors) {
-//              mcd.addColumnAuditor(new ColumnAuditor(childEntity));
-//            }
-//          } else if (childEntity.getEntityRecordType()
-//                  == SchemaEntityType.COLUMN_DEFINITION.getRecordType()) {
-//            mcd.addColumnDefinition(new ColumnDefinition(childEntity));
-//          }
-//        }
-//      }
-//      convertedObjects.add(mcd);
-//    }
-//    return convertedObjects;
-//  }
-
   void dumpRepositoryTable() throws IOException {
     logger.info("DUMP of ColumnManager repository table has been requested.");
     try (ResultScanner results
@@ -1900,7 +1852,7 @@ class Repository {
 
   boolean generateReportOnInvalidColumns (InvalidColumnReport.ReportType reportType,
           TableName tableName, byte[] colFamily, File targetFile, boolean verbose,
-          boolean useMapreduce) throws IOException {
+          boolean useMapreduce) throws Exception {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -1908,6 +1860,12 @@ class Repository {
     if (mtd == null || !mtd.hasColumnDefinitions()) {
       throw new ColumnDefinitionNotFoundException(tableName.getName(), colFamily, null,
               "No ColumnDefinitions found for table/columnFamily");
+    }
+    if (colFamily != null
+            && (mtd.getMColumnDescriptor(colFamily) == null
+            || mtd.getMColumnDescriptor(colFamily).getColumnDefinitions().isEmpty())) {
+      throw new ColumnDefinitionNotFoundException(tableName.getName(), colFamily, null,
+              "No ColumnDefinitions found for columnFamily");
     }
     try (InvalidColumnReport invalidColumnReport = new InvalidColumnReport(
             reportType, hbaseConnection, mtd, colFamily, targetFile, verbose, useMapreduce)) {
