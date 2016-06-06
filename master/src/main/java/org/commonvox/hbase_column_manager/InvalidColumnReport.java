@@ -21,13 +21,16 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -41,10 +44,13 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
@@ -55,9 +61,10 @@ import org.apache.log4j.Logger;
  */
 class InvalidColumnReport implements Closeable, AutoCloseable {
 
-  public static final CSVFormat SUMMARY_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
+  private static final Log LOG = LogFactory.getLog(InvalidColumnReport.class);
+  static final CSVFormat SUMMARY_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
           .withCommentMarker('#').withHeader(SummaryReportHeader.class);
-  public static final CSVFormat VERBOSE_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
+  static final CSVFormat VERBOSE_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
           .withCommentMarker('#').withHeader(VerboseReportHeader.class);
   private static final Logger staticLogger
           = Logger.getLogger(Repository.class.getPackage().getName());
@@ -108,15 +115,17 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
     verboseReport = verbose;
     invokedByMapper = false;
     if (useMapreduce) {
-      collectInvalidColumnMetadataViaMapreduce();
+      collectReportMetadataViaMapreduce();
     } else {
-      collectInvalidColumnMetadataViaDirectScan();
+      collectReportMetadataViaDirectScan();
     }
   }
 
-  public InvalidColumnReport(ReportType reportType, Connection connection,
-          MTableDescriptor sourceTableDescriptor, byte[] sourceColFamily,
-          TableName tempReportTableName, boolean verbose)
+  /**
+   * This constructor invoked in MapReduce context from InvalidColumnReportMapper#setup.
+   */
+  InvalidColumnReport(ReportType reportType, Connection connection,
+          MTableDescriptor sourceTableDescriptor, TableName tempReportTableName, boolean verbose)
           throws IOException {
     this.reportType = reportType;
     this.targetFile = null;
@@ -128,11 +137,10 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
     standardAdmin = connection.getAdmin();
     sourceMtd = sourceTableDescriptor;
     sourceTable = standardConnection.getTable(sourceTableDescriptor.getTableName());
-    this.sourceColFamily = sourceColFamily;
+    sourceColFamily = null; // not needed by Mapper; only referenced by Tool in Scan setup.
     tempReportTable = standardConnection.getTable(tempReportTableName);
     verboseReport = verbose;
     invokedByMapper = true;
-    collectInvalidColumnMetadataViaDirectScan();
   }
 
   /**
@@ -141,64 +149,71 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
    *
    * @throws IOException if a remote or network exception occurs
    */
-  private void collectInvalidColumnMetadataViaDirectScan() throws IOException {
+  private void collectReportMetadataViaDirectScan() throws IOException {
     // perform full scan (w/ KeyOnlyFilter(true) if summary report)
-    Scan columnScan = new Scan();
+    Scan scan = new Scan();
     if (!verboseReport && !reportType.equals(ReportType.VALUE)) {
-      columnScan.setFilter(new KeyOnlyFilter(true));
+      scan.setFilter(new KeyOnlyFilter(true));
     }
     if (sourceColFamily != null) {
-      columnScan.addFamily(sourceColFamily);
+      scan.addFamily(sourceColFamily);
     }
-    try (ResultScanner rows = sourceTable.getScanner(columnScan)) {
+    try (ResultScanner rows = sourceTable.getScanner(scan)) {
       for (Result row : rows) {
-        for (Entry<byte[], NavigableMap<byte[],byte[]>> familyToColumnsMapEntry :
-                row.getNoVersionMap().entrySet()) {
-          MColumnDescriptor mcd = sourceMtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
-          if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no def? everything's valid!
-            continue;
-          }
-          for (Entry<byte[],byte[]> colEntry : familyToColumnsMapEntry.getValue().entrySet()) {
-            byte[] colQualifier = colEntry.getKey();
-            byte[] colValue = colEntry.getValue();
-            ColumnDefinition colDef = mcd.getColumnDefinition(colQualifier);
-            boolean invalidRow = false;
-            switch (reportType) {
-              case QUALIFIER:
-                if (colDef == null) {
+        doSourceRowProcessing(row);
+      }
+    }
+  }
+
+  /**
+   * This method directly invoked by InvalidColumnReportMapper during MapReduce processing
+   */
+  void doSourceRowProcessing (Result row) throws IOException {
+    for (Entry<byte[], NavigableMap<byte[],byte[]>> familyToColumnsMapEntry :
+            row.getNoVersionMap().entrySet()) {
+      MColumnDescriptor mcd = sourceMtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
+      if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no def? everything's valid!
+        continue;
+      }
+      for (Entry<byte[],byte[]> colEntry : familyToColumnsMapEntry.getValue().entrySet()) {
+        byte[] colQualifier = colEntry.getKey();
+        byte[] colValue = colEntry.getValue();
+        ColumnDefinition colDef = mcd.getColumnDefinition(colQualifier);
+        boolean invalidRow = false;
+        switch (reportType) {
+          case QUALIFIER:
+            if (colDef == null) {
+              invalidRow = true;
+            }
+            break;
+          case LENGTH:
+            if (colDef != null && colDef.getColumnLength() > 0) {
+              if (verboseReport) {
+                if (colValue.length > colDef.getColumnLength()) {
                   invalidRow = true;
                 }
-                break;
-              case LENGTH:
-                if (colDef != null && colDef.getColumnLength() > 0) {
-                  if (verboseReport) {
-                    if (colValue.length > colDef.getColumnLength()) {
-                      invalidRow = true;
-                    }
-                  } else {
-                    if (Bytes.toInt(colValue) > colDef.getColumnLength()) {
-                      invalidRow = true;
-                    }
-                  }
+              } else {
+                if (Bytes.toInt(colValue) > colDef.getColumnLength()) {
+                  invalidRow = true;
                 }
-                break;
-              case VALUE:
-                if (colDef != null && !colDef.getColumnValidationRegex().isEmpty()) {
-                  if (!Bytes.toString(colValue).matches(colDef.getColumnValidationRegex())) {
-                    invalidRow = true;
-                  }
-                }
-                break;
+              }
             }
-            if (invalidRow) {
-              // upserts a user-column-specific report row with invalid user-column metadata
-              tempReportTable.put(new Put(buildRowId(mcd.getName(), colQualifier))
-                      .addColumn(TEMP_REPORT_CF, row.getRow(),
-                              (colValue.length < 200 ? colValue :
-                                      Bytes.add(Bytes.head(colValue, 200),
-                                              Bytes.toBytes("[value-truncated]")))));
+            break;
+          case VALUE:
+            if (colDef != null && !colDef.getColumnValidationRegex().isEmpty()) {
+              if (!Bytes.toString(colValue).matches(colDef.getColumnValidationRegex())) {
+                invalidRow = true;
+              }
             }
-          }
+            break;
+        }
+        if (invalidRow) {
+          // upserts a user-column-specific report row with invalid user-column metadata
+          tempReportTable.put(new Put(buildRowId(mcd.getName(), colQualifier))
+                  .addColumn(TEMP_REPORT_CF, row.getRow(),
+                          (colValue.length < 200 ? colValue :
+                                  Bytes.add(Bytes.head(colValue, 200),
+                                          Bytes.toBytes("[value-truncated]")))));
         }
       }
     }
@@ -218,11 +233,6 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
 
   private String[] parseRowId(byte[] rowId) {
     return Bytes.toString(rowId).split(ROW_ID_DELIMITER_STRING, 4);
-  }
-
-  private void collectInvalidColumnMetadataViaMapreduce() throws Exception {
-    int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
-              new String[]{"--sourceTable=" + sourceMtd.getTableName().getNameAsString()});
   }
 
   boolean isEmpty() {
@@ -311,28 +321,117 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
     }
   }
 
+  private void collectReportMetadataViaMapreduce() throws Exception {
+    List<String> argList = new ArrayList<>();
+    argList.add(InvalidColumnReportTool.TABLE_NAME_ARG_KEY
+                      + sourceMtd.getTableName().getNameAsString());
+    if (sourceColFamily != null) {
+      argList.add(InvalidColumnReportTool.COLFAMILY_ARG_KEY + Bytes.toString(sourceColFamily));
+    }
+    argList.add(InvalidColumnReportTool.REPORT_TYPE_ARG_KEY + reportType.name());
+    argList.add(InvalidColumnReportTool.REPORT_TEMP_TABLE_ARG_KEY + tempReportTable.getName());
+    argList.add(InvalidColumnReportTool.REPORT_VERBOSE_ARG_KEY + verboseReport);
+
+    int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new InvalidColumnReportTool(),
+            argList.toArray(new String[argList.size()]));
+    if (jobCompletionCode != 0) {
+      LOG.warn("Mapreduce process failure in " + this.getClass().getSimpleName());
+    }
+  }
+
   static class InvalidColumnReportTool extends Configured implements Tool  {
 
     private static final Log LOG = LogFactory.getLog(InvalidColumnReportTool.class);
+    private static final String JOB_NAME_CONF_KEY = "mapreduce.job.name";
+    private static final String MAP_SPECULATIVE_CONF_KEY = "mapreduce.map.speculative";
+    static final String TABLE_NAME_CONF_KEY = "mapreduce.source.table";
+    static final String COLFAMILY_CONF_KEY = "colmanager.source.colfamily";
+    static final String REPORT_TYPE_CONF_KEY = "colmanager.report.type";
+    static final String REPORT_VERBOSE_CONF_KEY = "colmanager.report.verbose";
+    static final String REPORT_TEMP_TABLE_CONF_KEY = "colmanager.report.target.table";
+    private static final String ARG_KEY_PREFIX = "--";
+    private static final String ARG_DELIMITER = "=";
+    static final String TABLE_NAME_ARG_KEY = ARG_KEY_PREFIX + TABLE_NAME_CONF_KEY + ARG_DELIMITER;
+    static final String COLFAMILY_ARG_KEY = ARG_KEY_PREFIX + COLFAMILY_CONF_KEY + ARG_DELIMITER;
+    static final String REPORT_TYPE_ARG_KEY
+            = ARG_KEY_PREFIX + REPORT_TYPE_CONF_KEY + ARG_DELIMITER;
+    static final String REPORT_TEMP_TABLE_ARG_KEY
+            = ARG_KEY_PREFIX + REPORT_TEMP_TABLE_CONF_KEY + ARG_DELIMITER;
+    static final String REPORT_VERBOSE_ARG_KEY
+            = ARG_KEY_PREFIX + REPORT_VERBOSE_CONF_KEY + ARG_DELIMITER;
+
+    private String sourceTableNameString = null;
+    private byte[] sourceColFamily = null;
+    private boolean verboseReport = false;
+    private InvalidColumnReport.ReportType reportType;
 
     Job createSubmittableJob(final String[] args) throws IOException {
-      return null;
+      Configuration configFromArgs = parseArguments(args);
+      if (configFromArgs == null || sourceTableNameString == null) {
+        return null;
+      }
+      getConf().addResource(configFromArgs);
+      getConf().setBoolean(MAP_SPECULATIVE_CONF_KEY, true); // prevent writing data twice
+
+      Job job = Job.getInstance(getConf(), getConf().get(JOB_NAME_CONF_KEY, sourceTableNameString));
+      TableMapReduceUtil.addDependencyJars(job);
+      Scan scan = new Scan();
+      scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
+      scan.setCacheBlocks(false);  // should be false for MapReduce jobs
+
+      if (!verboseReport && !reportType.equals(ReportType.VALUE)) {
+        scan.setFilter(new KeyOnlyFilter(true));
+      }
+      if (sourceColFamily != null) {
+        scan.addFamily(sourceColFamily);
+      }
+      TableMapReduceUtil.initTableMapperJob(
+              sourceTableNameString,
+              scan,
+              InvalidColumnReportMapper.class,
+              null,  // mapper output key is null
+              null,  // mapper output value is null
+              job);
+      job.setOutputFormatClass(NullOutputFormat.class);   // no Mapper output, no Reducer
+
+      return job;
     }
 
-    private boolean parseArguments (final String[] args) {
+    private Configuration parseArguments (final String[] args) {
       if (args.length < 1) {
-        printUsage(null);
-        return false;
+        return null;
       }
-      return true;
-    }
-
-    private void printUsage(final String errorMsg) {
-      if (errorMsg != null && errorMsg.length() > 0) {
-        System.err.println("ERROR: " + errorMsg);
+      Configuration configFromArgs = new Configuration();
+      for (String arg : args) {
+        String[] keyValuePair = arg.substring(ARG_KEY_PREFIX.length()).split(ARG_DELIMITER);
+        if (keyValuePair == null || keyValuePair.length != 2) {
+          LOG.warn("ERROR in MapReduce " + this.getClass().getSimpleName()
+                  + " submission: Invalid argument '" + arg + "'");
+          return null;
+        }
+        switch (keyValuePair[0]) {
+          case TABLE_NAME_CONF_KEY:
+            sourceTableNameString = keyValuePair[1];
+            break;
+          case COLFAMILY_CONF_KEY:
+            sourceColFamily = Bytes.toBytes(keyValuePair[1]);
+            break;
+          case REPORT_VERBOSE_CONF_KEY:
+            verboseReport = keyValuePair[1].equalsIgnoreCase(Boolean.TRUE.toString());
+            break;
+          case REPORT_TYPE_CONF_KEY:
+            reportType = InvalidColumnReport.ReportType.valueOf(keyValuePair[1]);
+            break;
+          case REPORT_TEMP_TABLE_CONF_KEY:
+            break;
+          default:
+            LOG.warn("ERROR in MapReduce " + this.getClass().getSimpleName()
+                    + " submission: Invalid argument '" + arg + "'");
+            return null;
+        }
+        configFromArgs.set(keyValuePair[0], keyValuePair[1]);
       }
-      System.err.println("Usage: " + ColumnDiscoveryTool.class.getSimpleName() + " "
-              + TABLE_NAME_ARG_KEY +"<tablename>");
+      return configFromArgs;
     }
 
     /**
@@ -346,20 +445,74 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
 
     @Override
     public int run(String[] args) throws Exception {
-    Job job = createSubmittableJob(args);
-    if (job == null) {
-      return 1;
-    }
-    if (!job.waitForCompletion(true)) {
-      LOG.info(InvalidColumnReportTool.class.getSimpleName() + " mapreduce job failed!");
-      return 1;
-    }
-    return 0;
+      Job job = createSubmittableJob(args);
+      if (job == null) {
+        return 1;
+      }
+      if (!job.waitForCompletion(true)) {
+        LOG.warn(InvalidColumnReportTool.class.getSimpleName() + " mapreduce job failed!");
+        return 1;
+      }
+      return 0;
     }
   }
 
   static class InvalidColumnReportMapper extends TableMapper<Text, Text> {
     private static final Log LOG = LogFactory.getLog(InvalidColumnReportMapper.class);
+    private MConnection columnManagerConnection = null;
+    private Repository repository = null;
+    private MTableDescriptor sourceMtd;
+    private TableName tempReportTableName; // table to which analysis metadata is written
+    private boolean verboseReport;
+    private ReportType reportType;
+    private InvalidColumnReport invalidColumnReport;
 
+    @Override
+    protected void setup(Context context) {
+      try {
+        columnManagerConnection = (MConnection)MConnectionFactory.createConnection();
+        repository = columnManagerConnection.getRepository();
+        Configuration jobConfig = context.getConfiguration();
+        reportType = InvalidColumnReport.ReportType.valueOf(
+                jobConfig.get(InvalidColumnReportTool.REPORT_TYPE_CONF_KEY));
+        sourceMtd = repository.getMTableDescriptor(TableName.valueOf(
+                jobConfig.get(InvalidColumnReportTool.TABLE_NAME_CONF_KEY)));
+        tempReportTableName = TableName.valueOf(
+                        jobConfig.get(InvalidColumnReportTool.REPORT_TEMP_TABLE_CONF_KEY));
+        verboseReport = jobConfig.get(InvalidColumnReportTool.REPORT_VERBOSE_CONF_KEY)
+                .equalsIgnoreCase(Boolean.TRUE.toString());
+        invalidColumnReport = new InvalidColumnReport(
+                reportType, columnManagerConnection.getStandardConnection(), sourceMtd,
+                tempReportTableName, verboseReport);
+      } catch (Exception e) {
+        columnManagerConnection = null;
+        repository = null;
+        LOG.warn(this.getClass().getSimpleName() + "mapper failed to initialize due to: "
+                + e.getMessage());
+      }
+    }
+    @Override
+    protected void cleanup(Context context) {
+      if (invalidColumnReport != null) {
+        try {
+          invalidColumnReport.close();
+        } catch (IOException e) { }
+      }
+      if (columnManagerConnection != null) {
+        try {
+          columnManagerConnection.close();
+        } catch (IOException e) { }
+      }
+    }
+
+    @Override
+    protected void map(ImmutableBytesWritable row, Result value, Context context)
+            throws InterruptedException, IOException {
+      if (columnManagerConnection == null || columnManagerConnection.isClosed()
+              || columnManagerConnection.isAborted() || repository == null || sourceMtd == null) {
+        return;
+      }
+      invalidColumnReport.doSourceRowProcessing(value);
+    }
   }
 }

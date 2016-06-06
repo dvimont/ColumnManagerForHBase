@@ -1626,7 +1626,9 @@ class Repository {
     if (useMapReduce) {
       int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
                 new String[]{"--sourceTable=" + tableName.getNameAsString()});
-
+      if (jobCompletionCode != 0) {
+        logger.warn("Mapreduce process failure in " + ColumnDiscoveryTool.class.getSimpleName());
+      }
     } else {
       Table table = hbaseConnection.getTable(tableName);
       try (ResultScanner rows

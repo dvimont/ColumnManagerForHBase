@@ -41,19 +41,22 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
 
   private static final Log LOG = LogFactory.getLog(ColumnDiscoveryTool.class);
   private static final String JOB_NAME_CONF_KEY = "mapreduce.job.name";
+  private static final String MAP_SPECULATIVE_CONF_KEY = "mapreduce.map.speculative";
   private static final String TABLE_NAME_ARG_KEY = "--sourceTable=";
+  static final String TABLE_NAME_CONF_KEY = "mapreduce.source.table";
   String sourceTableNameString = null;
 
   Job createSubmittableJob(final String[] args) throws IOException {
     if (!parseArguments(args)) {
       return null;
     }
+    getConf().setBoolean(MAP_SPECULATIVE_CONF_KEY, true); // prevent writing data twice
+    getConf().set(TABLE_NAME_CONF_KEY, sourceTableNameString);
     Job job = Job.getInstance(getConf(), getConf().get(JOB_NAME_CONF_KEY, sourceTableNameString));
     TableMapReduceUtil.addDependencyJars(job);
-    job.setJobName(sourceTableNameString); // pass tableName to Mapper via JobName
     Scan scan = new Scan();
     scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
-    scan.setCacheBlocks(false);  // don't set to true for MapReduce jobs
+    scan.setCacheBlocks(false);  // should be false for MapReduce jobs
     scan.setFilter(new KeyOnlyFilter(true));
     TableMapReduceUtil.initTableMapperJob(
             sourceTableNameString,
@@ -69,24 +72,15 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
 
   private boolean parseArguments (final String[] args) {
     if (args.length < 1) {
-      printUsage(null);
       return false;
     }
     if (args[0].startsWith(TABLE_NAME_ARG_KEY)) {
       sourceTableNameString = args[0].substring(TABLE_NAME_ARG_KEY.length());
       return true;
     } else {
-      printUsage("Invalid argument '" + args[0] + "'");
+      System.err.println("ERROR: Invalid argument '" + args[0] + "'");
       return false;
     }
-  }
-
-  private void printUsage(final String errorMsg) {
-    if (errorMsg != null && errorMsg.length() > 0) {
-      System.err.println("ERROR: " + errorMsg);
-    }
-    System.err.println("Usage: " + ColumnDiscoveryTool.class.getSimpleName() + " "
-            + TABLE_NAME_ARG_KEY +"<tablename>");
   }
 
   /**
@@ -105,7 +99,7 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
       return 1;
     }
     if (!job.waitForCompletion(true)) {
-      LOG.info(ColumnDiscoveryTool.class.getSimpleName() + " mapreduce job failed!");
+      LOG.info(this.getClass().getSimpleName() + " mapreduce job failed!");
       return 1;
     }
     return 0;
@@ -123,11 +117,12 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
       try {
         columnManagerConnection = (MConnection)MConnectionFactory.createConnection();
         repository = columnManagerConnection.getRepository();
-        mtd = repository.getMTableDescriptor(TableName.valueOf(context.getJobName()));
+        mtd = repository.getMTableDescriptor(TableName.valueOf(
+                context.getConfiguration().get(ColumnDiscoveryTool.TABLE_NAME_CONF_KEY)));
       } catch (IOException e) {
         columnManagerConnection = null;
         repository = null;
-        LOG.info(ColumnDiscoveryMapper.class.getSimpleName() + "mapper failed to get connection!");
+        LOG.warn(this.getClass().getSimpleName() + "mapper failed to get connection!");
       }
     }
     @Override
