@@ -16,7 +16,6 @@
  */
 package org.commonvox.hbase_column_manager;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,16 +35,12 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
 
 /**
- * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities, as
- * well as schema metadata {@link #discoverSchema(boolean) discovery},
- * {@link #exportSchema(java.io.File, boolean) export}, and
- * {@link #importSchema(java.io.File, boolean) import}
- * facilities; it is used as a complement to the standard {@code Admin} interface, with an
- * {@code Admin} instance (provided by an {@link MConnectionFactory#createConnection()
- * MConnectionFactory-created Connection}) being used in a standard manner to maintain
- * <i>Namespace</i>, <i>Table</i>, and <i>Column Family</i> structures, and a
- * {@code RepositoryAdmin} instance being used to maintain {@link ColumnDefinition} structures and
- * to query {@link ColumnAuditor} structures.
+ * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities,
+ * as well as column-metadata {@link #discoverColumnMetadata(boolean) discovery} and full-schema
+ * {@link #exportSchema(java.io.File, boolean) export}/{@link #importSchema(java.io.File, boolean) import}
+ * facilities; it is used as a complement to the standard
+ * {@link org.apache.hadoop.hbase.client.Admin} interface to provide for maintenance of optional
+ * {@link ColumnDefinition} structures and querying of {@link ColumnAuditor} structures.
  *
  * @author Daniel Vimont
  */
@@ -125,6 +120,22 @@ public class RepositoryAdmin {
   public static void uninstallRepositoryStructures(Admin hbaseAdmin) throws IOException {
     Repository.dropRepository(hbaseAdmin, Logger.getLogger(RepositoryAdmin.class.getPackage().getName()));
     InvalidColumnReport.dropTempReportNamespace(hbaseAdmin);
+  }
+
+  /**
+   * Delete temp report <i>Table</i>s which might remain from any abnormally terminated
+   * invocations of the
+   * {@link #generateReportOnInvalidColumnQualifiers(java.io.File, org.apache.hadoop.hbase.TableName, boolean, boolean)
+   * generateReportOnInvalidColumn*} methods. Note that invocation of this method will cause any
+   * currently-running invocations of the
+   * {@link #generateReportOnInvalidColumnQualifiers(java.io.File, org.apache.hadoop.hbase.TableName, boolean, boolean)
+   * generateReportOnInvalidColumn*} methods to abnormally terminate.
+   *
+   * @param hbaseAdmin standard HBase Admin
+   * @throws IOException if a remote or network exception occurs
+   */
+  public static void deleteTempReportTables(Admin hbaseAdmin) throws IOException {
+    InvalidColumnReport.dropTempReportTables(hbaseAdmin);
   }
 
   /**
@@ -343,7 +354,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Delete the {@link ColumnDefinition} pertaining to the submitted <i>Column Qualifier</i>
+   * Delete the {@link ColumnDefinition} (pertaining to the submitted <i>Column Qualifier</i>)
    * from the submitted <i>Table</i> and <i>Column Family</i>.
    *
    * @param tableName name of <i>Table</i> from which {@link ColumnDefinition} is to be deleted
@@ -358,7 +369,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Delete the {@link ColumnDefinition} pertaining to the submitted <i>Column Qualifier</i>
+   * Delete the {@link ColumnDefinition} (pertaining to the submitted <i>Column Qualifier</i>)
    * from the submitted <i>Table</i> and <i>Column Family</i>.
    *
    * @param htd <i>Table</i> from which {@link ColumnDefinition} is to be deleted
@@ -477,35 +488,52 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Performs discovery of all ColumnManager-included user <i>Table</i>s and stores the schema
-   * metadata in
-   * the ColumnManager repository; includes discovery of {@link ColumnAuditor} schema metadata
-   * (performing full scan [with KeyOnlyFilter] of all <i>Table</i>s that are
-   * <a href="package-summary.html#config">included in ColumnManager processing</a>).
+   * Performs discovery of Column metadata for all
+   * <a href="package-summary.html#config">ColumnManager-included</a> user <i>Table</i>s,
+   * storing the results for each unique Column Qualifier as a {@link ColumnAuditor} object in
+   * the ColumnManager Repository; all such metadata is then retrievable via the
+   * {@link #getColumnAuditors(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+   * getColumnAuditors} and
+   * {@link #getColumnQualifiers(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+   * getColumnQualifiers} methods. The discovery process entails a
+   * {@link org.apache.hadoop.hbase.filter.KeyOnlyFilter} scan of the <i>Table</i>s, either
+   * via direct scanning or via mapreduce. Note that when the mapreduce option is
+   * utilized, the default row-cache setting is 500, which may be overridden by setting the
+   * {@link org.apache.hadoop.conf.Configuration} parameter
+   * {@link org.apache.hadoop.hbase.mapreduce.TableInputFormat#SCAN_CACHEDROWS}.
    *
-   * @param useMapReduce if {@code true} discovery done via mapreduce
+   * @param useMapreduce if {@code true}, discovery is done via mapreduce
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverSchema(boolean useMapReduce) throws Exception {
-    repository.discoverSchema(true, useMapReduce);
+  public void discoverColumnMetadata(boolean useMapreduce) throws Exception {
+    repository.discoverSchema(true, useMapreduce);
   }
 
   /**
-   * Performs discovery of the specified <i>Table</i>'s schema metadata and stores it in the
-   * ColumnManager repository; includes discovery of {@link ColumnAuditor} schema metadata
-   * (performing full scan [with KeyOnlyFilter] of the <i>Table</i>).
-   * Note that the specified <i>Table</i>
-   * must be <a href="package-summary.html#config">included in ColumnManager processing</a>;
-   * otherwise invocation of this method will have no effect.
+   * Performs discovery of Column metadata for the specified <i>Table</i>,
+   * storing the results for each unique Column Qualifier as a {@link ColumnAuditor} object in
+   * the ColumnManager Repository; all such metadata is then retrievable via the
+   * {@link #getColumnAuditors(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+   * getColumnAuditors} and
+   * {@link #getColumnQualifiers(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+   * getColumnQualifiers} methods. The discovery process entails a
+   * {@link org.apache.hadoop.hbase.filter.KeyOnlyFilter} scan of the <i>Table</i>,
+   * either via direct scanning or via mapreduce. Note that when the mapreduce option is
+   * utilized, the default row-cache setting is 500, which may be overridden by setting the
+   * {@link org.apache.hadoop.conf.Configuration} parameter
+   * {@link org.apache.hadoop.hbase.mapreduce.TableInputFormat#SCAN_CACHEDROWS}.
+   * Note that the specified <i>Table</i> must be
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>;
+   * otherwise a {@link TableNotIncludedForProcessingException} will be thrown.
    *
    * @param tableName <i>Table</i> for which schema metadata is to be discovered; submitted
-   * <i>Table</i>
-   * must be <a href="package-summary.html#config">included in ColumnManager processing</a>
-   * @param useMapReduce if {@code true} discovery done via mapreduce
+   * <i>Table</i> must be
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * @param useMapreduce if {@code true}, discovery is done via mapreduce
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverSchema(TableName tableName, boolean useMapReduce) throws Exception {
-    repository.discoverSchema(tableName, true, useMapReduce);
+  public void discoverColumnMetadata(TableName tableName, boolean useMapreduce) throws Exception {
+    repository.discoverSchema(tableName, true, useMapreduce);
   }
 
   // make this method public if needs dictate

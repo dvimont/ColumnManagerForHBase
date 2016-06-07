@@ -45,6 +45,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableInputFormat;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -303,11 +304,15 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
     }
     staticLogger.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
             + " TempReport tables and namespace has been requested.");
+    dropTempReportTables(standardAdmin);
+    standardAdmin.deleteNamespace(TEMP_REPORT_NAMESPACE);
+    staticLogger.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
+            + " TempReport tables and namespace has been completed: " + TEMP_REPORT_NAMESPACE);
+  }
+
+  static void dropTempReportTables(Admin standardAdmin) throws IOException {
     standardAdmin.disableTables(TEMP_REPORT_NAMESPACE + ":" + ".*");
     standardAdmin.deleteTables(TEMP_REPORT_NAMESPACE + ":" + ".*");
-    standardAdmin.deleteNamespace(TEMP_REPORT_NAMESPACE);
-    staticLogger.warn("DROP (delete) of " + Repository.PRODUCT_NAME
-            + " TempReport tables and namespace has been completed: " + TEMP_REPORT_NAMESPACE);
   }
 
   @Override
@@ -323,10 +328,9 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
 
   private void collectReportMetadataViaMapreduce() throws Exception {
     List<String> argList = new ArrayList<>();
-    argList.add(InvalidColumnReportTool.TABLE_NAME_ARG_KEY
-                      + sourceMtd.getTableName().getNameAsString());
+    argList.add(Repository.TABLE_NAME_ARG_KEY + sourceMtd.getTableName().getNameAsString());
     if (sourceColFamily != null) {
-      argList.add(InvalidColumnReportTool.COLFAMILY_ARG_KEY + Bytes.toString(sourceColFamily));
+      argList.add(Repository.COLFAMILY_ARG_KEY + Bytes.toString(sourceColFamily));
     }
     argList.add(InvalidColumnReportTool.REPORT_TYPE_ARG_KEY + reportType.name());
     argList.add(InvalidColumnReportTool.REPORT_TEMP_TABLE_ARG_KEY + tempReportTable.getName());
@@ -342,23 +346,18 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
   static class InvalidColumnReportTool extends Configured implements Tool  {
 
     private static final Log LOG = LogFactory.getLog(InvalidColumnReportTool.class);
-    private static final String JOB_NAME_CONF_KEY = "mapreduce.job.name";
-    private static final String MAP_SPECULATIVE_CONF_KEY = "mapreduce.map.speculative";
-    static final String TABLE_NAME_CONF_KEY = "mapreduce.source.table";
-    static final String COLFAMILY_CONF_KEY = "colmanager.source.colfamily";
-    static final String REPORT_TYPE_CONF_KEY = "colmanager.report.type";
-    static final String REPORT_VERBOSE_CONF_KEY = "colmanager.report.verbose";
-    static final String REPORT_TEMP_TABLE_CONF_KEY = "colmanager.report.target.table";
-    private static final String ARG_KEY_PREFIX = "--";
-    private static final String ARG_DELIMITER = "=";
-    static final String TABLE_NAME_ARG_KEY = ARG_KEY_PREFIX + TABLE_NAME_CONF_KEY + ARG_DELIMITER;
-    static final String COLFAMILY_ARG_KEY = ARG_KEY_PREFIX + COLFAMILY_CONF_KEY + ARG_DELIMITER;
+    static final String REPORT_TYPE_CONF_KEY
+            = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.type";
+    static final String REPORT_VERBOSE_CONF_KEY
+            = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.verbose";
+    static final String REPORT_TEMP_TABLE_CONF_KEY
+            = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.target.temptable";
     static final String REPORT_TYPE_ARG_KEY
-            = ARG_KEY_PREFIX + REPORT_TYPE_CONF_KEY + ARG_DELIMITER;
+            = Repository.ARG_KEY_PREFIX + REPORT_TYPE_CONF_KEY + Repository.ARG_DELIMITER;
     static final String REPORT_TEMP_TABLE_ARG_KEY
-            = ARG_KEY_PREFIX + REPORT_TEMP_TABLE_CONF_KEY + ARG_DELIMITER;
+            = Repository.ARG_KEY_PREFIX + REPORT_TEMP_TABLE_CONF_KEY + Repository.ARG_DELIMITER;
     static final String REPORT_VERBOSE_ARG_KEY
-            = ARG_KEY_PREFIX + REPORT_VERBOSE_CONF_KEY + ARG_DELIMITER;
+            = Repository.ARG_KEY_PREFIX + REPORT_VERBOSE_CONF_KEY + Repository.ARG_DELIMITER;
 
     private String sourceTableNameString = null;
     private byte[] sourceColFamily = null;
@@ -371,12 +370,14 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
         return null;
       }
       getConf().addResource(configFromArgs);
-      getConf().setBoolean(MAP_SPECULATIVE_CONF_KEY, true); // prevent writing data twice
+      getConf().setBoolean(Repository.MAP_SPECULATIVE_CONF_KEY, true); // no redundant processing
 
-      Job job = Job.getInstance(getConf(), getConf().get(JOB_NAME_CONF_KEY, sourceTableNameString));
+      Job job = Job.getInstance(
+              getConf(), getConf().get(Repository.JOB_NAME_CONF_KEY, sourceTableNameString));
       TableMapReduceUtil.addDependencyJars(job);
       Scan scan = new Scan();
-      scan.setCaching(500);        // 1 is the default in Scan, which will be bad for MapReduce jobs
+      // note that user can override scan row-caching by setting TableInputFormat.SCAN_CACHEDROWS
+      scan.setCaching(getConf().getInt(TableInputFormat.SCAN_CACHEDROWS, 500));
       scan.setCacheBlocks(false);  // should be false for MapReduce jobs
 
       if (!verboseReport && !reportType.equals(ReportType.VALUE)) {
@@ -403,17 +404,18 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
       }
       Configuration configFromArgs = new Configuration();
       for (String arg : args) {
-        String[] keyValuePair = arg.substring(ARG_KEY_PREFIX.length()).split(ARG_DELIMITER);
+        String[] keyValuePair = arg.substring(
+                Repository.ARG_KEY_PREFIX.length()).split(Repository.ARG_DELIMITER);
         if (keyValuePair == null || keyValuePair.length != 2) {
           LOG.warn("ERROR in MapReduce " + this.getClass().getSimpleName()
                   + " submission: Invalid argument '" + arg + "'");
           return null;
         }
         switch (keyValuePair[0]) {
-          case TABLE_NAME_CONF_KEY:
+          case Repository.TABLE_NAME_CONF_KEY:
             sourceTableNameString = keyValuePair[1];
             break;
-          case COLFAMILY_CONF_KEY:
+          case Repository.COLFAMILY_CONF_KEY:
             sourceColFamily = Bytes.toBytes(keyValuePair[1]);
             break;
           case REPORT_VERBOSE_CONF_KEY:
@@ -476,7 +478,7 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
         reportType = InvalidColumnReport.ReportType.valueOf(
                 jobConfig.get(InvalidColumnReportTool.REPORT_TYPE_CONF_KEY));
         sourceMtd = repository.getMTableDescriptor(TableName.valueOf(
-                jobConfig.get(InvalidColumnReportTool.TABLE_NAME_CONF_KEY)));
+                jobConfig.get(Repository.TABLE_NAME_CONF_KEY)));
         tempReportTableName = TableName.valueOf(
                         jobConfig.get(InvalidColumnReportTool.REPORT_TEMP_TABLE_CONF_KEY));
         verboseReport = jobConfig.get(InvalidColumnReportTool.REPORT_VERBOSE_CONF_KEY)

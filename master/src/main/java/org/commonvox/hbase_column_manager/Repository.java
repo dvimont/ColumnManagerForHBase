@@ -123,6 +123,16 @@ class Repository {
           .put(VALUE_COLUMN_PREFIX_BYTES).put(Bytes.toBytes(ColumnAuditor.MAX_VALUE_LENGTH_KEY))
           .array();
 
+  static final String JOB_NAME_CONF_KEY = "mapreduce.job.name";
+  static final String MAP_SPECULATIVE_CONF_KEY = "mapreduce.map.speculative";
+  static final String COLMANAGER_MAP_CONF_KEY_PREFIX = "colmanager.map.";
+  static final String TABLE_NAME_CONF_KEY = COLMANAGER_MAP_CONF_KEY_PREFIX + "source.table";
+  static final String COLFAMILY_CONF_KEY = COLMANAGER_MAP_CONF_KEY_PREFIX + "source.colfamily";
+  static final String ARG_KEY_PREFIX = "--";
+  static final String ARG_DELIMITER = "=";
+  static final String TABLE_NAME_ARG_KEY = ARG_KEY_PREFIX + TABLE_NAME_CONF_KEY + ARG_DELIMITER;
+  static final String COLFAMILY_ARG_KEY = ARG_KEY_PREFIX + COLFAMILY_CONF_KEY + ARG_DELIMITER;
+
   private static final String SYNC_ERROR_MSG
           = "SYNCHRONIZATION ERROR FOUND IN " + PRODUCT_NAME + " REPOSITORY. ";
   private static final String SCHEMA_ENTITY_NOT_FOUND_SYNC_ERROR_MSG = SYNC_ERROR_MSG
@@ -1625,7 +1635,7 @@ class Repository {
     // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
     if (useMapReduce) {
       int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
-                new String[]{"--sourceTable=" + tableName.getNameAsString()});
+                new String[]{TABLE_NAME_ARG_KEY + tableName.getNameAsString()});
       if (jobCompletionCode != 0) {
         logger.warn("Mapreduce process failure in " + ColumnDiscoveryTool.class.getSimpleName());
       }

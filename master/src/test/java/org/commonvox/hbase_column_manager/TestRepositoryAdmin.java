@@ -589,7 +589,7 @@ public class TestRepositoryAdmin {
   private void doColumnDiscovery(Configuration configuration, boolean useMapReduce)
           throws Exception {
     new RepositoryAdmin(MConnectionFactory.createConnection(configuration))
-            .discoverSchema(useMapReduce);
+            .discoverColumnMetadata(useMapReduce);
   }
 
   private void verifyColumnAuditing(Configuration configuration) throws IOException {
