@@ -22,9 +22,9 @@ import org.apache.hadoop.hbase.util.Bytes;
  * A <b>ChangeEvent</b> (obtained via a {@code ChangeEventMonitor}'s various
  * {@link ChangeEventMonitor#getAllChangeEvents() get methods}) contains metadata pertaining to a
  * structural change made to a component of a
- * <a href="package-summary.html#config">ColumnManager-included</a> <i>Namespace</i>
- * or <i>Table</i>; for example, a change to the "durability" setting of a <i>Table</i>
- * or the "maxVersions" setting of a <i>Table</i>'s <i>Column Family</i>
+ * <a href="package-summary.html#config">ColumnManager-included</a> <i>Namespace</i>, <i>Table</i>,
+ * or Table component; for example, a change to the "durability" setting of a <i>Table</i>
+ * or the "maxVersions" setting of a <i>Column Family</i>
  * is captured in the ColumnManager repository as a {@code ChangeEvent}. When
  * <a href="package-summary.html#activate">ColumnManager is activated</a>, such {@code ChangeEvents}
  * are comprehensively tracked in the ColumnManager repository for all <i>Namespace</i>s and

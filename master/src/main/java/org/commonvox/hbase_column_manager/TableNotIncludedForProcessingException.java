@@ -18,6 +18,8 @@ package org.commonvox.hbase_column_manager;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
+ * Thrown when a submitted Table is not <a href="package-summary.html#config">included for
+ * ColumnManager processing</a>, but the context permits only ColumnManager-included Tables.
  *
  * @author Daniel Vimont
  */

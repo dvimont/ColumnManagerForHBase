@@ -163,9 +163,11 @@ public class RepositoryAdmin {
    * @return set of {@link ColumnAuditor}s, or null if <i>Table</i> or <i>Column Family</i> not
    * found
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     if (!repository.isIncludedTable(htd.getTableName())) {
       throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
     }
@@ -184,9 +186,11 @@ public class RepositoryAdmin {
    * @param colFamily Column Family
    * @return set of {@link ColumnAuditor}s, or null if tableName or colFamily not found
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public Set<ColumnAuditor> getColumnAuditors(TableName tableName, byte[] colFamily)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     if (!repository.isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -209,9 +213,11 @@ public class RepositoryAdmin {
    * @param hcd Column [Family] Descriptor
    * @return set of Column Qualifiers, or null if <i>Table</i> or <i>Column Family</i> not found
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public Set<byte[]> getColumnQualifiers(HTableDescriptor htd, HColumnDescriptor hcd)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     if (!repository.isIncludedTable(htd.getTableName())) {
       throw new TableNotIncludedForProcessingException(htd.getTableName().getName(), null);
     }
@@ -238,9 +244,11 @@ public class RepositoryAdmin {
    * @param colFamily Column Family
    * @return set of Column Qualifiers, or null if tableName or colFamily not found
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public Set<byte[]> getColumnQualifiers(TableName tableName, byte[] colFamily)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     if (!repository.isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -263,10 +271,12 @@ public class RepositoryAdmin {
    * @param colFamily <i>Column Family</i> to which {@link ColumnDefinition} is to be added
    * @param colDefinition {@link ColumnDefinition} to be added or modified
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void addColumnDefinition(TableName tableName, byte[] colFamily,
           final ColumnDefinition colDefinition)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     List<ColumnDefinition> colDefinitions
             = new ArrayList<ColumnDefinition>() { { add(colDefinition); } };
     repository.putColumnDefinitionSchemaEntities(tableName, colFamily, colDefinitions);
@@ -281,10 +291,12 @@ public class RepositoryAdmin {
    * added
    * @param colDefinition {@link ColumnDefinition} to be added or modified
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void addColumnDefinition(HTableDescriptor htd, HColumnDescriptor hcd,
           ColumnDefinition colDefinition)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     addColumnDefinition(htd.getTableName(), hcd.getName(), colDefinition);
   }
 
@@ -296,10 +308,12 @@ public class RepositoryAdmin {
    * @param colFamily <i>Column Family</i> to which {@link ColumnDefinition}s are to be added
    * @param colDefinitions List of {@link ColumnDefinition}s to be added or modified
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void addColumnDefinitions(TableName tableName, byte[] colFamily,
           List<ColumnDefinition> colDefinitions)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     repository.putColumnDefinitionSchemaEntities(tableName, colFamily, colDefinitions);
   }
 
@@ -312,10 +326,12 @@ public class RepositoryAdmin {
    * be added
    * @param colDefinitions List of {@link ColumnDefinition}s to be added or modified
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void addColumnDefinitions(HTableDescriptor htd, HColumnDescriptor hcd,
           List<ColumnDefinition> colDefinitions)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     repository.putColumnDefinitionSchemaEntities(htd.getTableName(), hcd.getName(), colDefinitions);
   }
 
@@ -327,9 +343,11 @@ public class RepositoryAdmin {
    * @param hcd <i>ColumnAuditor [Family] Descriptor</i> to which {@link ColumnDefinition}s belong
    * @return collection of {@link ColumnDefinition}s
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public Collection<ColumnDefinition> getColumnDefinitions(HTableDescriptor htd, HColumnDescriptor hcd)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
       return ((MColumnDescriptor) hcd).getColumnDefinitions();
     } else {
@@ -345,9 +363,11 @@ public class RepositoryAdmin {
    * @param colFamily <i>Column Family</i> to which {@link ColumnDefinition}s belong
    * @return collection of {@link ColumnDefinition}s
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public Collection<ColumnDefinition> getColumnDefinitions(TableName tableName, byte[] colFamily)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     MTableDescriptor mtd = getRepository().getMTableDescriptor(tableName);
     MColumnDescriptor mcd = mtd.getMColumnDescriptor(colFamily);
     return getColumnDefinitions(mtd, mcd);
@@ -362,9 +382,11 @@ public class RepositoryAdmin {
    * @param colQualifier qualifier which uniquely identifies the {@link ColumnDefinition} to be
    * deleted
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void deleteColumnDefinition(TableName tableName, byte[] colFamily, byte[] colQualifier)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     repository.deleteColumnDefinition(tableName, colFamily, colQualifier);
   }
 
@@ -377,10 +399,12 @@ public class RepositoryAdmin {
    * be deleted
    * @param colQualifier qualifier which uniquely identifies {@link ColumnDefinition} to be deleted
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void deleteColumnDefinition(HTableDescriptor htd, HColumnDescriptor hcd,
           byte[] colQualifier)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     repository.deleteColumnDefinition(htd.getTableName(), hcd.getName(), colQualifier);
   }
 
@@ -394,9 +418,11 @@ public class RepositoryAdmin {
    * @return {@code true} if column definition enforcement is enabled for the specified <i>Column
    * Family</i>; {@code false} if column definition enforcement is not enabled
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean columnDefinitionsEnforced(TableName tableName, byte[] colFamily)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     return repository.columnDefinitionsEnforced(tableName, colFamily);
   }
 
@@ -417,9 +443,11 @@ public class RepositoryAdmin {
    * @param colFamily Name of <i>Column Family</i> for which column definition enforcement is to be
    * enabled or disabled
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
-          throws IOException {
+          throws IOException, TableNotIncludedForProcessingException {
     repository.setColumnDefinitionsEnforced(enabled, tableName, colFamily);
   }
 
@@ -522,17 +550,17 @@ public class RepositoryAdmin {
    * utilized, the default row-cache setting is 500, which may be overridden by setting the
    * {@link org.apache.hadoop.conf.Configuration} parameter
    * {@link org.apache.hadoop.hbase.mapreduce.TableInputFormat#SCAN_CACHEDROWS}.
-   * Note that the specified <i>Table</i> must be
-   * <a href="package-summary.html#config">included in ColumnManager processing</a>;
-   * otherwise a {@link TableNotIncludedForProcessingException} will be thrown.
    *
    * @param tableName <i>Table</i> for which schema metadata is to be discovered; submitted
    * <i>Table</i> must be
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    * @param useMapreduce if {@code true}, discovery is done via mapreduce
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void discoverColumnMetadata(TableName tableName, boolean useMapreduce) throws Exception {
+  public void discoverColumnMetadata(TableName tableName, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     repository.discoverSchema(tableName, true, useMapreduce);
   }
 
@@ -578,9 +606,11 @@ public class RepositoryAdmin {
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void exportSchema(File targetFile, String sourceNamespaceName, boolean formatted)
-          throws IOException, JAXBException {
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
     repository.exportSchema(sourceNamespaceName, null, targetFile, formatted);
   }
 
@@ -599,9 +629,11 @@ public class RepositoryAdmin {
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void exportSchema(File targetFile, TableName sourceTableName, boolean formatted)
-          throws IOException, JAXBException {
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
     repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName,
             targetFile, formatted);
   }
@@ -644,9 +676,11 @@ public class RepositoryAdmin {
    * HBaseSchemaArchive file into the ColumnManager repository.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void importSchema(File sourceHsaFile, String namespaceName, boolean includeColumnAuditors)
-          throws IOException, JAXBException {
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
     repository.importSchema(sourceHsaFile, namespaceName, null, null, includeColumnAuditors, false);
   }
 
@@ -667,9 +701,11 @@ public class RepositoryAdmin {
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void importSchema(File sourceHsaFile, TableName tableName, boolean includeColumnAuditors)
-          throws IOException, JAXBException {
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
     repository.importSchema(sourceHsaFile, tableName.getNamespaceAsString(), tableName, null,
             includeColumnAuditors, false);
   }
@@ -705,14 +741,16 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param namespaceFilter namespace for which {@link ColumnDefinition}s are to be imported
+   * @param namespace namespace for which {@link ColumnDefinition}s are to be imported
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
     */
-  public void importColumnDefinitions(File sourceHsaFile, String namespaceFilter)
-          throws IOException, JAXBException {
-    repository.importSchema(sourceHsaFile, namespaceFilter, null, null, false, true);
+  public void importColumnDefinitions(File sourceHsaFile, String namespace)
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
+    repository.importSchema(sourceHsaFile, namespace, null, null, false, true);
   }
 
   /**
@@ -726,15 +764,17 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param tableNameFilter table for which {@link ColumnDefinition}s are to be imported
+   * @param tableName table for which {@link ColumnDefinition}s are to be imported
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
     */
-  public void importColumnDefinitions(File sourceHsaFile, TableName tableNameFilter)
-          throws IOException, JAXBException {
-    repository.importSchema(sourceHsaFile, tableNameFilter.getNamespaceAsString(),
-            tableNameFilter, null, false, true);
+  public void importColumnDefinitions(File sourceHsaFile, TableName tableName)
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
+    repository.importSchema(sourceHsaFile, tableName.getNamespaceAsString(),
+            tableName, null, false, true);
   }
 
   /**
@@ -748,17 +788,19 @@ public class RepositoryAdmin {
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
-   * @param tableNameFilter table of ColumnFamily for which {@link ColumnDefinition}s are to be imported
-   * @param colFamilyFilter ColumnFamily for which {@link ColumnDefinition}s are to be imported
+   * @param tableName table of ColumnFamily for which {@link ColumnDefinition}s are to be imported
+   * @param colFamily ColumnFamily for which {@link ColumnDefinition}s are to be imported
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
     */
   public void importColumnDefinitions(
-          File sourceHsaFile, TableName tableNameFilter, byte[] colFamilyFilter)
-          throws IOException, JAXBException {
-    repository.importSchema(sourceHsaFile, tableNameFilter.getNamespaceAsString(),
-            tableNameFilter, colFamilyFilter, false, true);
+          File sourceHsaFile, TableName tableName, byte[] colFamily)
+          throws IOException, JAXBException, TableNotIncludedForProcessingException {
+    repository.importSchema(sourceHsaFile, tableName.getNamespaceAsString(),
+            tableName, colFamily, false, true);
   }
 
   /**
@@ -791,9 +833,12 @@ public class RepositoryAdmin {
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce) throws Exception {
+          boolean verbose, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     return generateReportOnInvalidColumnQualifiers(
             targetFile, tableName, null, verbose, useMapreduce);
   }
@@ -815,9 +860,12 @@ public class RepositoryAdmin {
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce) throws Exception {
+          byte[] colFamily, boolean verbose, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
@@ -839,9 +887,12 @@ public class RepositoryAdmin {
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce) throws Exception {
+          boolean verbose, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     return generateReportOnInvalidColumnLengths(
             targetFile, tableName, null, verbose, useMapreduce);
   }
@@ -865,9 +916,12 @@ public class RepositoryAdmin {
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce) throws Exception {
+          byte[] colFamily, boolean verbose, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
@@ -890,9 +944,12 @@ public class RepositoryAdmin {
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce) throws Exception {
+          boolean verbose, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     return generateReportOnInvalidColumnValues(targetFile, tableName, null, verbose, useMapreduce);
   }
 
@@ -915,9 +972,12 @@ public class RepositoryAdmin {
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce) throws Exception {
+          byte[] colFamily, boolean verbose, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
     return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }

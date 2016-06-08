@@ -25,13 +25,13 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 
 /**
- * <b>IMPORTANT NOTE: This class only available with the HBase 2.0 (or later) implementation of
- * ColumnManagerAPI;
- * in pre-2.0 implementations, this class will throw UnsupportedOperationException.</b>
- * <br><br>
  * The {@code MHBaseTestingUtility} provides a ColumnManager-enabled extension to the
  * <a href="http://hbase.apache.org/testapidocs/org/apache/hadoop/hbase/HBaseTestingUtility.html?is-external=true">
  * HBaseTestingUtility</a>.
+ * <br><br>
+ * <b>IMPORTANT NOTE: This class only available with the HBase 2.0 (or later) implementation of
+ * ColumnManagerAPI;
+ * in pre-2.0 implementations, this class will throw an UnsupportedOperationException.</b>
  *
  * @author Daniel Vimont
  */

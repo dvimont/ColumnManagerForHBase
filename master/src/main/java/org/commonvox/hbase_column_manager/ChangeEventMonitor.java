@@ -401,7 +401,7 @@ public class ChangeEventMonitor {
 
   /**
    * Export the submitted list of ChangeEvent objects to a comma-separated-value (CSV) file, one
-   * line per ChangeEvent, with the first line of the file consisting of column headers.
+   * line per ChangeEvent, with the first non-comment line of the file consisting of column headers.
    *
    * @param changeEvents list of ChangeEvent objects returned by one of the "get" methods of the
    * {@code ChangeEventMonitor} class.

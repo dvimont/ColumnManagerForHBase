@@ -831,8 +831,9 @@ class Repository {
           throw new ColumnValueInvalidException(
                   mtd.getTableName().getName(), mcd.getName(), colQualifier, null,
                   "Value length of <" + cell.getValueLength()
-                  + "> is longer than defined maximum length of <"
-                  + colDefinition.getColumnLength() + ">.");
+                          + "> is longer than maximum length of <"
+                          + colDefinition.getColumnLength() + "> defined for the column in its "
+                          + "corresponding ColumnDefinition.");
         }
         String colValidationRegex = colDefinition.getColumnValidationRegex();
         if (colValidationRegex != null && colValidationRegex.length() > 0) {
@@ -840,8 +841,8 @@ class Repository {
           if (!Bytes.toString(colValue).matches(colValidationRegex)) {
             throw new ColumnValueInvalidException(mtd.getTableName().getName(), mcd.getName(),
                     colQualifier, colValue,
-                    "Value does not match the regular expression defined for column: <"
-                    + colValidationRegex + ">");
+                    "Value does not match the regular expression defined for the column in its "
+                            + "corresponding ColumnDefinition: <" + colValidationRegex + ">");
           }
         }
       }

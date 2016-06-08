@@ -20,12 +20,13 @@
  * with options for:<br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures
- * <a href="#query">Column metadata</a> (qualifier and max-length) as Tables are updated, or via a
- * <a href="#discovery">discovery facility</a> for previously-existing Tables;<br>
+ * <a href="#query">Column metadata</a> (qualifier and max-length) as <i>Tables</i> are updated, or via a
+ * <a href="#discovery">discovery facility</a> for previously-existing <i>Tables</i>;<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(2) <b>COLUMN-DEFINITION ENFORCEMENT</b> -- optionally
- * <a href="#enforcement">enforces administratively-managed Column definitions</a>
- * (stipulating valid name, length, and/or value) as Tables are updated (bringing HBase's
- * "on-the-fly" column-qualifier creation under centralized control);<br>
+ * <a href="#enforcement">enforces administratively-managed <i>ColumnDefinitions</i></a>
+ * (stipulating valid name, length, and/or value) as <i>Tables</i> are updated (bringing HBase's
+ * "on-the-fly" column-qualifier creation under centralized control for administrator-specified
+ * <i>Column Families</i>);<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(3) <b>SCHEMA CHANGE MONITORING</b> -- tracks and provides an
  * <a href="#auditing">audit trail</a> for structural modifications made to
  * <i>Namespaces</i>, <i>Tables</i>, and <i>Column Families</i>;<br>
@@ -42,9 +43,9 @@
  * behind the scenes to capture HBase metadata as stipulated by an administrator/developer in
  * <a href="#config">the ColumnManager configuration</a>.<br><br>
  * Any application coded with the ColumnManager API can be made to revert to standard HBase API
- * functionality simply by either (a) removing the {@code column_manager.activated} property from
- * all {@code hbase-*.xml} configuration files, or (b) by setting the value of that property to
- * {@code <false>}.<br>
+ * functionality simply by either (a) setting the value of the {@code column_manager.activated}
+ * property to {@code <false>} in all {@code hbase-*.xml} configuration files, or (b) removing
+ * that property from {@code hbase-*.xml} configuration files altogether.<br>
  * Thus, a ColumnManager-coded application can be used with ColumnManager activated in a development
  * and/or staging environment, but deactivated in production (where ColumnManager's extra overhead
  * might be undesirable).
@@ -54,17 +55,13 @@
  * <hr><b>UPCOMING ENHANCEMENTS MAY INCLUDE:</b>
  * <ul>
  * <li><b>GUI interface:</b>
- * A JavaFX-based GUI interface may be built atop the ColumnManagerAPI, for administrative use on
+ * A JavaFX-based GUI interface could be built atop the ColumnManagerAPI, for administrative use on
  * Mac, Linux, and Windows desktops.
  * </li>
- * <li><b>Metadata discovery via MapReduce:</b>
- * A MapReduce-based infrastructure will provide for much more efficient Column metadata discovery.
- * (The current discovery facility performs full <i>Table</i> scans [with KeyOnlyFilter] via the
- * HBase API).
- * </li>
- * <li><b>Capture/discovery of additional schema-oriented metadata:</b>
- * Users may identify additional schema-oriented metadata that would be worthwhile to capture or
- * discover using ColumnManager mechanisms.
+ * <li><b>Command-line invocation for some administrative functions:</b>
+ * For the convenience of HBase administrators, particularly those who are not Java coders, it
+ * may be advisable to make certain <a href="RepositoryAdmin.html">RepositoryAdmin</a> functions
+ * available via command-line invocation (i.e. through an executable JAR).
  * </li>
  * </ul>
  * <hr>
@@ -89,7 +86,7 @@
  * <hr style="height:3px;color:black;background-color:black">
  * <b>I. <u>PREREQUISITES</u></b>
  * <BLOCKQUOTE>
- * <b>HBase 1.x</b> -- HBase must be installed as per the installation instructions given in the
+ * <b>HBase 1.x or later</b> -- HBase must be installed as per the installation instructions given in the
  * official
  * <a href="https://hbase.apache.org/book.html" target="_blank">Apache HBase Reference Guide</a>
  * (either in stand-alone, pseudo-distributed, or fully-distributed mode).
@@ -100,19 +97,24 @@
  * World" application</a>
  * can be successfully compiled and run in it.
  * <br><br>
- * <b>JDK 7</b> -- HBase 1.x (upon which this package is dependent) requires JDK 7 or later.
+ * <b>JDK 7</b> -- HBase 1.x or later (upon which this package is dependent) requires JDK 7
+ * or later.
  * </BLOCKQUOTE>
  * <a name="install"></a>
  * <hr style="height:3px;color:black;background-color:black">
  * <b>II. <u>INSTALLATION</u></b>
  * <BLOCKQUOTE>
- * <b>Step 1: Get the required JAR files</b>
+ * <b>Step 1: Get the required JAR files via download or by setting Maven project dependencies</b>
  * <br>
- * The most recently released version of
+ * The most recently released versions of
  * <b><a href="https://github.com/dvimont/ColumnManager/releases" target="_blank">
- * the JAR file for ColumnManager</a></b>
+ * the JAR files for ColumnManager</a></b>
  * may be downloaded from GitHub and included in the IDE environment's compile and run-time
  * classpath configurations (just as the HBase API libraries are already included).
+ * <br>
+ * In the context of a Maven project, a dependency may be set as follows:
+ * <br>
+ * <pre>{@code      [DEPENDENCY EXAMPLE TO BE INSERTED HERE .]}</pre>
  * <br>
  * <br>
  * <a name="activate"></a>
@@ -129,9 +131,9 @@
  * <i>NOTE</i> that the default for "{@code column_manager.activated}" is "{@code false}", so when
  * the property above is not present in {@code <hbase-site.xml>}, the ColumnManager API will
  * function exactly like the standard HBase API. Thus, a single body of code can operate <i>with</i>
- * ColumnManager functionality in one environment (typically, a development environment) and can
- * completely <i>bypass</i>
- * ColumnManager functionality in another environment (potentially testing, staging, production),
+ * ColumnManager functionality in one environment (typically, a development or testing
+ * environment) and can completely <i>bypass</i>
+ * ColumnManager functionality in another environment (potentially staging or production),
  * with the only difference between the environments being the presence or absence of the
  * "{@code column_manager.activated}" property in each environment's {@code hbase-*.xml}
  * configuration files.
@@ -151,7 +153,7 @@
  *      } }</pre> Note that the first invocation of <a href="MConnectionFactory.html#createConnection--">
  * MConnectionFactory.createConnection()</a> (as in the above code) will result in the automatic
  * creation of the ColumnManager repository
- * <i>Namespace</i> ("{@code column_manager_repository_namespace}") and <i>Table</i>
+ * <i>Namespace</i> ("{@code __column_manager_repository_namespace}") and <i>Table</i>
  * ("{@code column_manager_repository_table}").<br>
  * If the code above runs successfully, its log output will include a number of lines of Zookeeper
  * INFO output, as well as several lines of ColumnManager INFO output.
@@ -165,8 +167,8 @@
  * <a href="RepositoryAdmin.html#installRepositoryStructures-org.apache.hadoop.hbase.client.Admin-">
  * installRepositoryStructures</a>. Successful creation of these structures will result in messages
  * such as the following appearing in the session's log output:
- * <pre>{@code      2015-10-09 11:03:30,184 INFO  [main] commonvox.column_manager: ColumnManager Repository Namespace has been created ...
- *      2015-10-09 11:03:31,498 INFO  [main] commonvox.column_manager: ColumnManager Repository Table has been created ...}</pre>
+ * <pre>{@code      2015-10-09 11:03:30,184 INFO  [main] commonvox.hbase_column_manager: ColumnManager Repository Namespace has been created ...
+ *      2015-10-09 11:03:31,498 INFO  [main] commonvox.hbase_column_manager: ColumnManager Repository Table has been created ...}</pre>
  * </BLOCKQUOTE>
  *
  * <a name="uninstall"></a>
@@ -232,15 +234,15 @@
  * delimited by a colon). Multiple values are delimited by commas, as in the following example:
  * <pre>{@code      <property>
  *         <name>column_manager.excludedTables</name>
- *         <value>myNamespace:*,goodNamespace:myTable,betterNamespace:yetAnotherTable</value>
+ *         <value>myNamespace:*,goodNamespace:myExcludedTable,betterNamespace:yetAnotherExcludedTable</value>
  *      </property>}</pre>
  * Note that all <i>Tables</i> in a given Namespace may be excluded by using an
  * asterisk {@code [*]} symbol in the place of a specific <i>Table</i> qualifier,
  * as in the example above which excludes all Tables in the
  * "myNamespace" namespace via the specification, [{@code myNamespace:*}].<br><br>
- * Note also that if a {@code [column_manager.includedTables]} property is found in the
+ * <i>Note also that if a {@code [column_manager.includedTables]} property is found in the
  * {@code <hbase-*.xml>}
- * files, then any {@code [column_manager.excludedTables]} property will be ignored.
+ * files, then any {@code [column_manager.excludedTables]} property will be ignored.</i>
  * </BLOCKQUOTE>
  *
  * <a name="enforcement"></a>
