@@ -27,7 +27,7 @@ import org.apache.hadoop.hbase.security.User;
 /**
  * The <b>MConnectionFactory</b> provides exactly the same static methods as those provided by the
  * standard HBase {@link org.apache.hadoop.hbase.client.ConnectionFactory ConnectionFactory},
- * but a {@code Connection} object
+ * but a {@link org.apache.hadoop.hbase.client.Connection} object
  * {@link #createConnection() created} by the {@code MConnectionFactory} generates special
  * {@code Admin}, {@code Table}, and {@code BufferedMutator} objects which, in addition to providing
  * all standard HBase API functionality, also: (a) transparently interface with the ColumnManager
@@ -50,7 +50,8 @@ public class MConnectionFactory {
   }
 
   /**
-   * Create a new Connection instance using default HBaseConfiguration.
+   * Create a new {@link org.apache.hadoop.hbase.client.Connection} instance using default
+   * HBaseConfiguration.
    *
    * @return Connection object
    * @throws IOException if a remote or network exception occurs
@@ -67,8 +68,8 @@ public class MConnectionFactory {
   }
 
   /**
-   * Create a new Connection instance using the passed Configuration instance instead of the default
-   * HBaseConfiguration.
+   * Create a new {@link org.apache.hadoop.hbase.client.Connection} instance using the
+   * passed Configuration instance.
    *
    * @param conf Configuration
    * @return Connection object
@@ -79,8 +80,8 @@ public class MConnectionFactory {
   }
 
   /**
-   * Create a new Connection instance using the passed Configuration instance instead of the default
-   * HBaseConfiguration, and using the passed thread pool for batch operations.
+   * Create a new {@link org.apache.hadoop.hbase.client.Connection} instance using the passed
+   * Configuration instance, and using the passed thread pool for batch operations.
    *
    * @param conf Configuration
    * @param pool The thread pool to use for batch operations
@@ -93,8 +94,8 @@ public class MConnectionFactory {
   }
 
   /**
-   * Create a new Connection instance using the passed Configuration instance instead of the default
-   * HBaseConfiguration, and using the passed thread pool for batch operations.
+   * Create a new {@link org.apache.hadoop.hbase.client.Connection} instance using the passed
+   * Configuration instance, and using the passed thread pool for batch operations.
    *
    * @param conf Configuration
    * @param pool The thread pool to use for batch operations
@@ -108,8 +109,8 @@ public class MConnectionFactory {
   }
 
   /**
-   * Create a new Connection instance using the passed Configuration instance instead of the default
-   * HBaseConfiguration.
+   * Create a new {@link org.apache.hadoop.hbase.client.Connection} instance using the passed
+   * Configuration instance.
    *
    * @param conf Configuration
    * @param user The user the connection is for

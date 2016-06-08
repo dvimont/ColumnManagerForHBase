@@ -204,7 +204,7 @@ public class TestRepositoryAdmin {
 
   private static final String TEST_ENVIRONMENT_SETUP_PROBLEM
           = "TEST ENVIRONMENT SETUP PROBLEM!! ==>> ";
-  private static final String REPOSITORY_ADMIN_FAILURE
+  static final String REPOSITORY_ADMIN_FAILURE
           = "FAILURE IN " + RepositoryAdmin.class.getSimpleName() + " PROCESSING!! ==>> ";
   private static final String COLUMN_AUDIT_FAILURE = "FAILURE IN Column Audit PROCESSING!! ==>> ";
   private static final String GET_COL_QUALIFIERS_FAILURE
@@ -2596,7 +2596,7 @@ public class TestRepositoryAdmin {
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
-    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
@@ -2612,6 +2612,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
-    new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsUsingMapReduce();
+    // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsUsingMapReduce();
   }
 }

@@ -19,13 +19,13 @@
  * is an extended <i>METADATA REPOSITORY SYSTEM for HBase 1.x</i>
  * with options for:<br><br>
  * <BLOCKQUOTE>
- * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING</b> -- captures
- * <a href="#query">Column metadata</a> (qualifier and max-length) as Tables are updated (or via a
- * <a href="#discovery">discovery facility</a> for previously-existing Tables);<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures
+ * <a href="#query">Column metadata</a> (qualifier and max-length) as Tables are updated, or via a
+ * <a href="#discovery">discovery facility</a> for previously-existing Tables;<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(2) <b>COLUMN-DEFINITION ENFORCEMENT</b> -- optionally
  * <a href="#enforcement">enforces administratively-managed Column definitions</a>
- * (stipulating valid name, length, and/or value) as Tables are updated, optionally bringing HBase's
- * "on-the-fly" column-qualifier creation under centralized control;<br>
+ * (stipulating valid name, length, and/or value) as Tables are updated (bringing HBase's
+ * "on-the-fly" column-qualifier creation under centralized control);<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(3) <b>SCHEMA CHANGE MONITORING</b> -- tracks and provides an
  * <a href="#auditing">audit trail</a> for structural modifications made to
  * <i>Namespaces</i>, <i>Tables</i>, and <i>Column Families</i>;<br>

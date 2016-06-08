@@ -19,6 +19,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 
 /**
+ * Provides {@link org.apache.hadoop.conf.Configuration}s with properties from classpath-accessible
+ * HBase and ColumnManager ({@code hbase-column-manager.xml}) configuration files.
  *
  * @author Daniel Vimont
  */
@@ -28,9 +30,9 @@ public class MConfiguration {
   }
 
   /**
-   * Creates a {@link Configuration} with HBase and ColumnManager resources.
+   * Creates a {@link org.apache.hadoop.conf.Configuration} with HBase and ColumnManager resources.
    *
-   * @return A {@link Configuration} with HBase and ColumnManager resources.
+   * @return A {@link org.apache.hadoop.conf.Configuration} with HBase and ColumnManager resources.
    */
   public static Configuration create() {
     Configuration conf = HBaseConfiguration.create(); // get standard HBase configuration
@@ -41,12 +43,12 @@ public class MConfiguration {
   }
 
   /**
-   * Creates a {@link Configuration} with HBase resources, the submitted {@link Configuration}'s
-   * resources, and ColumnManager resources.
+   * Creates a {@link org.apache.hadoop.conf.Configuration} with HBase resources, the submitted
+   * {@link org.apache.hadoop.conf.Configuration}'s resources, and ColumnManager resources.
    *
    * @param addedConfiguration Configuration object with resources to be added.
-   * @return A {@link Configuration} with HBase resources, the submitted {@link Configuration}'s
-   * resources, and ColumnManager resources.
+   * @return A {@link org.apache.hadoop.conf.Configuration} with HBase resources, the submitted
+   * {@link org.apache.hadoop.conf.Configuration}'s resources, and ColumnManager resources.
    */
   public static Configuration create(Configuration addedConfiguration) {
     Configuration conf = create();
