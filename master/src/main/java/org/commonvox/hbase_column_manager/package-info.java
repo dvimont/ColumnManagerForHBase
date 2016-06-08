@@ -20,15 +20,16 @@
  * with options for:<br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures
- * <a href="#query">Column metadata</a> (qualifier and max-length) as <i>Tables</i> are updated, or via a
- * <a href="#discovery">discovery facility</a> for previously-existing <i>Tables</i>;<br>
+ * <a href="#query">Column metadata</a> (qualifier and max-length) -- either in real-time auditing
+ * as <i>Tables</i> are updated, or via a <a href="#discovery">discovery facility</a>
+ * (direct or mapreduce) for previously-existing <i>Tables</i>;<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(2) <b>COLUMN-DEFINITION ENFORCEMENT</b> -- optionally
  * <a href="#enforcement">enforces administratively-managed <i>ColumnDefinitions</i></a>
  * (stipulating valid name, length, and/or value) as <i>Tables</i> are updated (bringing HBase's
  * "on-the-fly" column-qualifier creation under centralized control for administrator-specified
  * <i>Column Families</i>);<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(3) <b>SCHEMA CHANGE MONITORING</b> -- tracks and provides an
- * <a href="#auditing">audit trail</a> for structural modifications made to
+ * <a href="#audit-trail">audit trail</a> for structural modifications made to
  * <i>Namespaces</i>, <i>Tables</i>, and <i>Column Families</i>;<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(4) <b>SCHEMA EXPORT/IMPORT</b> -- provides
  * <a href="#export-import">schema (metadata) export and import facilities</a>
@@ -77,6 +78,7 @@
  * <li><a href="#install">INSTALLATION</a></li>
  * <li><a href="#uninstall">UNINSTALLATION</a></li>
  * <li><a href="#config">CONFIGURATION</a></li>
+ * <li><a href="#column-auditing">COLUMN AUDITING IN REAL-TIME</a></li>
  * <li><a href="#usage">USAGE</a></li>
  * <li><a href="#query">QUERIES</a></li>
  * <li><a href="#admin">ADMINISTRATIVE TOOLS</a>
@@ -328,9 +330,27 @@
  * </BLOCKQUOTE>
  * </BLOCKQUOTE>
  *
+ * <a name="column-auditing"></a>
+ * <hr style="height:3px;color:black;background-color:black">
+ * <b>VI. <u>COLUMN AUDITING IN REAL-TIME</u></b>
+ * <BLOCKQUOTE>
+ * When <a href="#activate">ColumnManager is activated</a>,
+ * <a href="ColumnAuditor.html">ColumnAuditor</a> metadata is gathered and persisted at runtime as
+ * Mutations (i.e. puts, appends, increments) are submitted via the API to any
+ * <a href="#config">ColumnManager-included</a> <i>Table</i>.
+ * <br><br>Note that <a href="ColumnAuditor.html">ColumnAuditor</a> metadata may also be
+ * gathered for already-existing <i>Column</i>s via the
+ * <a href="#discovery">RepositoryAdmin discovery methods</a>.
+ * All such metadata is then retrievable via the
+ * <a href="RepositoryAdmin.html#getColumnAuditors-org.apache.hadoop.hbase.HTableDescriptor-org.apache.hadoop.hbase.HColumnDescriptor-">
+ * RepositoryAdmin#getColumnAuditors</a> and
+ * <a href="RepositoryAdmin.html#getColumnQualifiers-org.apache.hadoop.hbase.HTableDescriptor-org.apache.hadoop.hbase.HColumnDescriptor-">
+ * RepositoryAdmin#getColumnQualifiers</a> methods.
+ * </BLOCKQUOTE>
+ *
  * <a name="query"></a>
  * <hr style="height:3px;color:black;background-color:black">
- * <b>VI. <u>QUERYING THE COLUMN-MANAGER REPOSITORY</u></b>
+ * <b>VII. <u>QUERYING THE COLUMN-MANAGER REPOSITORY</u></b>
  * <ul>
  * <li>Get <i>Column Qualifier</i> names and additional column metadata:
  * <BLOCKQUOTE>
@@ -345,7 +365,7 @@
  * getColumnAuditors</a>.
  * </BLOCKQUOTE>
  * </li>
- * <li><a name="auditing"></a>Get audit trail metadata:<br>
+ * <li><a name="audit-trail"></a>Get audit trail metadata:<br>
  * <BLOCKQUOTE>
  * A <a href="ChangeEventMonitor.html">ChangeEventMonitor</a> object (obtained via the
  * {@code RepositoryAdmin} method
@@ -365,17 +385,23 @@
  *
  * <a name="admin"></a>
  * <hr style="height:3px;color:black;background-color:black">
- * <b>VII. <u>ADMINISTRATIVE TOOLS</u></b>
+ * <b>VIII. <u>ADMINISTRATIVE TOOLS</u></b>
  * <ul>
- * <li><a name="discovery"></a>HBase metadata discovery tools
+ * <li><a name="discovery"></a>HBase column-metadata discovery tools
  * <BLOCKQUOTE>
  * When ColumnManager is installed into an already-populated HBase environment, the
  * {@code RepositoryAdmin} method
- * <a href="RepositoryAdmin.html#discoverMetadata--">discoverMetadata</a>
- * may be invoked to perform discovery of all ColumnManager-included user <i>Namespaces</i> and
- * <i>Tables</i> and store pertinent metadata in the repository. The method includes discovery of
- * <a href="ColumnAuditor.html">ColumnAuditor</a> metadata (via a full scan of the Tables [with
- * KeyOnlyFilter]).
+ * <a href="RepositoryAdmin.html#discoverColumnMetadata-boolean-">discoverColumnMetadata</a>
+ * may be invoked to perform discovery of column-metadata
+ * for all <a href="#config">ColumnManager-included</a> <i>Table</i>s.
+ * Column metadata (for each unique column-qualifier value found) is persisted in the
+ * ColumnManager Repository in the form of <a href="ColumnAuditor.html">ColumnAuditor</a> objects;
+ * all such metadata is then retrievable via the
+ * <a href="RepositoryAdmin.html#getColumnAuditors-org.apache.hadoop.hbase.HTableDescriptor-org.apache.hadoop.hbase.HColumnDescriptor-">
+ * RepositoryAdmin#getColumnAuditors</a> and
+ * <a href="RepositoryAdmin.html#getColumnQualifiers-org.apache.hadoop.hbase.HTableDescriptor-org.apache.hadoop.hbase.HColumnDescriptor-">
+ * RepositoryAdmin#getColumnQualifiers</a> methods. Column discovery involves a full Table scan
+ * (with KeyOnlyFilter), using either a direct-scan option or a mapreduce option.
  * </BLOCKQUOTE>
  * </li>
  * <li><a name="export-import"></a>HBase schema export/import tools
@@ -397,7 +423,7 @@
  * <li>Set "maxVersions" for ColumnManager repository
  * <BLOCKQUOTE>
  * By default, the Audit Trail subsystem (as outlined in the section
- * <a href="#auditing">"Get audit trail metadata"</a> above) is configured to track and report on
+ * <a href="#audit-trail">"Get audit trail metadata"</a> above) is configured to track and report on
  * only the most recent 50 {@code ChangeEvent}s of each entity-attribute that it tracks (for
  * example, the most recent 50 changes to the "durability" setting of a given
  * <i>Table</i>). This limitation relates directly to the default "maxVersions" setting of the
