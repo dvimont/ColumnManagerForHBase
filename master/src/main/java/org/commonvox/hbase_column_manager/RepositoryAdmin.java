@@ -530,7 +530,8 @@ public class RepositoryAdmin {
    * {@link org.apache.hadoop.conf.Configuration} parameter
    * {@link org.apache.hadoop.hbase.mapreduce.TableInputFormat#SCAN_CACHEDROWS}.
    *
-   * @param useMapreduce if {@code true}, discovery is done via mapreduce
+   * @param useMapreduce if {@code true}, discovery is done via mapreduce; otherwise, discovery
+   * is done via direct-scan
    * @throws IOException if a remote or network exception occurs
    */
   public void discoverColumnMetadata(boolean useMapreduce) throws Exception {
@@ -554,7 +555,8 @@ public class RepositoryAdmin {
    * @param tableName <i>Table</i> for which schema metadata is to be discovered; submitted
    * <i>Table</i> must be
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
-   * @param useMapreduce if {@code true}, discovery is done via mapreduce
+   * @param useMapreduce if {@code true}, discovery is done via mapreduce; otherwise, discovery
+   * is done via direct-scan
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
@@ -830,7 +832,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each invalid column
    * qualifier found, along with a count of the number of rows which contain that same invalid
    * column qualifier.
-   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
+   * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
@@ -857,7 +860,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each invalid column
    * qualifier found, along with a count of the number of rows which contain that same invalid
    * column qualifier.
-   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
+   * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
@@ -884,7 +888,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column length, along with a count of the
    * number of rows in which that column contains an invalid column length.
-   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
+   * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
@@ -913,7 +918,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column length, along with a count of the
    * number of rows in which that column contains an invalid column length.
-   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
+   * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
@@ -941,7 +947,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column value, along with a count of the
    * number of rows in which that column contains an invalid column value.
-   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
+   * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
@@ -969,7 +976,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column value, along with a count of the
    * number of rows in which that column contains an invalid column value.
-   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs
+   * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
+   * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
