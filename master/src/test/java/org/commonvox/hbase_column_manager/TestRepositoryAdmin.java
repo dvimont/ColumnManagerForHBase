@@ -459,7 +459,9 @@ public class TestRepositoryAdmin {
       if (!standardAdmin.tableExists(tableName)) {
         continue;
       }
-      standardAdmin.disableTable(tableName);
+      if (!standardAdmin.isTableDisabled(tableName)) {
+        standardAdmin.disableTable(tableName);
+      }
       standardAdmin.deleteTable(tableName);
     }
     for (String namespaceName : testNamespacesAndDescriptors.keySet()) {

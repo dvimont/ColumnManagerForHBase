@@ -72,7 +72,7 @@ class Repository {
 
   private final Logger logger;
   private static final Logger staticLogger
-          = Logger.getLogger(Repository.class.getPackage().getName());
+          = Logger.getLogger(Repository.class.getName());
   private final byte[] javaUsername;
   private final boolean columnManagerIsActivated;
   private final Set<String> includedNamespaces;
@@ -165,7 +165,7 @@ class Repository {
   }
 
   Repository(Connection hBaseConnection, Object originatingObject) throws IOException {
-    logger = Logger.getLogger(this.getClass().getPackage().getName());
+    logger = Logger.getLogger(this.getClass().getName());
     javaUsername
             = Bytes.toBytes(System.getProperty(Bytes.toString(JAVA_USERNAME_PROPERTY_KEY)));
     this.hbaseConnection = hBaseConnection;

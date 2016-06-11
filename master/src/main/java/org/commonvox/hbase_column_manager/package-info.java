@@ -66,7 +66,7 @@
  * <li><b>Command-line invocation for some administrative functions:</b>
  * For the convenience of HBase administrators, particularly those who are not Java coders, it
  * may be advisable to make certain <a href="RepositoryAdmin.html">RepositoryAdmin</a> functions
- * available via command-line invocation (i.e. through an executable JAR).
+ * available via command-line invocation (i.e. through an executable UtilityRunner).
  * </li>
  * </ul>
  * <hr>

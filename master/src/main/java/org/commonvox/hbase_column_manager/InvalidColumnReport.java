@@ -68,7 +68,7 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
   static final CSVFormat VERBOSE_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
           .withCommentMarker('#').withHeader(VerboseReportHeader.class);
   private static final Logger staticLogger
-          = Logger.getLogger(Repository.class.getPackage().getName());
+          = Logger.getLogger(Repository.class.getName());
   static final String TEMP_REPORT_NAMESPACE = "__column_manager_temp_reports";
   private static final String TEMP_REPORT_TABLENAME_PREFIX = "temp_report_table_";
   private static final byte[] TEMP_REPORT_CF = Bytes.toBytes("cr");

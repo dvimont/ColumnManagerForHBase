@@ -59,7 +59,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public RepositoryAdmin(Connection connection) throws IOException {
-    logger = Logger.getLogger(this.getClass().getPackage().getName());
+    logger = Logger.getLogger(this.getClass().getName());
     MConnection mConnection;
     if (MConnection.class.isAssignableFrom(connection.getClass())) {
       mConnection = (MConnection) connection;
@@ -118,7 +118,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public static void uninstallRepositoryStructures(Admin hbaseAdmin) throws IOException {
-    Repository.dropRepository(hbaseAdmin, Logger.getLogger(RepositoryAdmin.class.getPackage().getName()));
+    Repository.dropRepository(hbaseAdmin, Logger.getLogger(RepositoryAdmin.class.getName()));
     InvalidColumnReport.dropTempReportNamespace(hbaseAdmin);
   }
 
