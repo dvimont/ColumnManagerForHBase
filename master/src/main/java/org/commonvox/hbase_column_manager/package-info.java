@@ -16,7 +16,7 @@
  */
 /**
  * <hr><b>ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a></b>
- * is an extended <i>METADATA REPOSITORY SYSTEM for HBase 1.x</i>
+ * provides an extended <i>METADATA REPOSITORY SYSTEM for HBase 1.x</i>
  * with options for:<br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures Column metadata
@@ -325,9 +325,10 @@
  * </BLOCKQUOTE>
  * <b>B. OPTIONALLY CATCH {@code ColumnManagerIOException} OCCURRENCES</b>
  * <BLOCKQUOTE>
- * In the context of certain applications, it may be necessary to perform special processing when a
- * <a href="ColumnManagerIOException.html">ColumnManagerIOException</a> is thrown, signifying
- * rejection of a specific <i>Column</i> entry submitted in a {@code put} (i.e., insert/update) to
+ * In the context of some applications it may be necessary to perform special processing when a
+ * <a href="ColumnManagerIOException.html">ColumnManagerIOException</a> is thrown, which may
+ * signify rejection of a specific <i>Column</i> entry submitted in a {@code put}
+ * (i.e., insert/update) to
  * an <a href="#enforcement">enforcement-enabled</a> <i>Table/Column-Family</i>.
  * In such cases, exceptions of this abstract
  * type (or its concrete subclasses) may be caught, and appropriate processing performed.

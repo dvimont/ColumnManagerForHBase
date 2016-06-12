@@ -35,8 +35,7 @@ import org.apache.hadoop.hbase.security.User;
  * <i>Table</i>, <i>Column Family</i>, and <i>{@link ColumnAuditor}</i> metadata, and (b)
  * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
  * optionally enforce} administrator-specified {@link ColumnDefinition}s when <i>Columns</i> are
- * submitted in a {@code put} (i.e., insert/update) via the standard {@code Table},
- * {@code BufferedMutator}, and
+ * submitted in a {@code put} (i.e., insert/update) via {@code Table}, {@code BufferedMutator}, and
  * {@link RepositoryAdmin#createHTableMultiplexer(int)  HTableMultiplexer} interfaces.
  *
  * @author Daniel Vimont

@@ -35,7 +35,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
 
 /**
- * A <b>RepositoryAdmin</b> provides ColumnManager repository maintenance and query facilities,
+ * A <b>RepositoryAdmin</b> provides ColumnManager Repository maintenance and query facilities,
  * as well as column-metadata {@link #discoverColumnMetadata(boolean) discovery} and full-schema
  * {@link #exportSchema(java.io.File, boolean) export}/{@link #importSchema(java.io.File, boolean) import}
  * facilities; it is used as a complement to the standard
@@ -89,7 +89,7 @@ public class RepositoryAdmin {
    * default setting is 50.
    *
    * @param hbaseAdmin Standard Admin object
-   * @param maxVersions Maximum versions for repository to retain of each schema metadata attribute
+   * @param maxVersions Maximum versions for Repository to retain of each schema metadata attribute
    * @throws IOException if a remote or network exception occurs
    */
   public static void setRepositoryMaxVersions(Admin hbaseAdmin, int maxVersions)
@@ -98,11 +98,11 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Get the maxVersions setting for the Repository table (maximum versions for repository to retain
+   * Get the maxVersions setting for the Repository table (maximum versions for Repository to retain
    * of each schema metadata attribute).
    *
    * @param hbaseAdmin Standard Admin object
-   * @return Maximum versions for repository to retain of each schema metadata attribute
+   * @return Maximum versions for Repository to retain of each schema metadata attribute
    * @throws IOException if a remote or network exception occurs
    */
   public static int getRepositoryMaxVersions(Admin hbaseAdmin)
@@ -111,7 +111,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Disable and delete repository table and drop repository namespace (for uninstall or reinstall
+   * Disable and delete Repository table and drop Repository namespace (for uninstall or reinstall
    * of ColumnManager).
    *
    * @param hbaseAdmin standard HBase Admin
@@ -155,7 +155,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Get {@link ColumnAuditor} objects from the repository for a specified <i>Table</i> and
+   * Get {@link ColumnAuditor} objects from the Repository for a specified <i>Table</i> and
    * <i>Column Family</i>.
    *
    * @param htd Table Descriptor
@@ -179,7 +179,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Get {@link ColumnAuditor} objects from the repository for a specified <i>Table</i> and
+   * Get {@link ColumnAuditor} objects from the Repository for a specified <i>Table</i> and
    * <i>Column Family</i>.
    *
    * @param tableName Table name
@@ -206,7 +206,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Get Column Qualifiers from the {@link ColumnAuditor} metadata in the repository for a specified
+   * Get Column Qualifiers from the {@link ColumnAuditor} metadata in the Repository for a specified
    * <i>Table</i> and <i>Column Family</i>.
    *
    * @param htd Table Descriptor
@@ -237,7 +237,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Get Column Qualifiers from the {@link ColumnAuditor} metadata in the repository for a specified
+   * Get Column Qualifiers from the {@link ColumnAuditor} metadata in the Repository for a specified
    * <i>Table</i> and <i>Column Family</i>.
    *
    * @param tableName Table name
@@ -498,11 +498,11 @@ public class RepositoryAdmin {
    * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the related <i>Column Family</i>), (2)
    * process "put" requests in a standard manner (queuing them for subsequent <b>asynchronous</b>
-   * processing by HBase) and then (3) perform <b>synchronous</b> ColumnManager repository
+   * processing by HBase) and then (3) perform <b>synchronous</b> ColumnManager Repository
    * processing upon the metadata of each successfully queued "put". <i>Be advised that the third
    * step will not take into account any potentially failed "put" transactions among those queued in
    * the second step; instead it assumes that all "put" transactions succeeded, updating the
-   * ColumnManager repository accordingly.</i>
+   * ColumnManager Repository accordingly.</i>
    *
    * @param perRegionServerBufferQueueSize determines the max number of the buffered Put ops for
    * each region server before dropping a request.
@@ -576,7 +576,7 @@ public class RepositoryAdmin {
    * metadata contents (i.e., all <i>{@link NamespaceDescriptor Namespace}</i>,
    * <i>{@link HTableDescriptor Table}</i>, <i>{@link HColumnDescriptor Column Family}</i>,
    * <i>{@link ColumnAuditor}</i>, and <i>{@link ColumnDefinition}</i> metadata) of the
-   * ColumnManager metadata repository. This constitutes an XML-formatted serialization of
+   * ColumnManager metadata Repository. This constitutes an XML-formatted serialization of
    * objects of the following classes: {@link NamespaceDescriptor}, {@link HTableDescriptor},
    * {@link HColumnDescriptor}, {@link ColumnAuditor}, and {@link ColumnDefinition}.
    * <br><br>*An HSA file adheres to the XML Schema layout in
@@ -652,7 +652,7 @@ public class RepositoryAdmin {
    *
    * @param sourceHsaFile source file
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
-   * HBaseSchemaArchive file into the ColumnManager repository.
+   * HBaseSchemaArchive file into the ColumnManager Repository.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    */
@@ -675,7 +675,7 @@ public class RepositoryAdmin {
    * @param sourceHsaFile source file
    * @param namespaceName namespace to import.
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
-   * HBaseSchemaArchive file into the ColumnManager repository.
+   * HBaseSchemaArchive file into the ColumnManager Repository.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
@@ -698,7 +698,7 @@ public class RepositoryAdmin {
    * HBaseSchemaArchive.xsd.xml</a>.
    *
    * @param includeColumnAuditors if <b>true</b>, import {@link ColumnAuditor} metadata from the
-   * HBaseSchemaArchive file into the ColumnManager repository.
+   * HBaseSchemaArchive file into the ColumnManager Repository.
    * @param tableName Name of table to be imported.
    * @param sourceHsaFile source file
    * @throws IOException if a remote or network exception occurs
@@ -713,7 +713,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Import into the ColumnManager repository all {@link ColumnDefinition}s that are found in the
+   * Import into the ColumnManager Repository all {@link ColumnDefinition}s that are found in the
    * submitted HBaseSchemaArchive (HSA) XML file*;
    * for a {@link ColumnDefinition} to be imported, it must belong to an existing
    * Table/ColumnFamily which is
@@ -733,7 +733,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Import into the ColumnManager repository all of a specified Namespace's
+   * Import into the ColumnManager Repository all of a specified Namespace's
    * {@link ColumnDefinition}s that are found in the submitted HBaseSchemaArchive (HSA) XML file*;
    * for a {@link ColumnDefinition} to be imported, it must belong to an existing
    * Table/ColumnFamily which is
@@ -756,7 +756,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Import into the ColumnManager repository all of a specified Table's
+   * Import into the ColumnManager Repository all of a specified Table's
    * {@link ColumnDefinition}s that are found in the submitted HBaseSchemaArchive (HSA) XML file*;
    * for a {@link ColumnDefinition} to be imported, it must belong to an existing
    * Table/ColumnFamily which is
@@ -780,7 +780,7 @@ public class RepositoryAdmin {
   }
 
   /**
-   * Import into the ColumnManager repository all of a specified ColumnFamily's
+   * Import into the ColumnManager Repository all of a specified ColumnFamily's
    * {@link ColumnDefinition}s that are found in the submitted HBaseSchemaArchive (HSA) XML file*;
    * for a {@link ColumnDefinition} to be imported, it must belong to an existing
    * Table/ColumnFamily which is
