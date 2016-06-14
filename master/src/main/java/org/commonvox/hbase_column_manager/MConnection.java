@@ -42,8 +42,7 @@ class MConnection implements Connection, Closeable, AutoCloseable {
   private final Connection STANDARD_HBASE_CONNECTION;
   private final Repository REPOSITORY;
 
-  MConnection(Connection hBaseClientConnection)
-          throws IOException {
+  MConnection(Connection hBaseClientConnection) throws IOException {
     STANDARD_HBASE_CONNECTION = hBaseClientConnection;
     REPOSITORY = new Repository(STANDARD_HBASE_CONNECTION, this);
   }

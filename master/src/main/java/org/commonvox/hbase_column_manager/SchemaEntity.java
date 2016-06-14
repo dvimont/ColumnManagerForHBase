@@ -278,7 +278,11 @@ class SchemaEntity implements Comparable<SchemaEntity> {
   }
 
   Set<SchemaEntity> getChildren() {
-    return children;
+    if (children == null) {
+      return new TreeSet<>();
+    } else {
+      return children;
+    }
   }
 
   /**

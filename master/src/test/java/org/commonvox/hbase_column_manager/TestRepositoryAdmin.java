@@ -494,97 +494,100 @@ public class TestRepositoryAdmin {
 
   private void createSchemaStructuresInHBase(
           Configuration configuration, boolean bypassColumnManager) throws IOException {
+    if (bypassColumnManager) {
+      try (Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
+        createNamespaceAndTables(standardAdmin);
+      }
+    } else {
+      try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin()) {
+        createNamespaceAndTables(mAdmin);
+      }
+    }
+  }
+
+  private void createNamespaceAndTables (Admin admin) throws IOException {
     int memStoreFlushSize = 60000000;
     int maxVersions = 8;
     boolean alternateBooleanAttribute = false;
 
-    try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin();
-            Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
-      for (NamespaceDescriptor nd : testNamespacesAndDescriptors.values()) {
-        if (nd.getName().isEmpty() || nd.getName().equals("default")) {
-          continue;
-        }
-        nd.setConfiguration("NamespaceConfigTest", "value=" + nd.getName());
-        if (bypassColumnManager) {
-          standardAdmin.createNamespace(nd);
-        } else {
-          mAdmin.createNamespace(nd);
-        }
+    for (NamespaceDescriptor nd : testNamespacesAndDescriptors.values()) {
+      if (nd.getName().isEmpty() || nd.getName().equals("default")) {
+        continue;
       }
-      for (HTableDescriptor htd : testTableNamesAndDescriptors.values()) {
-        htd.setMemStoreFlushSize(memStoreFlushSize++);
-        htd.setDurability(Durability.SKIP_WAL);
-        for (HColumnDescriptor hcd : testColumnFamilyNamesAndDescriptors.values()) {
-          alternateBooleanAttribute = !alternateBooleanAttribute;
-          hcd.setInMemory(alternateBooleanAttribute);
-          hcd.setMaxVersions(maxVersions++);
-          htd.addFamily(hcd);
-        }
-        if (bypassColumnManager) {
-          standardAdmin.createTable(htd);
-        } else {
-          mAdmin.createTable(htd);
-        }
+      nd.setConfiguration("NamespaceConfigTest", "value=" + nd.getName());
+      admin.createNamespace(nd);
+    }
+    for (HTableDescriptor htd : testTableNamesAndDescriptors.values()) {
+      htd.setMemStoreFlushSize(memStoreFlushSize++);
+      htd.setDurability(Durability.SKIP_WAL);
+      for (HColumnDescriptor hcd : testColumnFamilyNamesAndDescriptors.values()) {
+        alternateBooleanAttribute = !alternateBooleanAttribute;
+        hcd.setInMemory(alternateBooleanAttribute);
+        hcd.setMaxVersions(maxVersions++);
+        htd.addFamily(hcd);
       }
+      admin.createTable(htd);
     }
   }
 
   private void loadColumnData(Configuration configuration, boolean bypassColumnManager)
           throws IOException {
 
-    try (Connection mConnection = MConnectionFactory.createConnection(configuration);
-            Connection standardConnection = ConnectionFactory.createConnection(configuration)) {
-
-      Connection connection;
-      if (bypassColumnManager) {
-        connection = standardConnection;
-      } else {
-        connection = mConnection;
+    if (bypassColumnManager) {
+      try (Connection standardConnection = ConnectionFactory.createConnection(configuration)) {
+        loadColumns(standardConnection);
       }
-      // put rows into Table which is INCLUDED for auditing
-      try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01)) {
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_01).
-                addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
-                addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
-        putList.add(new Put(ROW_ID_02).
-                addColumn(CF01, COLQUALIFIER01, VALUE_82_BYTES_LONG).
-                addColumn(CF01, COLQUALIFIER03, VALUE_9_BYTES_LONG).
-                addColumn(CF02, COLQUALIFIER04, VALUE_82_BYTES_LONG));
-        table01InNamespace01.put(putList);
+    } else {
+      try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+        loadColumns(mConnection);
       }
+    }
+  }
 
-      try (Table table01InNamespace03 = connection.getTable(NAMESPACE03_TABLE01)) {
+  private void loadColumns(Connection connection) throws IOException {
+    // put rows into Table which is INCLUDED for auditing
+    try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01)) {
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_01).
+              addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, COLQUALIFIER01, VALUE_82_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER03, VALUE_9_BYTES_LONG).
+              addColumn(CF02, COLQUALIFIER04, VALUE_82_BYTES_LONG));
+      table01InNamespace01.put(putList);
+    }
 
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_04).
-                addColumn(CF01, COLQUALIFIER03, VALUE_82_BYTES_LONG).
-                addColumn(CF01, COLQUALIFIER01, VALUE_9_BYTES_LONG));
-        table01InNamespace03.put(putList);
-      }
+    try (Table table01InNamespace03 = connection.getTable(NAMESPACE03_TABLE01)) {
 
-      // put two rows into Table in Namespace which is NOT included for ColumnManager auditing
-      try (Table table01InNamespace02 = connection.getTable(NAMESPACE02_TABLE01)) {
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_04).
+              addColumn(CF01, COLQUALIFIER03, VALUE_82_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER01, VALUE_9_BYTES_LONG));
+      table01InNamespace03.put(putList);
+    }
 
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_01).
-                addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG).
-                addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
-        putList.add(new Put(ROW_ID_02).
-                addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
-                addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
-        table01InNamespace02.put(putList);
-      }
+    // put two rows into Table in Namespace which is NOT included for ColumnManager auditing
+    try (Table table01InNamespace02 = connection.getTable(NAMESPACE02_TABLE01)) {
 
-      // put one row into Table which is explicitly NOT included for ColumnManager auditing
-      try (Table table02InNamespace03 = connection.getTable(NAMESPACE03_TABLE02)) {
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_01).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
+      table01InNamespace02.put(putList);
+    }
 
-        List<Put> putList = new ArrayList<>();
-        putList.add(new Put(ROW_ID_03).
-                addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
-                addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_5_BYTES_LONG));
-        table02InNamespace03.put(putList);
-      }
+    // put one row into Table which is explicitly NOT included for ColumnManager auditing
+    try (Table table02InNamespace03 = connection.getTable(NAMESPACE03_TABLE02)) {
+
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_03).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_5_BYTES_LONG));
+      table02InNamespace03.put(putList);
     }
   }
 
@@ -2593,12 +2596,36 @@ public class TestRepositoryAdmin {
         }
       }
     }
+  }
 
+  public void testUtilityRunner() throws Exception {
+    // UtilityRunner -u getColumnAuditors --table tableName -f testOutput.txt -h
+    System.out.println("#testUtilityRunner has been invoked using WILDCARDED "
+            + "EXCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+    loadColumnData(configuration, true);
+//    doColumnDiscovery(configuration, false);
+//    verifyColumnAuditing(configuration);
+    String[] args = new String[]{
+      "-u", "exportSchema", // "getColumnAuditors",
+      "--table", NAMESPACE01_TABLE01.getNameAsString(),
+      "-f", "testOutput.txt",
+      "-h"};
+    UtilityRunner.main(args);
+    clearTestingEnvironment();
+    System.out.println("#testUtilityRunner using WILDCARDED EXCLUDE config properties has "
+            + "run to completion.");
   }
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
-    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
@@ -2615,5 +2642,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsUsingMapReduce();
+    new TestRepositoryAdmin().testUtilityRunner();
   }
 }

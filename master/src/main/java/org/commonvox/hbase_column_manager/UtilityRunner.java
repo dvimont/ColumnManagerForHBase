@@ -15,8 +15,11 @@
  */
 package org.commonvox.hbase_column_manager;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
+import javax.xml.bind.JAXBException;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -24,6 +27,8 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.log4j.Logger;
 
 /**
@@ -37,16 +42,17 @@ class UtilityRunner {
   private static final Logger LOG = Logger.getLogger(UtilityRunner.class.getName());
   private static final Option UTILITY_OPTION;
   private static final Option TABLE_OPTION;
+  private static final Option FILE_OPTION;
   private static final Option HELP_OPTION;
   private static final Options OPTIONS;
   private static final HelpFormatter HELP_FORMATTER;
   private static final String BAR = "====================";
-  private static final String EXPORT_SCHEMA_UTILITY = "exportSchema";
-  private static final String IMPORT_SCHEMA_UTILITY = "importSchema";
-  private static final String GET_COLUMN_AUDITORS_UTILITY = "getColumnAuditors";
-  private static final String DISCOVER_COLUMN_METADATA_UTILITY = "discoverColumnMetadata";
-  private static final String GET_ALL_CHANGE_EVENTS_UTILITY = "getAllChangeEvents";
-  private static final String ADD_COLUMN_DEFINITIONS_UTILITY = "addColumnDefinitions";
+  public static final String EXPORT_SCHEMA_UTILITY = "exportSchema";
+  public static final String IMPORT_SCHEMA_UTILITY = "importSchema";
+  public static final String GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN = "getColumnAuditors";
+  public static final String GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE
+          = "getColumnAuditorsViaMapReduce";
+  public static final String GET_CHANGE_EVENTS_UTILITY = "getChangeEventsForTable";
   private static final Set<String> UTILITY_LIST;
   static {
     HELP_FORMATTER = new HelpFormatter();
@@ -54,10 +60,9 @@ class UtilityRunner {
     UTILITY_LIST = new TreeSet<>();
     UTILITY_LIST.add(EXPORT_SCHEMA_UTILITY);
     UTILITY_LIST.add(IMPORT_SCHEMA_UTILITY);
-    UTILITY_LIST.add(GET_COLUMN_AUDITORS_UTILITY);
-    UTILITY_LIST.add(DISCOVER_COLUMN_METADATA_UTILITY);
-    UTILITY_LIST.add(GET_ALL_CHANGE_EVENTS_UTILITY);
-    UTILITY_LIST.add(ADD_COLUMN_DEFINITIONS_UTILITY);
+    UTILITY_LIST.add(GET_CHANGE_EVENTS_UTILITY);
+    UTILITY_LIST.add(GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN);
+    UTILITY_LIST.add(GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE);
     StringBuilder validUtilities = new StringBuilder();
     for (String utility : UTILITY_LIST) {
       if (validUtilities.length() > 0) {
@@ -65,23 +70,26 @@ class UtilityRunner {
       }
       validUtilities.append(" ").append(utility);
     }
-    UTILITY_OPTION = Option.builder("u").longOpt("utility").hasArg().optionalArg(false)
-            .required(true).desc("Utility to run. Valid <arg> values are as follows:"
-                    + validUtilities).build();
-    TABLE_OPTION = Option.builder("t").longOpt("table").hasArg().optionalArg(false)
-            .required(true).desc("Fully-qualified table name.").build();
-    HELP_OPTION = Option.builder("h").longOpt("help").hasArg(false)
-            .required(false).desc("Display help message.").build();
+    UTILITY_OPTION = Option.builder("u").longOpt("utility").hasArg().required(true)
+            .desc("Utility to run. Valid <arg> values are as follows:" + validUtilities)
+            .optionalArg(false).build();
+    TABLE_OPTION = Option.builder("t").longOpt("table").hasArg().required(true)
+            .desc("Fully-qualified table name.").optionalArg(false).build();
+    FILE_OPTION = Option.builder("f").longOpt("file").hasArg().required(true)
+            .desc("Source/target file.").optionalArg(false).build();
+    HELP_OPTION = Option.builder("h").longOpt("help").hasArg(false).required(false)
+            .desc("Display help message.").build();
     OPTIONS = new Options();
     OPTIONS.addOption(UTILITY_OPTION);
     OPTIONS.addOption(TABLE_OPTION);
+    OPTIONS.addOption(FILE_OPTION);
     OPTIONS.addOption(HELP_OPTION);
   }
 
-  UtilityRunner(String[] args) throws ParseException {
-    if (args != null && args.length == 1
+  UtilityRunner(String[] args) throws Exception, ParseException, IOException, JAXBException {
+    if ( args != null && args.length == 1
             && (args[0].equals("-" + HELP_OPTION.getOpt())
-            || args[0].equals("--" + HELP_OPTION.getLongOpt()))) {
+            || args[0].equals("--" + HELP_OPTION.getLongOpt())) ) {
       printHelp();
       return;
     }
@@ -106,24 +114,39 @@ class UtilityRunner {
     LOG.info(parmInfo);
 
     String selectedUtility = commandLine.getOptionValue(UTILITY_OPTION.getOpt());
+    String selectedTableString = commandLine.getOptionValue(TABLE_OPTION.getOpt());
+    String selectedFileString = commandLine.getOptionValue(FILE_OPTION.getOpt());
     if (!UTILITY_LIST.contains(selectedUtility)) {
-      throw new ParseException("Invalid utility argument submitted: " + selectedUtility);
+      throw new ParseException("Invalid utility argument submitted: <" + selectedUtility + ">");
     }
-    LOG.info(this.getClass().getSimpleName()
-            + " is invoking the following utility: " + selectedUtility);
-    switch (selectedUtility) {
-      case EXPORT_SCHEMA_UTILITY:
-        break;
-      case IMPORT_SCHEMA_UTILITY:
-        break;
-      case GET_COLUMN_AUDITORS_UTILITY:
-        break;
-      case DISCOVER_COLUMN_METADATA_UTILITY:
-        break;
-      case GET_ALL_CHANGE_EVENTS_UTILITY:
-        break;
-      case ADD_COLUMN_DEFINITIONS_UTILITY:
-        break;
+    try (Connection mConnection = MConnectionFactory.createConnection()) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection);
+      // Note that selectedUtility will validate selectedTableString and selectedFileString
+      File selectedFile = new File(selectedFileString);
+      LOG.info(this.getClass().getSimpleName()
+              + " is invoking the following utility: <" + selectedUtility
+              + "> on the following table: <" + selectedTableString + "> using the following "
+              + "source/target file <" + selectedFileString + ">");
+      switch (selectedUtility) {
+        case EXPORT_SCHEMA_UTILITY:
+          repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          break;
+        case IMPORT_SCHEMA_UTILITY:
+          repositoryAdmin.importSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          break;
+        case GET_CHANGE_EVENTS_UTILITY:
+          ChangeEventMonitor.exportChangeEventListToCsvFile(repositoryAdmin.getChangeEventMonitor()
+                  .getChangeEventsForTable(TableName.valueOf(selectedTableString)), selectedFile);
+          break;
+        case GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN:
+          repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), false);
+          repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          break;
+        case GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE:
+          repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), true);
+          repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          break;
+      }
     }
   }
 
@@ -141,7 +164,8 @@ class UtilityRunner {
   /**
    * @param args the command line arguments
    */
-  public static void main(String[] args) throws ParseException {
+  public static void main(String[] args)
+          throws Exception, ParseException, IOException, JAXBException {
 //    if (args == null || args.length == 0) {
 //      args = new String[]{"-u", "oregano", "-h"};
 //    }

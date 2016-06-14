@@ -75,12 +75,12 @@ class Repository {
           = Logger.getLogger(Repository.class.getName());
   private final byte[] javaUsername;
   private final boolean columnManagerIsActivated;
-  private final Set<String> includedNamespaces;
-  private final Set<String> includedEntireNamespaces;
-  private final Set<TableName> includedTables;
-  private final Set<String> excludedNamespaces;
-  private final Set<String> excludedEntireNamespaces;
-  private final Set<TableName> excludedTables;
+  private Set<String> includedNamespaces;
+  private Set<String> includedEntireNamespaces;
+  private Set<TableName> includedTables;
+  private Set<String> excludedNamespaces;
+  private Set<String> excludedEntireNamespaces;
+  private Set<TableName> excludedTables;
   private final Connection hbaseConnection;
   private final Admin standardAdmin;
   private final Table repositoryTable;
@@ -185,8 +185,14 @@ class Repository {
             + " = " + columnManagerActivatedStatus);
     if (columnManagerActivatedStatus.equalsIgnoreCase(HBASE_CONFIG_PARM_VALUE_COLMANAGER_ACTIVATED)) {
       columnManagerIsActivated = true;
-      repositoryTable = getRepositoryTable();
       logger.info(PRODUCT_NAME + " Repository is ACTIVATED.");
+      buildIncludedAndExcludedTablesSets(conf);
+      boolean newInstallation = !standardAdmin.tableExists(REPOSITORY_TABLENAME);
+      repositoryTable = getRepositoryTable();
+      doSyncCheck();
+      if (newInstallation) {
+        discoverSchema(false,false);
+      }
     } else {
       columnManagerIsActivated = false;
       repositoryTable = null;
@@ -199,6 +205,13 @@ class Repository {
       excludedTables = null;
       return;
     }
+  }
+
+  private void buildIncludedAndExcludedTablesSets(Configuration conf) {
+    String[] includedTablesArray
+            = conf.getStrings(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES);
+    String[] excludedTablesArray
+            = conf.getStrings(HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES);
     if (includedTablesArray != null && excludedTablesArray != null) {
       logger.warn(PRODUCT_NAME + " " + HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
               + " parameter will be ignored; overridden by "
@@ -265,7 +278,6 @@ class Repository {
       logger.info(PRODUCT_NAME + " Repository activated for ONLY the following user tables: "
               + conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES));
     }
-    doSyncCheck();
   }
 
   private Table getRepositoryTable() throws IOException {
@@ -1601,7 +1613,7 @@ class Repository {
     }
   }
 
-  void discoverSchema(boolean includeColumnQualifiers, boolean useMapReduce) throws Exception {
+  void discoverSchema(boolean includeColumnQualifiers, boolean useMapReduce) throws IOException {
     for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
@@ -1618,7 +1630,7 @@ class Repository {
   }
 
   void discoverSchema(TableName tableName, boolean includeColumnQualifiers, boolean useMapReduce)
-          throws Exception {
+          throws IOException {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -1628,17 +1640,27 @@ class Repository {
     }
   }
 
-  private void discoverColumnMetadata(TableName tableName, boolean useMapReduce) throws Exception {
+  private void discoverColumnMetadata(TableName tableName, boolean useMapReduce) throws IOException {
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     if (mtd == null) {
       return;
     }
     // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
     if (useMapReduce) {
-      int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
-                new String[]{TABLE_NAME_ARG_KEY + tableName.getNameAsString()});
-      if (jobCompletionCode != 0) {
-        logger.warn("Mapreduce process failure in " + ColumnDiscoveryTool.class.getSimpleName());
+      try {
+        int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
+                  new String[]{TABLE_NAME_ARG_KEY + tableName.getNameAsString()});
+        if (jobCompletionCode != 0) {
+          logger.warn("Mapreduce process failure in " + ColumnDiscoveryTool.class.getSimpleName());
+        }
+      } catch (Exception e) {
+        if (IOException.class.isAssignableFrom(e.getClass())) {
+          throw (IOException)e;
+        } else {
+          IOException mapreduceExceptionWrapper = new IOException("Mapreduce process failure");
+          mapreduceExceptionWrapper.initCause(e);
+          throw mapreduceExceptionWrapper;
+        }
       }
     } else {
       Table table = hbaseConnection.getTable(tableName);

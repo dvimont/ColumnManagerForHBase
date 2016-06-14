@@ -82,6 +82,7 @@ public class RepositoryAdmin {
           throws IOException {
     Repository.createRepositoryNamespace(hbaseAdmin);
     Repository.createRepositoryTable(hbaseAdmin);
+    new RepositoryAdmin(hbaseAdmin.getConnection()).repository.discoverSchema(false, false);
   }
 
   /**
