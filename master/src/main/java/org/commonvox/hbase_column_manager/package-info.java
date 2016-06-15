@@ -204,8 +204,9 @@
  * <BLOCKQUOTE>
  * <b>A. INCLUDE/EXCLUDE TABLES FOR ColumnManager PROCESSING</b>
  * <br>
- * By default, when ColumnManager is installed and <a href="#activate">activated</a>, all user
- * Tables are included in ColumnManager processing. However, the following options are available
+ * <i><b>By default, when ColumnManager is installed and <a href="#activate">activated</a>,
+ * all user Tables are included in ColumnManager processing.</b></i>
+ * However, the following options are available
  * to limit ColumnManager processing to a specific subset of user Tables.
  * <BLOCKQUOTE>
  * <b>Option 1: Explicitly INCLUDE Tables for ColumnManager processing</b><br>

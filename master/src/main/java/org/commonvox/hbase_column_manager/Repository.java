@@ -99,6 +99,7 @@ class Repository {
           = HBASE_CONFIG_PARM_KEY_PREFIX + "includedTables";
   static final String HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES
           = HBASE_CONFIG_PARM_KEY_PREFIX + "excludedTables";
+  static final String ALL_TABLES_WILDCARD_INDICATOR = ":*";
 
   private static final int UNIQUE_FOREIGN_KEY_LENGTH = 16;
   private static final NamespaceDescriptor HBASE_SYSTEM_NAMESPACE_DESCRIPTOR
@@ -112,7 +113,7 @@ class Repository {
   static final int DEFAULT_REPOSITORY_MAX_VERSIONS = 50; // should this be set higher?
 
   static final byte[] NAMESPACE_PARENT_FOREIGN_KEY = {'-'};
-  private static final byte[] DEFAULT_NAMESPACE = Bytes.toBytes("default");
+  static final byte[] HBASE_DEFAULT_NAMESPACE = Bytes.toBytes("default");
   private static final Map<ImmutableBytesWritable, ImmutableBytesWritable> EMPTY_VALUES = new HashMap<>();
   private static final String CONFIG_COLUMN_PREFIX = "Configuration__";
   private static final byte[] CONFIG_COLUMN_PREFIX_BYTES = Bytes.toBytes(CONFIG_COLUMN_PREFIX);
@@ -235,7 +236,7 @@ class Repository {
             TableName excludedTableName = TableName.valueOf(excludedTableString);
             excludedTables.add(excludedTableName);
           } catch (IllegalArgumentException e) {
-            if (excludedTableString.endsWith(":*")) { // exclude entire namespace
+            if (excludedTableString.endsWith(ALL_TABLES_WILDCARD_INDICATOR)) {
               String excludedNamespaceString
                       = excludedTableString.substring(0, excludedTableString.length() - 2);
               // #isLegalNamespaceName throws IllegalArgumentException if not legal Namespace
@@ -263,7 +264,7 @@ class Repository {
           includedTables.add(includedTableName);
           includedNamespaces.add(includedTableName.getNamespaceAsString());
         } catch (IllegalArgumentException e) {
-          if (includedTableString.endsWith(":*")) { // include entire namespace
+          if (includedTableString.endsWith(ALL_TABLES_WILDCARD_INDICATOR)) {
             String includedNamespaceString
                     = includedTableString.substring(0, includedTableString.length() - 2);
             // #isLegalNamespaceName throws IllegalArgumentException if not legal Namespace
@@ -1629,6 +1630,26 @@ class Repository {
     }
   }
 
+  void discoverSchema(String namespace, boolean includeColumnQualifiers, boolean useMapReduce)
+          throws IOException {
+    NamespaceDescriptor nd = getAdmin().getNamespaceDescriptor(namespace); // Exception if not found
+    if (!isIncludedNamespace(namespace)) {
+      throw new TableNotIncludedForProcessingException(
+              Bytes.toBytes(namespace + ALL_TABLES_WILDCARD_INDICATOR),
+              "NO table from namespace <" + namespace + "> is included for "
+                      + PRODUCT_NAME + " processing.");
+    }
+    putNamespaceSchemaEntity(nd);
+    for (HTableDescriptor htd : standardAdmin.listTableDescriptorsByNamespace(nd.getName())) {
+      if (!isIncludedTable(htd.getTableName())
+              || standardAdmin.isTableDisabled(htd.getTableName())) {
+        continue;
+      }
+      discoverSchema(htd.getTableName(), includeColumnQualifiers, useMapReduce);
+    }
+  }
+
+
   void discoverSchema(TableName tableName, boolean includeColumnQualifiers, boolean useMapReduce)
           throws IOException {
     if (!isIncludedTable(tableName)) {
@@ -1679,7 +1700,8 @@ class Repository {
     if (tableName == null || tableName.getNameAsString().isEmpty()) {
       if (namespace != null && !namespace.isEmpty()
               && !isIncludedNamespace(namespace)) {
-        throw new TableNotIncludedForProcessingException(Bytes.toBytes(namespace + ":*"),
+        throw new TableNotIncludedForProcessingException(
+                Bytes.toBytes(namespace + ALL_TABLES_WILDCARD_INDICATOR),
                 "NO table from namespace <" + namespace + "> is included for "
                         + PRODUCT_NAME + " processing.");
       }

@@ -29,6 +29,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
 
 /**
@@ -115,6 +116,14 @@ class UtilityRunner {
 
     String selectedUtility = commandLine.getOptionValue(UTILITY_OPTION.getOpt());
     String selectedTableString = commandLine.getOptionValue(TABLE_OPTION.getOpt());
+    String selectedNamespaceString = "";
+    if (selectedTableString.endsWith(Repository.ALL_TABLES_WILDCARD_INDICATOR)) {
+      selectedNamespaceString
+                = selectedTableString.substring(0, selectedTableString.length() - 2);
+      if (selectedNamespaceString.isEmpty()) {
+        selectedNamespaceString = Bytes.toString(Repository.HBASE_DEFAULT_NAMESPACE);
+      }
+    }
     String selectedFileString = commandLine.getOptionValue(FILE_OPTION.getOpt());
     if (!UTILITY_LIST.contains(selectedUtility)) {
       throw new ParseException("Invalid utility argument submitted: <" + selectedUtility + ">");
@@ -129,22 +138,47 @@ class UtilityRunner {
               + "source/target file <" + selectedFileString + ">");
       switch (selectedUtility) {
         case EXPORT_SCHEMA_UTILITY:
-          repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          if (selectedNamespaceString.isEmpty()) {
+            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          } else {
+            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString, true);
+          }
           break;
         case IMPORT_SCHEMA_UTILITY:
-          repositoryAdmin.importSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          if (selectedNamespaceString.isEmpty()) {
+            repositoryAdmin.importSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          } else {
+            repositoryAdmin.importSchema(selectedFile, selectedNamespaceString, true);
+          }
           break;
         case GET_CHANGE_EVENTS_UTILITY:
-          ChangeEventMonitor.exportChangeEventListToCsvFile(repositoryAdmin.getChangeEventMonitor()
-                  .getChangeEventsForTable(TableName.valueOf(selectedTableString)), selectedFile);
+          if (selectedNamespaceString.isEmpty()) {
+            ChangeEventMonitor.exportChangeEventListToCsvFile(
+                    repositoryAdmin.getChangeEventMonitor().getChangeEventsForTable(
+                            TableName.valueOf(selectedTableString)), selectedFile);
+          } else {
+            ChangeEventMonitor.exportChangeEventListToCsvFile(
+                    repositoryAdmin.getChangeEventMonitor().getChangeEventsForNamespace(
+                            Bytes.toBytes(selectedNamespaceString)), selectedFile);
+          }
           break;
         case GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN:
-          repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), false);
-          repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          if (selectedNamespaceString.isEmpty()) {
+            repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), false);
+            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          } else {
+            repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, false);
+            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString, true);
+          }
           break;
         case GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE:
-          repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), true);
-          repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          if (selectedNamespaceString.isEmpty()) {
+            repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), true);
+            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+          } else {
+            repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, true);
+            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString, true);
+          }
           break;
       }
     }

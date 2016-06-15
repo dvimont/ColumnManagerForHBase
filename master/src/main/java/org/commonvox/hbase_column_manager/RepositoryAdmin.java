@@ -540,6 +540,36 @@ public class RepositoryAdmin {
   }
 
   /**
+   * Performs discovery of Column metadata for all
+   * <a href="package-summary.html#config">ColumnManager-included</a> user <i>Table</i>s in the
+   * submitted namespace,
+   * storing the results for each unique Column Qualifier as a {@link ColumnAuditor} object in
+   * the ColumnManager Repository; all such metadata is then retrievable via the
+   * {@link #getColumnAuditors(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+   * getColumnAuditors} and
+   * {@link #getColumnQualifiers(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+   * getColumnQualifiers} methods. The discovery process entails a
+   * {@link org.apache.hadoop.hbase.filter.KeyOnlyFilter} scan of the <i>Table</i>s, either
+   * via direct scanning or via mapreduce. Note that when the mapreduce option is
+   * utilized, the default row-cache setting is 500, which may be overridden by setting the
+   * {@link org.apache.hadoop.conf.Configuration} parameter
+   * {@link org.apache.hadoop.hbase.mapreduce.TableInputFormat#SCAN_CACHEDROWS}.
+   *
+   * @param namespace Namespace for which schema metadata is to be discovered; submitted
+   * namespace must have at least one <i>Table</i> that is
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * @param useMapreduce if {@code true}, discovery is done via mapreduce; otherwise, discovery
+   * is done via direct-scan
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void discoverColumnMetadata(String namespace, boolean useMapreduce)
+          throws Exception, TableNotIncludedForProcessingException {
+    repository.discoverSchema(namespace, true, useMapreduce);
+  }
+
+  /**
    * Performs discovery of Column metadata for the specified <i>Table</i>,
    * storing the results for each unique Column Qualifier as a {@link ColumnAuditor} object in
    * the ColumnManager Repository; all such metadata is then retrievable via the
