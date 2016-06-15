@@ -17,8 +17,8 @@
 package org.commonvox.hbase_column_manager;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.Timestamp;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -30,7 +30,8 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.util.Bytes;
 
 /**
  * A container class that provides for straightforward JAXB processing (i.e., XML-formatted
@@ -52,16 +53,38 @@ class HBaseSchemaArchive {
 //  @XmlTransient
 //  private final String ROOT_ELEMENT = "hBaseSchemaArchive";
 
-  HBaseSchemaArchive() {
-    this.fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
+  HBaseSchemaArchive() { // default, no-arg constructor required for JAXB processing
+    fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
   }
 
-  SchemaEntity addSchemaEntity(SchemaEntity entity) {
-    if (entity == null) {
-      return null;
+  HBaseSchemaArchive(String sourceNamespace, TableName sourceTableName, Repository repository)
+          throws IOException {
+    this();
+    for (MNamespaceDescriptor mnd : repository.getMNamespaceDescriptors()) {
+      if (sourceNamespace != null && !sourceNamespace.equals(Bytes.toString(mnd.getName()))) {
+        continue;
+      }
+      SchemaEntity namespaceEntity = new SchemaEntity(mnd);
+      hBaseSchemaEntities.add(namespaceEntity);
+      for (MTableDescriptor mtd : repository.getMTableDescriptors(mnd.getForeignKey())) {
+        if (sourceTableName != null
+                && !sourceTableName.getNameAsString().equals(mtd.getNameAsString())) {
+          continue;
+        }
+        SchemaEntity tableEntity = new SchemaEntity(mtd);
+        namespaceEntity.addChild(tableEntity);
+        for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
+          SchemaEntity colFamilyEntity = new SchemaEntity(mcd);
+          tableEntity.addChild(colFamilyEntity);
+          for (ColumnAuditor colAuditor : mcd.getColumnAuditors()) {
+            colFamilyEntity.addChild(new SchemaEntity(colAuditor));
+          }
+          for (ColumnDefinition colDef : mcd.getColumnDefinitions()) {
+            colFamilyEntity.addChild(new SchemaEntity(colDef));
+          }
+        }
+      }
     }
-    hBaseSchemaEntities.add(entity);
-    return entity;
   }
 
   Set<SchemaEntity> getSchemaEntities() {

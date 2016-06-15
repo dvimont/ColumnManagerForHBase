@@ -359,35 +359,55 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
       this.namespace = namespaceEntity;
     }
 
+    byte[] getNamespace() {
+      return this.namespace.getEntityName().getBytes();
+    }
+
     String getNamespaceAsString() {
-      return extractEntityName(this.namespace);
+      return extractEntityNameAsString(this.namespace);
     }
 
     void setTableEntity(Entity tableEntity) {
       this.table = tableEntity;
     }
 
+    byte[] getTableName() {
+      return this.table.getEntityName().getBytes();
+    }
+
     String getTableNameAsString() {
-      return extractEntityName(this.table);
+      return extractEntityNameAsString(this.table);
     }
 
     void setColumnFamilyEntity(Entity colFamilyEntity) {
       this.colFamily = colFamilyEntity;
     }
 
+    byte[] getColumnFamily() {
+      return this.colFamily.getEntityName().getBytes();
+    }
+
     String getColumnFamilyAsString() {
-      return extractEntityName(this.colFamily);
+      return extractEntityNameAsString(this.colFamily);
     }
 
     void setColumnQualifierEntity(Entity columnEntity) {
       this.column = columnEntity;
     }
 
-    String getColumnQualifierAsString() {
-      return extractEntityName(this.column);
+    byte[] getColumnQualifier() {
+      return this.column.getEntityName().getBytes();
     }
 
-    private String extractEntityName(Entity entity) {
+   String getColumnQualifierAsString() {
+      return extractEntityNameAsString(this.column);
+    }
+
+    private byte[] extractEntityNameAsBytes(Entity entity) {
+      return entity.getEntityName().getBytes();
+    }
+
+    private String extractEntityNameAsString(Entity entity) {
       return (entity == null) ? "" : entity.getEntityName().toString();
     }
 
@@ -452,6 +472,10 @@ public class ChangeEvent implements Comparable<ChangeEvent> {
 
     EntityType(byte entityRecordType) {
       super(new byte[]{entityRecordType});
+    }
+
+    public byte getByte() {
+      return this.getBytes()[0];
     }
 
     @Override

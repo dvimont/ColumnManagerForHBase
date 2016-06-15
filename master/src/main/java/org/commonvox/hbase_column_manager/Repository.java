@@ -86,7 +86,7 @@ class Repository {
   private final Table repositoryTable;
 
   static final String PRODUCT_NAME = "ColumnManagerAPI";
-  private static final byte[] JAVA_USERNAME_PROPERTY_KEY = Bytes.toBytes("user.name");
+  static final byte[] JAVA_USERNAME_PROPERTY_KEY = Bytes.toBytes("user.name");
 
   // The following HBASE_CONFIG_PARM* keys & values used in hbase-site.xml
   //   or hbase-column-manager.xml to activate ColumnManager, include Tables for processing, etc.
@@ -109,7 +109,7 @@ class Repository {
   static final TableName REPOSITORY_TABLENAME
           = TableName.valueOf(REPOSITORY_NAMESPACE_DESCRIPTOR.getName(),
                   "column_manager_repository_table");
-  private static final byte[] REPOSITORY_CF = Bytes.toBytes("se"); // ("se"="SchemaEntities")
+  static final byte[] REPOSITORY_CF = Bytes.toBytes("se"); // ("se"="SchemaEntities")
   static final int DEFAULT_REPOSITORY_MAX_VERSIONS = 50; // should this be set higher?
 
   static final byte[] NAMESPACE_PARENT_FOREIGN_KEY = {'-'};
@@ -119,7 +119,7 @@ class Repository {
   private static final byte[] CONFIG_COLUMN_PREFIX_BYTES = Bytes.toBytes(CONFIG_COLUMN_PREFIX);
   private static final String VALUE_COLUMN_PREFIX = "Value__";
   private static final byte[] VALUE_COLUMN_PREFIX_BYTES = Bytes.toBytes(VALUE_COLUMN_PREFIX);
-  private static final byte[] MAX_VALUE_COLUMN_NAME
+  static final byte[] MAX_VALUE_COLUMN_NAME
           = ByteBuffer.allocate(VALUE_COLUMN_PREFIX.length() + ColumnAuditor.MAX_VALUE_LENGTH_KEY.length())
           .put(VALUE_COLUMN_PREFIX_BYTES).put(Bytes.toBytes(ColumnAuditor.MAX_VALUE_LENGTH_KEY))
           .array();
@@ -155,7 +155,7 @@ class Repository {
   private static final byte[] ENTITY_STATUS_COLUMN = Bytes.toBytes("_Status");
   private static final byte[] ACTIVE_STATUS = Bytes.toBytes("A");
   private static final byte[] DELETED_STATUS = Bytes.toBytes("D");
-  private static final byte[] FOREIGN_KEY_COLUMN = Bytes.toBytes("_ForeignKey");
+  static final byte[] FOREIGN_KEY_COLUMN = Bytes.toBytes("_ForeignKey");
   private static final byte[] COL_DEFINITIONS_ENFORCED_COLUMN
           = Bytes.toBytes("_ColDefinitionsEnforced");
   private static final byte[] HEX_00_ARRAY = new byte[16];
@@ -189,7 +189,7 @@ class Repository {
       logger.info(PRODUCT_NAME + " Repository is ACTIVATED.");
       buildIncludedAndExcludedTablesSets(conf);
       boolean newInstallation = !standardAdmin.tableExists(REPOSITORY_TABLENAME);
-      repositoryTable = getRepositoryTable();
+      repositoryTable = initializeRepositoryTable();
       doSyncCheck();
       if (newInstallation) {
         discoverSchema(false,false);
@@ -281,9 +281,13 @@ class Repository {
     }
   }
 
-  private Table getRepositoryTable() throws IOException {
+  private Table initializeRepositoryTable() throws IOException {
     createRepositoryNamespace(standardAdmin);
     return createRepositoryTable(standardAdmin);
+  }
+
+  Table getRepositoryTable() {
+    return repositoryTable;
   }
 
   /**
@@ -1133,7 +1137,7 @@ class Repository {
     return mtd;
   }
 
-  private Set<MTableDescriptor> getMTableDescriptors(byte[] namespaceForeignKey)
+  Set<MTableDescriptor> getMTableDescriptors(byte[] namespaceForeignKey)
           throws IOException {
     Set<MTableDescriptor> mTableDescriptors = new TreeSet<>();
     for (Result row : getActiveRows(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey)) {
@@ -1455,7 +1459,7 @@ class Repository {
     }
   }
 
-  private byte[] extractNameFromRowId(byte[] rowId) {
+  static byte[] extractNameFromRowId(byte[] rowId) {
     if (rowId.length < 2) {
       return null;
     }
@@ -1480,7 +1484,7 @@ class Repository {
     return name;
   }
 
-  private byte[] extractParentForeignKeyFromRowId(byte[] rowId) {
+  static byte[] extractParentForeignKeyFromRowId(byte[] rowId) {
     if (rowId.length < 2) {
       return null;
     }
@@ -1731,33 +1735,8 @@ class Repository {
     }
     logger.info("EXPORT target FILE NAME: " + targetFile.getAbsolutePath());
 
-    // Convert each object to SchemaEntity and add to schemaArchive
-    HBaseSchemaArchive schemaArchive = new HBaseSchemaArchive();
-    for (MNamespaceDescriptor mnd : getMNamespaceDescriptors()) {
-      if (sourceNamespace != null && !sourceNamespace.equals(Bytes.toString(mnd.getName()))) {
-        continue;
-      }
-      SchemaEntity namespaceEntity = schemaArchive.addSchemaEntity(new SchemaEntity(mnd));
-      for (MTableDescriptor mtd : getMTableDescriptors(mnd.getForeignKey())) {
-        if (sourceTableName != null
-                && !sourceTableName.getNameAsString().equals(mtd.getNameAsString())) {
-          continue;
-        }
-        SchemaEntity tableEntity = new SchemaEntity(mtd);
-        namespaceEntity.addChild(tableEntity);
-        for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
-          SchemaEntity colFamilyEntity = new SchemaEntity(mcd);
-          tableEntity.addChild(colFamilyEntity);
-          for (ColumnAuditor colAuditor : mcd.getColumnAuditors()) {
-            colFamilyEntity.addChild(new SchemaEntity(colAuditor));
-          }
-          for (ColumnDefinition colDef : mcd.getColumnDefinitions()) {
-            colFamilyEntity.addChild(new SchemaEntity(colDef));
-          }
-        }
-      }
-    }
-    HBaseSchemaArchive.exportToXmlFile(schemaArchive, targetFile, formatted);
+    HBaseSchemaArchive.exportToXmlFile(
+            new HBaseSchemaArchive(sourceNamespace, sourceTableName, this), targetFile, formatted);
     logger.info("EXPORT of ColumnManager repository schema has been completed.");
   }
 
@@ -1868,46 +1847,20 @@ class Repository {
     logger.info("DUMP of ColumnManager repository table is complete.");
   }
 
-  ChangeEventMonitor buildChangeEventMonitor() throws IOException {
-    ChangeEventMonitor changeEventMonitor = new ChangeEventMonitor();
-    try (ResultScanner rows = repositoryTable.getScanner(new Scan().setMaxVersions())) {
-      for (Result row : rows) {
-        byte[] rowId = row.getRow();
-        byte entityType = rowId[0];
-        byte[] entityName = extractNameFromRowId(rowId);
-        byte[] parentForeignKey = extractParentForeignKeyFromRowId(rowId);
-        byte[] entityForeignKey = row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
-        Map<Long, byte[]> userNameKeyedByTimestampMap = new HashMap<>();
-        for (Cell userNameCell : row.getColumnCells(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY)) {
-          userNameKeyedByTimestampMap.put(userNameCell.getTimestamp(),
-                  Bytes.getBytes(CellUtil.getValueBufferShallowCopy(userNameCell)));
-        }
-        for (Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> cfEntry : row.getMap().entrySet()) {
-          for (Entry<byte[], NavigableMap<Long, byte[]>> colEntry
-                  : cfEntry.getValue().entrySet()) {
-            byte[] attributeName = colEntry.getKey();
-            // bypass ColumnManager-maintained columns
-            if (Bytes.equals(attributeName, FOREIGN_KEY_COLUMN)
-                    || Bytes.equals(attributeName, JAVA_USERNAME_PROPERTY_KEY)
-                    || Bytes.equals(attributeName, MAX_VALUE_COLUMN_NAME)) {
-              continue;
-            }
-            for (Entry<Long, byte[]> cellEntry : colEntry.getValue().entrySet()) {
-              long timestamp = cellEntry.getKey();
-              byte[] attributeValue = cellEntry.getValue();
-              byte[] userName = userNameKeyedByTimestampMap.get(timestamp);
-              changeEventMonitor.add(new ChangeEvent(entityType, parentForeignKey, entityName,
-                      entityForeignKey, attributeName,
-                      timestamp, attributeValue, userName));
-            }
-          }
-        }
-      }
+  boolean outputReportOnColumnAuditors (
+          String namespace, TableName tableName, byte[] colFamily, File targetFile)
+          throws IOException {
+    if (tableName != null && !isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
-    return changeEventMonitor.denormalize();
+//    try (ColumnAuditorReport columnAuditorReport = new ColumnAuditorReport(
+//            hbaseConnection, namespace, tableName, colFamily, targetFile)) {
+//      return !columnAuditorReport.isEmpty();
+//    }
+    return true;
   }
 
-  boolean generateReportOnInvalidColumns (InvalidColumnReport.ReportType reportType,
+  boolean outputReportOnInvalidColumns (InvalidColumnReport.ReportType reportType,
           TableName tableName, byte[] colFamily, File targetFile, boolean verbose,
           boolean useMapreduce) throws Exception {
     if (!isIncludedTable(tableName)) {

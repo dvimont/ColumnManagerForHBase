@@ -25,14 +25,22 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
@@ -90,15 +98,48 @@ public class ChangeEventMonitor {
   );
   private final static Charset ENCODING = StandardCharsets.UTF_8;
 
-  ChangeEventMonitor() {
+  ChangeEventMonitor(Table repositoryTable) throws IOException {
+    try (ResultScanner rows = repositoryTable.getScanner(new Scan().setMaxVersions())) {
+      for (Result row : rows) {
+        byte[] rowId = row.getRow();
+        byte entityType = rowId[0];
+        byte[] entityName = Repository.extractNameFromRowId(rowId);
+        byte[] parentForeignKey = Repository.extractParentForeignKeyFromRowId(rowId);
+        byte[] entityForeignKey = row.getValue(Repository.REPOSITORY_CF, Repository.FOREIGN_KEY_COLUMN);
+        Map<Long, byte[]> userNameKeyedByTimestampMap = new HashMap<>();
+        for (Cell userNameCell : row.getColumnCells(
+                Repository.REPOSITORY_CF, Repository.JAVA_USERNAME_PROPERTY_KEY)) {
+          userNameKeyedByTimestampMap.put(userNameCell.getTimestamp(),
+                  Bytes.getBytes(CellUtil.getValueBufferShallowCopy(userNameCell)));
+        }
+        for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> cfEntry : row.getMap().entrySet()) {
+          for (Map.Entry<byte[], NavigableMap<Long, byte[]>> colEntry
+                  : cfEntry.getValue().entrySet()) {
+            byte[] attributeName = colEntry.getKey();
+            // bypass ColumnManager-maintained columns
+            if (Bytes.equals(attributeName, Repository.FOREIGN_KEY_COLUMN)
+                    || Bytes.equals(attributeName, Repository.JAVA_USERNAME_PROPERTY_KEY)
+                    || Bytes.equals(attributeName, Repository.MAX_VALUE_COLUMN_NAME)) {
+              continue;
+            }
+            for (Map.Entry<Long, byte[]> cellEntry : colEntry.getValue().entrySet()) {
+              long timestamp = cellEntry.getKey();
+              byte[] attributeValue = cellEntry.getValue();
+              byte[] userName = userNameKeyedByTimestampMap.get(timestamp);
+              ChangeEvent changeEvent = new ChangeEvent(entityType, parentForeignKey, entityName,
+                      entityForeignKey, attributeName,
+                      timestamp, attributeValue, userName);
+              changeEventsByEntity.add(changeEvent);
+              entitySet.add(changeEvent.getEntity());
+            }
+          }
+        }
+      }
+    }
+    denormalize();
   }
 
-  void add(ChangeEvent changeEvent) {
-    changeEventsByEntity.add(changeEvent);
-    entitySet.add(changeEvent.getEntity());
-  }
-
-  ChangeEventMonitor denormalize() {
+  private void denormalize() {
     // use complete list of Entities to build entityForeignKeyMap for subsequent "look-ups"
     Map<byte[], ChangeEvent.Entity> entityForeignKeyMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
     for (ChangeEvent.Entity entity : entitySet) {
@@ -156,7 +197,6 @@ public class ChangeEventMonitor {
     }
     changeEventsByEntity = denormalizedChangeEventsByEntity;
     entitySet = denormalizedEntitySet;
-    return this;
   }
 
   /**
@@ -185,7 +225,7 @@ public class ChangeEventMonitor {
    * property in effect within a session as a change was made), in timestamp order.
    *
    * @param userName value of Java "user.name" property in effect when change was made
-   * @return list of {@link ChangeEvent}s pertaining to the user name, in timestamp order
+   * @return Set of {@link ChangeEvent}s pertaining to the user name, in timestamp order
    */
   public Set<ChangeEvent> getChangeEventsForUserName(String userName) {
     Set<ChangeEvent> changeEventsForUser = new LinkedHashSet<>();
@@ -207,11 +247,15 @@ public class ChangeEventMonitor {
    * {@link org.apache.hadoop.hbase.NamespaceDescriptor Namespace}, in timestamp order.
    *
    * @param namespaceName Namespace name
-   * @return list of {@link ChangeEvent}s pertaining to the specified
+   * @param includeChildEntities if {@code true} {@link ChangeEvent}s for <i>Tables</i> and
+   * all table components in the Namespace will be included in returned Set
+   * @return Set of {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.NamespaceDescriptor Namespace}
    */
-  public Set<ChangeEvent> getChangeEventsForNamespace(byte[] namespaceName) {
-    return getChangeEventsForEntity(SchemaEntityType.NAMESPACE, namespaceName, null, null, null);
+  public Set<ChangeEvent> getChangeEventsForNamespace(
+          byte[] namespaceName, boolean includeChildEntities) {
+    return getChangeEventsForEntity(
+            SchemaEntityType.NAMESPACE, namespaceName, null, null, null, includeChildEntities);
   }
 
   /**
@@ -219,12 +263,15 @@ public class ChangeEventMonitor {
    * {@link org.apache.hadoop.hbase.HTableDescriptor Table}, in timestamp order.
    *
    * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
-   * @return list of {@link ChangeEvent}s pertaining to the specified
+   * @param includeChildEntities if {@code true} {@link ChangeEvent}s for <i>Column Families</i>,
+   * {@link ColumnAuditor}s, and {@link ColumnDefinition}s will be included in returned Set
+   * @return Set of {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.HTableDescriptor Table}
    */
-  public Set<ChangeEvent> getChangeEventsForTable(TableName tableName) {
-    return getChangeEventsForEntity(
-            SchemaEntityType.TABLE, tableName.getNamespace(), tableName.getName(), null, null);
+  public Set<ChangeEvent> getChangeEventsForTable(
+          TableName tableName, boolean includeChildEntities) {
+    return getChangeEventsForEntity(SchemaEntityType.TABLE, tableName.getNamespace(),
+            tableName.getName(), null, null, includeChildEntities);
   }
 
   /**
@@ -233,12 +280,12 @@ public class ChangeEventMonitor {
    *
    * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
    * @param attributeName name of attribute
-   * @return list of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
+   * @return Set of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
    * {@link org.apache.hadoop.hbase.HTableDescriptor Table}
    */
   public Set<ChangeEvent> getChangeEventsForTableAttribute(
           TableName tableName, String attributeName) {
-    Set<ChangeEvent> tableEvents = getChangeEventsForTable(tableName);
+    Set<ChangeEvent> tableEvents = getChangeEventsForTable(tableName, false);
     Set<ChangeEvent> attributeEvents = new LinkedHashSet<>();
     for (ChangeEvent changeEvent : tableEvents) {
       if (attributeName.equals(changeEvent.getAttributeNameAsString())) {
@@ -254,13 +301,15 @@ public class ChangeEventMonitor {
    *
    * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
    * @param columnFamily name of Column Family
-   * @return list of {@link ChangeEvent}s pertaining to the specified
+   * @param includeChildEntities if {@code true} {@link ChangeEvent}s for {@link ColumnAuditor}s
+   * and {@link ColumnDefinition}s will be included in returned Set
+   * @return Set of {@link ChangeEvent}s pertaining to the specified
    * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}
    */
   public Set<ChangeEvent> getChangeEventsForColumnFamily(
-          TableName tableName, byte[] columnFamily) {
+          TableName tableName, byte[] columnFamily, boolean includeChildEntities) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_FAMILY, tableName.getNamespace(),
-            tableName.getName(), columnFamily, null);
+            tableName.getName(), columnFamily, null, includeChildEntities);
   }
 
   /**
@@ -270,12 +319,12 @@ public class ChangeEventMonitor {
    * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
    * @param columnFamily name of Column Family
    * @param attributeName name of attribute
-   * @return list of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
+   * @return Set of {@link ChangeEvent}s pertaining to the specified Attribute of the specified
    * {@link org.apache.hadoop.hbase.HColumnDescriptor Column Family}
    */
   public Set<ChangeEvent> getChangeEventsForColumnFamilyAttribute(
           TableName tableName, byte[] columnFamily, String attributeName) {
-    Set<ChangeEvent> cfEvents = getChangeEventsForColumnFamily(tableName, columnFamily);
+    Set<ChangeEvent> cfEvents = getChangeEventsForColumnFamily(tableName, columnFamily, false);
     Set<ChangeEvent> attributeEvents = new LinkedHashSet<>();
     for (ChangeEvent changeEvent : cfEvents) {
       if (attributeName.equals(changeEvent.getAttributeNameAsString())) {
@@ -292,12 +341,12 @@ public class ChangeEventMonitor {
    * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
    * @param columnFamily name of Column Family
    * @param columnQualifier qualifier that identifies the {@link ColumnDefinition}
-   * @return list of {@link ChangeEvent}s pertaining to the specified {@link ColumnDefinition}
+   * @return Set of {@link ChangeEvent}s pertaining to the specified {@link ColumnDefinition}
    */
   public Set<ChangeEvent> getChangeEventsForColumnDefinition(
           TableName tableName, byte[] columnFamily, byte[] columnQualifier) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_DEFINITION, tableName.getNamespace(),
-            tableName.getName(), columnFamily, columnQualifier);
+            tableName.getName(), columnFamily, columnQualifier, false);
   }
 
   /**
@@ -307,12 +356,12 @@ public class ChangeEventMonitor {
    * @param tableName {@link org.apache.hadoop.hbase.TableName TableName} object
    * @param columnFamily name of Column Family
    * @param columnQualifier qualifier that identifies the {@link ColumnAuditor}
-   * @return list of {@link ChangeEvent}s pertaining to the specified {@link ColumnAuditor}
+   * @return Set of {@link ChangeEvent}s pertaining to the specified {@link ColumnAuditor}
    */
   public Set<ChangeEvent> getChangeEventsForColumnAuditor(
           TableName tableName, byte[] columnFamily, byte[] columnQualifier) {
     return getChangeEventsForEntity(SchemaEntityType.COLUMN_AUDITOR, tableName.getNamespace(),
-            tableName.getName(), columnFamily, columnQualifier);
+            tableName.getName(), columnFamily, columnQualifier, false);
   }
 
   /**
@@ -326,11 +375,12 @@ public class ChangeEventMonitor {
    * @param tableName Name of <i>Table</i> which pertains to the Entity (if applicable)
    * @param columnFamily Name of <i>Column Family</i> which pertains to the Entity (if applicable)
    * @param columnQualifier <i>Column Qualifier</i> which pertains to the Entity (if applicable)
-   * @return list of ChangeEvents pertaining to the specified Entity, in timestamp order
+   * @param includeChildEntities
+   * @return Set of ChangeEvents pertaining to the specified Entity, in timestamp order
    */
   private Set<ChangeEvent> getChangeEventsForEntity(SchemaEntityType entityType,
           byte[] namespaceName, byte[] tableName,
-          byte[] columnFamily, byte[] columnQualifier) {
+          byte[] columnFamily, byte[] columnQualifier, boolean includeChildEntities) {
 
     ChangeEvent.Entity[] entityArray = entitySet.toArray(new ChangeEvent.Entity[entitySet.size()]);
 
@@ -342,7 +392,18 @@ public class ChangeEventMonitor {
       return null;
     }
     if (entityType.equals(SchemaEntityType.NAMESPACE)) {
-      return getChangeEventsForEntity(namespaceEntity);
+      Set<ChangeEvent> returnedChangeEvents = getChangeEventsForEntity(namespaceEntity);
+      if (includeChildEntities) {
+        for (ChangeEvent.Entity entity : entityArray) {
+          if (entity.getEntityRecordType().getByte() == SchemaEntityType.TABLE.getRecordType()
+                  && Bytes.equals(entity.getNamespace(), namespaceName)) {
+            returnedChangeEvents.addAll(getChangeEventsForEntity(SchemaEntityType.TABLE,
+                    namespaceName, entity.getEntityName().getBytes(),
+                    null, null, includeChildEntities));
+          }
+        }
+      }
+      return returnedChangeEvents;
     }
 
     byte[] namespaceForeignKey = entityArray[namespaceIndex].getEntityForeignKey().getBytes();
@@ -353,7 +414,20 @@ public class ChangeEventMonitor {
       return null;
     }
     if (entityType.equals(SchemaEntityType.TABLE)) {
-      return getChangeEventsForEntity(tableEntity);
+      Set<ChangeEvent> returnedChangeEvents = getChangeEventsForEntity(tableEntity);
+      if (includeChildEntities) {
+        for (ChangeEvent.Entity entity : entityArray) {
+          if (entity.getEntityRecordType().getByte()
+                  == SchemaEntityType.COLUMN_FAMILY.getRecordType()
+                  && Bytes.equals(entity.getNamespace(), namespaceName)
+                  && Bytes.equals(entity.getTableName(), tableName)) {
+            returnedChangeEvents.addAll(getChangeEventsForEntity(SchemaEntityType.COLUMN_FAMILY,
+                    namespaceName, tableName, entity.getEntityName().getBytes(),
+                    null, includeChildEntities));
+          }
+        }
+      }
+      return returnedChangeEvents;
     }
 
     byte[] tableForeignKey = entityArray[tableIndex].getEntityForeignKey().getBytes();
@@ -364,7 +438,30 @@ public class ChangeEventMonitor {
       return null;
     }
     if (entityType.equals(SchemaEntityType.COLUMN_FAMILY)) {
-      return getChangeEventsForEntity(colFamilyEntity);
+      Set<ChangeEvent> returnedChangeEvents = getChangeEventsForEntity(colFamilyEntity);
+      if (includeChildEntities) {
+        for (ChangeEvent.Entity entity : entityArray) {
+          if (entity.getEntityRecordType().getByte()
+                      == SchemaEntityType.COLUMN_AUDITOR.getRecordType()
+                  && Bytes.equals(entity.getNamespace(), namespaceName)
+                  && Bytes.equals(entity.getTableName(), tableName)
+                  && Bytes.equals(entity.getColumnFamily(), columnFamily)) {
+            returnedChangeEvents.addAll(getChangeEventsForEntity(SchemaEntityType.COLUMN_AUDITOR,
+                    namespaceName, tableName, entity.getEntityName().getBytes(),
+                    null, includeChildEntities));
+          }
+          if (entity.getEntityRecordType().getByte()
+                      == SchemaEntityType.COLUMN_DEFINITION.getRecordType()
+                  && Bytes.equals(entity.getNamespace(), namespaceName)
+                  && Bytes.equals(entity.getTableName(), tableName)
+                  && Bytes.equals(entity.getColumnFamily(), columnFamily)) {
+            returnedChangeEvents.addAll(getChangeEventsForEntity(SchemaEntityType.COLUMN_DEFINITION,
+                    namespaceName, tableName, entity.getEntityName().getBytes(),
+                    null, includeChildEntities));
+          }
+        }
+      }
+      return returnedChangeEvents;
     }
 
     byte[] colFamilyForeignKey = entityArray[colFamilyIndex].getEntityForeignKey().getBytes();

@@ -1287,18 +1287,18 @@ public class TestRepositoryAdmin {
               "#getChangeEventsForUserName");
 
       ChangeEventMonitor.exportChangeEventListToCsvFile(
-              monitor.getChangeEventsForNamespace(NAMESPACE01_TABLE01.getNamespace()),
+              monitor.getChangeEventsForNamespace(NAMESPACE01_TABLE01.getNamespace(), false),
               eventsForNamespaceFile);
       compareResourceFileToExportedFile(EVENTS_FOR_NAMESPACE_RESOURCE_FILE, eventsForNamespaceFile,
               "#getChangeEventsForNamespace");
 
       ChangeEventMonitor.exportChangeEventListToCsvFile(
-              monitor.getChangeEventsForTable(NAMESPACE01_TABLE01), eventsForTableFile);
+              monitor.getChangeEventsForTable(NAMESPACE01_TABLE01, false), eventsForTableFile);
       compareResourceFileToExportedFile(EVENTS_FOR_TABLE_RESOURCE_FILE, eventsForTableFile,
               "#getChangeEventsForTable");
 
       ChangeEventMonitor.exportChangeEventListToCsvFile(
-              monitor.getChangeEventsForColumnFamily(NAMESPACE01_TABLE02, CF02),
+              monitor.getChangeEventsForColumnFamily(NAMESPACE01_TABLE02, CF02, false),
               eventsForColumnFamilyFile);
       compareResourceFileToExportedFile(EVENTS_FOR_COL_FAMILY_RESOURCE_FILE,
               eventsForColumnFamilyFile, "#getChangeEventsForColumnFamily");
@@ -1717,25 +1717,25 @@ public class TestRepositoryAdmin {
     try (Connection connection = ConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForSummaryTable01, NAMESPACE01_TABLE01, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForVerboseTable01, NAMESPACE01_TABLE01, true, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+              repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, useMapReduce));
       try {
-        repositoryAdmin.generateReportOnInvalidColumnQualifiers(
+        repositoryAdmin.outputReportOnInvalidColumnQualifiers(
                       fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, useMapReduce);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
@@ -2121,25 +2121,25 @@ public class TestRepositoryAdmin {
     try (Connection connection = ConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnLengths(
+              repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForSummaryTable01, NAMESPACE01_TABLE01, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnLengths(
+              repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForVerboseTable01,NAMESPACE01_TABLE01,  true, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnLengths(
+              repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnLengths(
+              repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, useMapReduce));
       assertTrue(reportGenerationFailure,
-              !repositoryAdmin.generateReportOnInvalidColumnLengths(
+              !repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              !repositoryAdmin.generateReportOnInvalidColumnLengths(
+              !repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, useMapReduce));
       try {
-        repositoryAdmin.generateReportOnInvalidColumnLengths(
+        repositoryAdmin.outputReportOnInvalidColumnLengths(
                       fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, useMapReduce);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
@@ -2347,25 +2347,25 @@ public class TestRepositoryAdmin {
     try (Connection connection = ConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnValues(
+              repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForSummaryTable01, NAMESPACE01_TABLE01, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnValues(
+              repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForVerboseTable01, NAMESPACE01_TABLE01, true, useMapReduce));
       assertTrue(reportGenerationFailure,
-              !repositoryAdmin.generateReportOnInvalidColumnValues(
+              !repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              !repositoryAdmin.generateReportOnInvalidColumnValues(
+              !repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnValues(
+              repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, useMapReduce));
       assertTrue(reportGenerationFailure,
-              repositoryAdmin.generateReportOnInvalidColumnValues(
+              repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, useMapReduce));
       try {
-        repositoryAdmin.generateReportOnInvalidColumnValues(
+        repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, useMapReduce);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
@@ -2613,9 +2613,16 @@ public class TestRepositoryAdmin {
 //    doColumnDiscovery(configuration, false);
 //    verifyColumnAuditing(configuration);
     String[] args = new String[]{
-      "-u", "exportSchema", // "getColumnAuditors",
-      "--table", NAMESPACE01_TABLE01.getNameAsString(),
-      "-f", "testOutput.txt",
+      "-u",
+      // UtilityRunner.GET_CHANGE_EVENTS_UTILITY,
+      // UtilityRunner.EXPORT_SCHEMA_UTILITY,
+      // UtilityRunner.GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN,
+      UtilityRunner.GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE,
+      "--table", NAMESPACE01 + ":*",
+      "-f",
+      // "target/testGetChangeEvents.txt",
+      // "target/testExportSchema.xml",
+      "target/testGetColumnAuditors.xml",
       "-h"};
     UtilityRunner.main(args);
     clearTestingEnvironment();
@@ -2631,7 +2638,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
-    // new TestRepositoryAdmin().testExportImport();
+    new TestRepositoryAdmin().testExportImport();
     // new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
@@ -2642,6 +2649,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsUsingMapReduce();
-    new TestRepositoryAdmin().testUtilityRunner();
+    // new TestRepositoryAdmin().testUtilityRunner();
   }
 }

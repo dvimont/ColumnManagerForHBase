@@ -134,7 +134,10 @@ class UtilityRunner {
       File selectedFile = new File(selectedFileString);
       LOG.info(this.getClass().getSimpleName()
               + " is invoking the following utility: <" + selectedUtility
-              + "> on the following table: <" + selectedTableString + "> using the following "
+              + (selectedNamespaceString.isEmpty() ?
+                      "> on the following table: <" + selectedTableString
+                      : "> on the following namespace: <" + selectedNamespaceString)
+              + "> using the following "
               + "source/target file <" + selectedFileString + ">");
       switch (selectedUtility) {
         case EXPORT_SCHEMA_UTILITY:
@@ -155,11 +158,11 @@ class UtilityRunner {
           if (selectedNamespaceString.isEmpty()) {
             ChangeEventMonitor.exportChangeEventListToCsvFile(
                     repositoryAdmin.getChangeEventMonitor().getChangeEventsForTable(
-                            TableName.valueOf(selectedTableString)), selectedFile);
+                            TableName.valueOf(selectedTableString), true), selectedFile);
           } else {
             ChangeEventMonitor.exportChangeEventListToCsvFile(
                     repositoryAdmin.getChangeEventMonitor().getChangeEventsForNamespace(
-                            Bytes.toBytes(selectedNamespaceString)), selectedFile);
+                            Bytes.toBytes(selectedNamespaceString), true), selectedFile);
           }
           break;
         case GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN:

@@ -126,11 +126,11 @@ public class RepositoryAdmin {
   /**
    * Delete temp report <i>Table</i>s which might remain from any abnormally terminated
    * invocations of the
-   * {@link #generateReportOnInvalidColumnQualifiers(java.io.File, org.apache.hadoop.hbase.TableName, boolean, boolean)
-   * generateReportOnInvalidColumn*} methods. Note that invocation of this method will cause any
+   * {@link #outputReportOnInvalidColumnQualifiers(java.io.File, org.apache.hadoop.hbase.TableName, boolean, boolean)
+   * outputReportOnInvalidColumn*} methods. Note that invocation of this method will cause any
    * currently-running invocations of the
-   * {@link #generateReportOnInvalidColumnQualifiers(java.io.File, org.apache.hadoop.hbase.TableName, boolean, boolean)
-   * generateReportOnInvalidColumn*} methods to abnormally terminate.
+   * {@link #outputReportOnInvalidColumnQualifiers(java.io.File, org.apache.hadoop.hbase.TableName, boolean, boolean)
+   * outputReportOnInvalidColumn*} methods to abnormally terminate.
    *
    * @param hbaseAdmin standard HBase Admin
    * @throws IOException if a remote or network exception occurs
@@ -459,7 +459,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public ChangeEventMonitor getChangeEventMonitor() throws IOException {
-    return repository.buildChangeEventMonitor();
+    return new ChangeEventMonitor(repository.getRepositoryTable());
   }
 
   MTableDescriptor getMTableDescriptor(TableName tn)
@@ -850,6 +850,24 @@ public class RepositoryAdmin {
     return HBaseSchemaArchive.getSummaryReport(sourceHsaFile);
   }
 
+  public boolean outputReportOnColumnAuditors(File targetFile, String namespace)
+          throws IOException, TableNotIncludedForProcessingException {
+    return repository.outputReportOnColumnAuditors(namespace, null, null, targetFile);
+  }
+
+  public boolean outputReportOnColumnAuditors(File targetFile, TableName tableName)
+          throws IOException, TableNotIncludedForProcessingException {
+    return repository.outputReportOnColumnAuditors(
+            tableName.getNamespaceAsString(), tableName, null, targetFile);
+  }
+
+  public boolean outputReportOnColumnAuditors(
+          File targetFile, TableName tableName, byte[] colFamily)
+          throws IOException, TableNotIncludedForProcessingException {
+    return repository.outputReportOnColumnAuditors(
+            tableName.getNamespaceAsString(), tableName, colFamily, targetFile);
+  }
+
   /**
    * Generates and outputs a CSV-formatted report of all invalid column qualifiers stored in a
    * Table, as stipulated by the Table's {@link ColumnDefinition}s.
@@ -870,10 +888,10 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
+  public boolean outputReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
           boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return generateReportOnInvalidColumnQualifiers(
+    return outputReportOnInvalidColumnQualifiers(
             targetFile, tableName, null, verbose, useMapreduce);
   }
 
@@ -898,10 +916,10 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public boolean generateReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
+  public boolean outputReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
+    return repository.outputReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
@@ -926,10 +944,10 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
+  public boolean outputReportOnInvalidColumnLengths(File targetFile, TableName tableName,
           boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return generateReportOnInvalidColumnLengths(
+    return outputReportOnInvalidColumnLengths(
             targetFile, tableName, null, verbose, useMapreduce);
   }
 
@@ -956,10 +974,10 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public boolean generateReportOnInvalidColumnLengths(File targetFile, TableName tableName,
+  public boolean outputReportOnInvalidColumnLengths(File targetFile, TableName tableName,
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
+    return repository.outputReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
@@ -985,10 +1003,10 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
+  public boolean outputReportOnInvalidColumnValues(File targetFile, TableName tableName,
           boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return generateReportOnInvalidColumnValues(targetFile, tableName, null, verbose, useMapreduce);
+    return outputReportOnInvalidColumnValues(targetFile, tableName, null, verbose, useMapreduce);
   }
 
   /**
@@ -1014,10 +1032,10 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public boolean generateReportOnInvalidColumnValues(File targetFile, TableName tableName,
+  public boolean outputReportOnInvalidColumnValues(File targetFile, TableName tableName,
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return repository.generateReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
+    return repository.outputReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
