@@ -851,7 +851,7 @@ public class TestRepositoryAdmin {
   public TemporaryFolder tempTestFolder = new TemporaryFolder();
 
   @Test
-  public void testExportImport() throws IOException, JAXBException {
+  public void testExportImport() throws Exception {
     System.out.println("#testExportImport has been invoked.");
     // file setup
     final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
@@ -979,7 +979,7 @@ public class TestRepositoryAdmin {
    * @throws JAXBException
    */
   @Test
-  public void testImportColumnDefinitions() throws IOException, JAXBException {
+  public void testImportColumnDefinitions() throws Exception {
     System.out.println("#testImportColumnDefinitions has been invoked.");
     // file setup
     final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
@@ -1041,8 +1041,8 @@ public class TestRepositoryAdmin {
       repositoryAdmin.importColumnDefinitions(exportAllFile);
       repositoryAdmin.exportSchema(exportAllComparisonFile, false);
     }
-    // both export files should be identical, except for timestamp attribute
-    final String TIMESTAMP_ATTR_REGEX = "fileTimestamp=\".....................?.?.?\"";
+    // both export files should be identical, except for timestamp in the comments
+    final String TIMESTAMP_ATTR_REGEX = "File generated on \\[.....................?.?.?\\]";
     String originalHsaXmlContent = new String(Files.readAllBytes(exportAllFile.toPath()))
             .replaceFirst(TIMESTAMP_ATTR_REGEX, "");
     String comparisonHsaXmlContent = new String(Files.readAllBytes(exportAllComparisonFile.toPath()))
@@ -2610,21 +2610,27 @@ public class TestRepositoryAdmin {
     Configuration configuration = MConfiguration.create();
     createSchemaStructuresInHBase(configuration, true);
     loadColumnData(configuration, true);
-//    doColumnDiscovery(configuration, false);
-//    verifyColumnAuditing(configuration);
+
     String[] args = new String[]{
       "-u",
-      // UtilityRunner.GET_CHANGE_EVENTS_UTILITY,
+      UtilityRunner.GET_CHANGE_EVENTS_UTILITY,
       // UtilityRunner.EXPORT_SCHEMA_UTILITY,
-      // UtilityRunner.GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN,
-      UtilityRunner.GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE,
-      "--table", NAMESPACE01 + ":*",
+      // UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN,
+      // UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE,
+      "--table", "default:testTable01", //NAMESPACE03_TABLE01.getNameAsString(),
       "-f",
       // "target/testGetChangeEvents.txt",
       // "target/testExportSchema.xml",
-      "target/testGetColumnAuditors.xml",
+      "target/testGetColumnQualifiers.txt",
       "-h"};
     UtilityRunner.main(args);
+
+//    args = new String[]{
+//      "-u",  UtilityRunner.EXPORT_SCHEMA_UTILITY,
+//      "-t",  NAMESPACE03_TABLE01.getNameAsString(),
+//      "-f",  "target/testExportSchema.xml"};
+//    UtilityRunner.main(args);
+
     clearTestingEnvironment();
     System.out.println("#testUtilityRunner using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
@@ -2638,7 +2644,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
-    new TestRepositoryAdmin().testExportImport();
+    // new TestRepositoryAdmin().testExportImport();
     // new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
@@ -2649,6 +2655,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsUsingMapReduce();
-    // new TestRepositoryAdmin().testUtilityRunner();
+    new TestRepositoryAdmin().testUtilityRunner();
   }
 }

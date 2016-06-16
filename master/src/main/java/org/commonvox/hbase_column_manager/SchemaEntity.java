@@ -58,11 +58,14 @@ class SchemaEntity implements Comparable<SchemaEntity> {
   private TreeSet<SchemaEntity> children = null; // TreeSet stipulated for ordered unmarshalling!!
   @XmlTransient
   private byte[] foreignKeyValue;
+  @XmlTransient
+  private SchemaEntityType type;
 
   public SchemaEntity() {
   }
 
   SchemaEntity(byte entityType, byte[] name) {
+    this.type = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType);
     this.schemaEntityType
             = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType).toString();
     this.name = Bytes.toString(name);
@@ -119,6 +122,13 @@ class SchemaEntity implements Comparable<SchemaEntity> {
 
   byte getEntityRecordType() {
     return SchemaEntityType.ENTITY_TYPE_LABEL_TO_BYTE_MAP.get(this.schemaEntityType);
+  }
+
+  SchemaEntityType getSchemaEntityType() {
+    if (type == null) {
+      type = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(getEntityRecordType());
+    }
+    return type;
   }
 
   /**
@@ -266,7 +276,7 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     return Boolean.parseBoolean(this.columnDefinitionsEnforced);
   }
 
-  void setColumnDefinitionsEnforced(boolean enforced) {
+  final void setColumnDefinitionsEnforced(boolean enforced) {
     this.columnDefinitionsEnforced = Boolean.toString(enforced);
   }
 

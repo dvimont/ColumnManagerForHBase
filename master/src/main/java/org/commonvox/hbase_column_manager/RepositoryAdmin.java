@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.xml.bind.JAXBException;
+import javax.xml.stream.XMLStreamException;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
@@ -618,9 +619,10 @@ public class RepositoryAdmin {
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws XMLStreamException if an exception occurs in the context of JAXB processing
    */
   public void exportSchema(File targetFile, boolean formatted)
-          throws IOException, JAXBException {
+          throws IOException, JAXBException, XMLStreamException {
     repository.exportSchema(null, null, targetFile, formatted);
   }
 
@@ -639,11 +641,13 @@ public class RepositoryAdmin {
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws XMLStreamException if an exception occurs in the context of JAXB processing
    * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void exportSchema(File targetFile, String sourceNamespaceName, boolean formatted)
-          throws IOException, JAXBException, TableNotIncludedForProcessingException {
+          throws IOException, JAXBException, XMLStreamException,
+          TableNotIncludedForProcessingException {
     repository.exportSchema(sourceNamespaceName, null, targetFile, formatted);
   }
 
@@ -662,11 +666,13 @@ public class RepositoryAdmin {
    * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
+   * @throws XMLStreamException if an exception occurs in the context of JAXB processing
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public void exportSchema(File targetFile, TableName sourceTableName, boolean formatted)
-          throws IOException, JAXBException, TableNotIncludedForProcessingException {
+          throws IOException, JAXBException, XMLStreamException,
+          TableNotIncludedForProcessingException {
     repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName,
             targetFile, formatted);
   }
@@ -850,21 +856,65 @@ public class RepositoryAdmin {
     return HBaseSchemaArchive.getSummaryReport(sourceHsaFile);
   }
 
-  public boolean outputReportOnColumnAuditors(File targetFile, String namespace)
+  /**
+   * Generates and outputs a CSV-formatted report on all {@link ColumnAuditor}s that have been
+   * {@link ColumnAuditor captured} or
+   * {@link RepositoryAdmin#discoverColumnMetadata(boolean) discovered}
+   * pertaining to all <a href="package-summary.html#config">ColumnManager-included</a> user
+   * <i>Tables</i> within the submitted <i>Namespace</i>.
+   *
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param namespace namespace for which {@link ColumnAuditor} report is to be generated/outputted
+   * @return {@code true} if {@link ColumnAuditor}s found and reported on; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public boolean outputReportOnColumnQualifiers(File targetFile, String namespace)
           throws IOException, TableNotIncludedForProcessingException {
-    return repository.outputReportOnColumnAuditors(namespace, null, null, targetFile);
+    return repository.outputReportOnColumnQualifiers(namespace, null, null, targetFile);
   }
 
-  public boolean outputReportOnColumnAuditors(File targetFile, TableName tableName)
+  /**
+   * Generates and outputs a CSV-formatted report on all {@link ColumnAuditor}s that have been
+   * {@link ColumnAuditor captured} or
+   * {@link RepositoryAdmin#discoverColumnMetadata(boolean) discovered}
+   * pertaining to the submitted user <i>Table</i>.
+   *
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table for which {@link ColumnAuditor} report is to be
+   * generated/outputted
+   * @return {@code true} if {@link ColumnAuditor}s found and reported on; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public boolean outputReportOnColumnQualifiers(File targetFile, TableName tableName)
           throws IOException, TableNotIncludedForProcessingException {
-    return repository.outputReportOnColumnAuditors(
+    return repository.outputReportOnColumnQualifiers(
             tableName.getNamespaceAsString(), tableName, null, targetFile);
   }
 
-  public boolean outputReportOnColumnAuditors(
+  /**
+   * Generates and outputs a CSV-formatted report on all {@link ColumnAuditor}s that have been
+   * {@link ColumnAuditor captured} or
+   * {@link RepositoryAdmin#discoverColumnMetadata(boolean) discovered}
+   * pertaining to the submitted <i>Column Family</i> within the submitted user <i>Table</i>.
+   *
+   * @param targetFile file to which the CSV file is to be outputted
+   * @param tableName name of the Table for which {@link ColumnAuditor} report is to be
+   * generated/outputted
+   * @param colFamily name of the Column Family within the Table for which {@link ColumnAuditor}
+   * report is to be generated/outputted
+   * @return {@code true} if {@link ColumnAuditor}s found and reported on; otherwise, {@code false}
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public boolean outputReportOnColumnQualifiers(
           File targetFile, TableName tableName, byte[] colFamily)
           throws IOException, TableNotIncludedForProcessingException {
-    return repository.outputReportOnColumnAuditors(
+    return repository.outputReportOnColumnQualifiers(
             tableName.getNamespaceAsString(), tableName, colFamily, targetFile);
   }
 

@@ -28,8 +28,6 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -62,13 +60,12 @@ import org.apache.log4j.Logger;
  */
 class InvalidColumnReport implements Closeable, AutoCloseable {
 
-  private static final Log LOG = LogFactory.getLog(InvalidColumnReport.class);
+  private static final Logger LOGGER = Logger.getLogger(InvalidColumnReport.class);
+  private static final Logger STATIC_LOGGER = Logger.getLogger(InvalidColumnReport.class);
   static final CSVFormat SUMMARY_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
           .withCommentMarker('#').withHeader(SummaryReportHeader.class);
   static final CSVFormat VERBOSE_CSV_FORMAT = CSVFormat.DEFAULT.withRecordSeparator("\n")
           .withCommentMarker('#').withHeader(VerboseReportHeader.class);
-  private static final Logger staticLogger
-          = Logger.getLogger(Repository.class.getName());
   static final String TEMP_REPORT_NAMESPACE = "__column_manager_temp_reports";
   private static final String TEMP_REPORT_TABLENAME_PREFIX = "temp_report_table_";
   private static final byte[] TEMP_REPORT_CF = Bytes.toBytes("cr");
@@ -292,7 +289,7 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
             = NamespaceDescriptor.create(TEMP_REPORT_NAMESPACE).build();
     if (!Repository.namespaceExists(standardAdmin, tempReportNamespaceDescriptor)) {
       standardAdmin.createNamespace(tempReportNamespaceDescriptor);
-      staticLogger.info(
+      STATIC_LOGGER.info(
               "ColumnManager TempReport Namespace has been created (did not already exist): "
               + tempReportNamespaceDescriptor.getName());
     }
@@ -302,11 +299,11 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
     if (!Repository.namespaceExists(standardAdmin, Bytes.toBytes(TEMP_REPORT_NAMESPACE))) {
       return;
     }
-    staticLogger.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
+    STATIC_LOGGER.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
             + " TempReport tables and namespace has been requested.");
     dropTempReportTables(standardAdmin);
     standardAdmin.deleteNamespace(TEMP_REPORT_NAMESPACE);
-    staticLogger.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
+    STATIC_LOGGER.warn("DROP (disable/delete) of " + Repository.PRODUCT_NAME
             + " TempReport tables and namespace has been completed: " + TEMP_REPORT_NAMESPACE);
   }
 
@@ -339,13 +336,14 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
     int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new InvalidColumnReportTool(),
             argList.toArray(new String[argList.size()]));
     if (jobCompletionCode != 0) {
-      LOG.warn("Mapreduce process failure in " + this.getClass().getSimpleName());
+      LOGGER.warn("Mapreduce process failure in " + this.getClass().getSimpleName());
     }
   }
 
   static class InvalidColumnReportTool extends Configured implements Tool  {
 
-    private static final Log LOG = LogFactory.getLog(InvalidColumnReportTool.class);
+    private static final Logger LOG = Logger.getLogger(InvalidColumnReportTool.class);
+    //LogFactory.getLog(InvalidColumnReportTool.class);
     static final String REPORT_TYPE_CONF_KEY
             = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.type";
     static final String REPORT_VERBOSE_CONF_KEY
@@ -460,7 +458,7 @@ class InvalidColumnReport implements Closeable, AutoCloseable {
   }
 
   static class InvalidColumnReportMapper extends TableMapper<Text, Text> {
-    private static final Log LOG = LogFactory.getLog(InvalidColumnReportMapper.class);
+    private static final Logger LOG = Logger.getLogger(InvalidColumnReportMapper.class);
     private MConnection columnManagerConnection = null;
     private Repository repository = null;
     private MTableDescriptor sourceMtd;

@@ -33,6 +33,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import javax.xml.bind.JAXBException;
+import javax.xml.stream.XMLStreamException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
@@ -1665,7 +1666,8 @@ class Repository {
     }
   }
 
-  private void discoverColumnMetadata(TableName tableName, boolean useMapReduce) throws IOException {
+  private void discoverColumnMetadata(TableName tableName, boolean useMapReduce)
+          throws IOException {
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     if (mtd == null) {
       return;
@@ -1718,7 +1720,7 @@ class Repository {
 
   void exportSchema(String sourceNamespace, TableName sourceTableName,
           File targetFile, boolean formatted)
-          throws IOException, JAXBException {
+          throws IOException, JAXBException, XMLStreamException {
     validateNamespaceTableNameIncludedForProcessing(sourceNamespace, sourceTableName);
     String allLiteral = "";
     if ((sourceNamespace == null || sourceNamespace.isEmpty())
@@ -1847,17 +1849,21 @@ class Repository {
     logger.info("DUMP of ColumnManager repository table is complete.");
   }
 
-  boolean outputReportOnColumnAuditors (
+  boolean outputReportOnColumnQualifiers (
           String namespace, TableName tableName, byte[] colFamily, File targetFile)
           throws IOException {
+    if (tableName == null && !isIncludedNamespace(namespace)) {
+      throw new TableNotIncludedForProcessingException(
+              Bytes.toBytes(namespace + ALL_TABLES_WILDCARD_INDICATOR),
+              "NO table from namespace <" + namespace + "> is included for "
+                      + PRODUCT_NAME + " processing.");
+    }
     if (tableName != null && !isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
-//    try (ColumnAuditorReport columnAuditorReport = new ColumnAuditorReport(
-//            hbaseConnection, namespace, tableName, colFamily, targetFile)) {
-//      return !columnAuditorReport.isEmpty();
-//    }
-    return true;
+    ColumnQualifierReport columnQualifierReport
+            = new ColumnQualifierReport(namespace, tableName, colFamily, this, targetFile);
+    return columnQualifierReport.isEmpty();
   }
 
   boolean outputReportOnInvalidColumns (InvalidColumnReport.ReportType reportType,

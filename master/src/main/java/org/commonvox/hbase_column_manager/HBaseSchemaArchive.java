@@ -17,6 +17,8 @@
 package org.commonvox.hbase_column_manager;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.LinkedHashSet;
@@ -30,6 +32,10 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.stream.XMLOutputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -46,12 +52,16 @@ class HBaseSchemaArchive {
   private static final String BLANKS = "                    ";
   private static final int TAB = 3;
 
-  @XmlAttribute
+  @XmlTransient // @XmlAttribute (Timestamp attribute now written to comment)
   private final String fileTimestamp;
   @XmlElement(name = "hBaseSchemaEntity")
   private final Set<SchemaEntity> hBaseSchemaEntities = new LinkedHashSet<>();
 //  @XmlTransient
 //  private final String ROOT_ELEMENT = "hBaseSchemaArchive";
+  @XmlTransient
+  private String namespace;
+  @XmlTransient
+  private TableName tableName;
 
   HBaseSchemaArchive() { // default, no-arg constructor required for JAXB processing
     fileTimestamp = new Timestamp(System.currentTimeMillis()).toString();
@@ -60,6 +70,8 @@ class HBaseSchemaArchive {
   HBaseSchemaArchive(String sourceNamespace, TableName sourceTableName, Repository repository)
           throws IOException {
     this();
+    this.namespace = sourceNamespace;
+    this.tableName = sourceTableName;
     for (MNamespaceDescriptor mnd : repository.getMNamespaceDescriptors()) {
       if (sourceNamespace != null && !sourceNamespace.equals(Bytes.toString(mnd.getName()))) {
         continue;
@@ -96,13 +108,23 @@ class HBaseSchemaArchive {
   }
 
   static void exportToXmlFile(HBaseSchemaArchive hsa, File targetFile, boolean formatted)
-          throws JAXBException {
+          throws JAXBException, XMLStreamException, FileNotFoundException {
+    XMLStreamWriter xsw = XMLOutputFactory.newFactory()
+            .createXMLStreamWriter(new FileOutputStream(targetFile));
+    xsw.writeStartDocument();
+    xsw.writeComment(HBaseSchemaArchive.class.getSimpleName() + " file generated for "
+            + (hsa.namespace == null && hsa.tableName == null ?
+                    "full " + Repository.PRODUCT_NAME + " Repository, " : "")
+            + (hsa.namespace == null ? "" : "Namespace [" + hsa.namespace + "], ")
+            + (hsa.tableName == null ? "" : "Table [" + hsa.tableName.getNameAsString() + "], ")
+            + "File generated on [" + hsa.fileTimestamp + "]");
     Marshaller marshaller
             = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
     if (formatted) {
       marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
     }
-    marshaller.marshal(hsa, targetFile);
+    marshaller.setProperty(Marshaller.JAXB_FRAGMENT, true);
+    marshaller.marshal(hsa, xsw);
   }
 
   static HBaseSchemaArchive deserializeXmlFile(File sourceHsaFile)

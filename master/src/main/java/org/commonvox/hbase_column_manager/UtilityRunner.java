@@ -50,9 +50,9 @@ class UtilityRunner {
   private static final String BAR = "====================";
   public static final String EXPORT_SCHEMA_UTILITY = "exportSchema";
   public static final String IMPORT_SCHEMA_UTILITY = "importSchema";
-  public static final String GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN = "getColumnAuditors";
-  public static final String GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE
-          = "getColumnAuditorsViaMapReduce";
+  public static final String GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN = "getColumnQualifiers";
+  public static final String GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE
+          = "getColumnQualifiersViaMapReduce";
   public static final String GET_CHANGE_EVENTS_UTILITY = "getChangeEventsForTable";
   private static final Set<String> UTILITY_LIST;
   static {
@@ -62,8 +62,8 @@ class UtilityRunner {
     UTILITY_LIST.add(EXPORT_SCHEMA_UTILITY);
     UTILITY_LIST.add(IMPORT_SCHEMA_UTILITY);
     UTILITY_LIST.add(GET_CHANGE_EVENTS_UTILITY);
-    UTILITY_LIST.add(GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN);
-    UTILITY_LIST.add(GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE);
+    UTILITY_LIST.add(GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN);
+    UTILITY_LIST.add(GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE);
     StringBuilder validUtilities = new StringBuilder();
     for (String utility : UTILITY_LIST) {
       if (validUtilities.length() > 0) {
@@ -149,9 +149,9 @@ class UtilityRunner {
           break;
         case IMPORT_SCHEMA_UTILITY:
           if (selectedNamespaceString.isEmpty()) {
-            repositoryAdmin.importSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+            repositoryAdmin.importSchema(selectedFile, TableName.valueOf(selectedTableString), false);
           } else {
-            repositoryAdmin.importSchema(selectedFile, selectedNamespaceString, true);
+            repositoryAdmin.importSchema(selectedFile, selectedNamespaceString, false);
           }
           break;
         case GET_CHANGE_EVENTS_UTILITY:
@@ -165,22 +165,24 @@ class UtilityRunner {
                             Bytes.toBytes(selectedNamespaceString), true), selectedFile);
           }
           break;
-        case GET_COLUMN_AUDITORS_UTILITY_DIRECT_SCAN:
+        case GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN:
           if (selectedNamespaceString.isEmpty()) {
             repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), false);
-            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+            repositoryAdmin.outputReportOnColumnQualifiers(
+                    selectedFile, TableName.valueOf(selectedTableString));
           } else {
             repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, false);
-            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString, true);
+            repositoryAdmin.outputReportOnColumnQualifiers(selectedFile, selectedNamespaceString);
           }
           break;
-        case GET_COLUMN_AUDITORS_UTILITY_MAP_REDUCE:
+        case GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE:
           if (selectedNamespaceString.isEmpty()) {
             repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), true);
-            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+            repositoryAdmin.outputReportOnColumnQualifiers(
+                    selectedFile, TableName.valueOf(selectedTableString));
           } else {
             repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, true);
-            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString, true);
+            repositoryAdmin.outputReportOnColumnQualifiers(selectedFile, selectedNamespaceString);
           }
           break;
       }
@@ -203,10 +205,6 @@ class UtilityRunner {
    */
   public static void main(String[] args)
           throws Exception, ParseException, IOException, JAXBException {
-//    if (args == null || args.length == 0) {
-//      args = new String[]{"-u", "oregano", "-h"};
-//    }
     new UtilityRunner(args);
   }
-
 }

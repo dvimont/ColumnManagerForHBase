@@ -20,7 +20,8 @@ import java.util.Map.Entry;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 
 /**
- * A <b>ColumnAuditor</b> object (obtained via a {@code RepositoryAdmin}'s  {@link RepositoryAdmin#getColumnAuditors(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+ * A <b>ColumnAuditor</b> object (obtained via a {@code RepositoryAdmin}'s
+ * {@link RepositoryAdmin#getColumnAuditors(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
  * getColumnAuditors} method) contains captured* or discovered** metadata pertaining to a specific
  * <i>Column Qualifier</i> actively stored in HBase as part of a <i>Column Family</i> of a
  * <a href="package-summary.html#config">ColumnManager-included</a> <i>Table</i>.
