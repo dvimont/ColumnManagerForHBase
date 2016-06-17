@@ -507,11 +507,17 @@ public class ChangeEventMonitor {
    */
   public static void exportChangeEventListToCsvFile(
           Collection<ChangeEvent> changeEvents, File targetFile) throws IOException {
+    exportChangeEventListToCsvFile(changeEvents, targetFile, "");
+  }
+
+  static void exportChangeEventListToCsvFile(
+          Collection<ChangeEvent> changeEvents, File targetFile, String headerDetail)
+          throws IOException {
     CSVFormat csvFormat = CSVFormat.DEFAULT.withRecordSeparator("\n").withCommentMarker('#')
             .withHeader(ReportHeader.class);
     try (CSVPrinter csvPrinter = csvFormat.withHeaderComments(
-            "List of ChangeEvents in " + Repository.PRODUCT_NAME
-                    + " repository  -- Exported to CSV by " + Repository.PRODUCT_NAME + ":"
+            "List of ChangeEvents in " + Repository.PRODUCT_NAME + " repository " + headerDetail
+                    + "-- Exported to CSV by " + Repository.PRODUCT_NAME + ":"
                     + ChangeEventMonitor.class.getSimpleName(),
             new Date()).print(new FileWriter(targetFile))) {
       if (changeEvents == null) {

@@ -513,7 +513,7 @@ class Repository {
   private boolean isIncludedNamespace(String namespaceName) {
     if (namespaceName.equals(HBASE_SYSTEM_NAMESPACE_DESCRIPTOR.getName())
             || namespaceName.equals(REPOSITORY_NAMESPACE_DESCRIPTOR.getName())
-            || namespaceName.equals(InvalidColumnReport.TEMP_REPORT_NAMESPACE)) {
+            || namespaceName.equals(ColumnInvalidityReport.TEMP_REPORT_NAMESPACE)) {
       return false;
     }
     if (includedNamespaces == null) {
@@ -1718,8 +1718,7 @@ class Repository {
     }
   }
 
-  void exportSchema(String sourceNamespace, TableName sourceTableName,
-          File targetFile, boolean formatted)
+  void exportSchema(String sourceNamespace, TableName sourceTableName, File targetFile)
           throws IOException, JAXBException, XMLStreamException {
     validateNamespaceTableNameIncludedForProcessing(sourceNamespace, sourceTableName);
     String allLiteral = "";
@@ -1738,7 +1737,7 @@ class Repository {
     logger.info("EXPORT target FILE NAME: " + targetFile.getAbsolutePath());
 
     HBaseSchemaArchive.exportToXmlFile(
-            new HBaseSchemaArchive(sourceNamespace, sourceTableName, this), targetFile, formatted);
+            new HBaseSchemaArchive(sourceNamespace, sourceTableName, this), targetFile);
     logger.info("EXPORT of ColumnManager repository schema has been completed.");
   }
 
@@ -1866,7 +1865,7 @@ class Repository {
     return columnQualifierReport.isEmpty();
   }
 
-  boolean outputReportOnInvalidColumns (InvalidColumnReport.ReportType reportType,
+  boolean outputReportOnInvalidColumns (ColumnInvalidityReport.ReportType reportType,
           TableName tableName, byte[] colFamily, File targetFile, boolean verbose,
           boolean useMapreduce) throws Exception {
     if (!isIncludedTable(tableName)) {
@@ -1883,9 +1882,9 @@ class Repository {
       throw new ColumnDefinitionNotFoundException(tableName.getName(), colFamily, null,
               "No ColumnDefinitions found for columnFamily");
     }
-    try (InvalidColumnReport invalidColumnReport = new InvalidColumnReport(
+    try (ColumnInvalidityReport columnInvalidityReport = new ColumnInvalidityReport(
             reportType, hbaseConnection, mtd, colFamily, targetFile, verbose, useMapreduce)) {
-      return !invalidColumnReport.isEmpty();
+      return !columnInvalidityReport.isEmpty();
     }
   }
 

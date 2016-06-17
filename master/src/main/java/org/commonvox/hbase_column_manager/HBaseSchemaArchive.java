@@ -107,7 +107,7 @@ class HBaseSchemaArchive {
     return fileTimestamp;
   }
 
-  static void exportToXmlFile(HBaseSchemaArchive hsa, File targetFile, boolean formatted)
+  static void exportToXmlFile(HBaseSchemaArchive hsa, File targetFile)
           throws JAXBException, XMLStreamException, FileNotFoundException {
     XMLStreamWriter xsw = XMLOutputFactory.newFactory()
             .createXMLStreamWriter(new FileOutputStream(targetFile));
@@ -115,14 +115,15 @@ class HBaseSchemaArchive {
     xsw.writeComment(HBaseSchemaArchive.class.getSimpleName() + " file generated for "
             + (hsa.namespace == null && hsa.tableName == null ?
                     "full " + Repository.PRODUCT_NAME + " Repository, " : "")
-            + (hsa.namespace == null ? "" : "Namespace [" + hsa.namespace + "], ")
-            + (hsa.tableName == null ? "" : "Table [" + hsa.tableName.getNameAsString() + "], ")
+            + (hsa.namespace == null ? "" : "Namespace:[" + hsa.namespace + "], ")
+            + (hsa.tableName == null ? "" : "Table:[" + hsa.tableName.getNameAsString() + "], ")
             + "File generated on [" + hsa.fileTimestamp + "]");
     Marshaller marshaller
             = JAXBContext.newInstance(HBaseSchemaArchive.class).createMarshaller();
-    if (formatted) {
-      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-    }
+    // commented out because XMLStreamWriter does NOT support formatted output!!
+    //    if (formatted) {
+    //      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+    //    }
     marshaller.setProperty(Marshaller.JAXB_FRAGMENT, true);
     marshaller.marshal(hsa, xsw);
   }

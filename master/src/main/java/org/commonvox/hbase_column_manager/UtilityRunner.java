@@ -17,6 +17,7 @@ package org.commonvox.hbase_column_manager;
 
 import java.io.File;
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.xml.bind.JAXBException;
@@ -142,9 +143,9 @@ class UtilityRunner {
       switch (selectedUtility) {
         case EXPORT_SCHEMA_UTILITY:
           if (selectedNamespaceString.isEmpty()) {
-            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString), true);
+            repositoryAdmin.exportSchema(selectedFile, TableName.valueOf(selectedTableString));
           } else {
-            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString, true);
+            repositoryAdmin.exportSchema(selectedFile, selectedNamespaceString);
           }
           break;
         case IMPORT_SCHEMA_UTILITY:
@@ -155,14 +156,23 @@ class UtilityRunner {
           }
           break;
         case GET_CHANGE_EVENTS_UTILITY:
+          StringBuilder headerDetail = new StringBuilder("-- file generated for ")
+                  .append(selectedNamespaceString.isEmpty() && selectedTableString.isEmpty() ?
+                          "full " + Repository.PRODUCT_NAME + " Repository, " : "")
+                  .append(selectedNamespaceString.isEmpty() ? ""
+                          : "Namespace:[" + selectedNamespaceString + "], ")
+                  .append(selectedTableString.isEmpty() ? ""
+                          : "Table:[" + selectedTableString + "], ");
           if (selectedNamespaceString.isEmpty()) {
             ChangeEventMonitor.exportChangeEventListToCsvFile(
                     repositoryAdmin.getChangeEventMonitor().getChangeEventsForTable(
-                            TableName.valueOf(selectedTableString), true), selectedFile);
+                            TableName.valueOf(selectedTableString), true),
+                    selectedFile, headerDetail.toString());
           } else {
             ChangeEventMonitor.exportChangeEventListToCsvFile(
                     repositoryAdmin.getChangeEventMonitor().getChangeEventsForNamespace(
-                            Bytes.toBytes(selectedNamespaceString), true), selectedFile);
+                            Bytes.toBytes(selectedNamespaceString), true),
+                    selectedFile, headerDetail.toString());
           }
           break;
         case GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN:

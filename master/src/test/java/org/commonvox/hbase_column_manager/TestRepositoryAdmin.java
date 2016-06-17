@@ -221,8 +221,9 @@ public class TestRepositoryAdmin {
           = COLUMN_ENFORCE_FAILURE + "FAILURE IN enforcement of Column Value (regex)";
   private static final String HSA_FAILURE = "FAILURE IN HBase Schema Archive PROCESSING!! ==>> ";
   private static final String CHANGE_EVENT_FAILURE = "FAILURE IN ChangeEvent PROCESSING!! ==>> ";
-  private static final String INVALID_COLUMN_REPORT_FAILURE
-          = "FAILURE IN InvalidColumnReport PROCESSING!! ==>> ";
+  private static final String UTILITY_RUNNER_FAILURE = "FAILURE IN UtilityRunner PROCESSING!! ==>> ";
+  private static final String COLUMN_INVALIDITY_REPORT_FAILURE
+          = "FAILURE IN ColumnInvalidityReport PROCESSING!! ==>> ";
   private static final String TABLE_NOT_INCLUDED_EXCEPTION_FAILURE
           = TableNotIncludedForProcessingException.class.getSimpleName() + " failed to be thrown ";
   private static final String IMPORT_COLDEFINITIONS_FAILURE
@@ -887,16 +888,16 @@ public class TestRepositoryAdmin {
     // extract schema into external HBase Schema Archive files
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.exportSchema(exportAllFile, true);
+      repositoryAdmin.exportSchema(exportAllFile);
       repositoryAdmin.exportSchema(
-              exportNamespaceFile, TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX), true);
+              exportNamespaceFile, TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX));
       try {
         repositoryAdmin.exportSchema(
-                exportInvalidNamespaceFile, TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX), true);
+                exportInvalidNamespaceFile, TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX));
         fail(TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
-      repositoryAdmin.exportSchema(exportTableFile, NAMESPACE01_TABLE01, true);
+      repositoryAdmin.exportSchema(exportTableFile, NAMESPACE01_TABLE01);
     }
     clearTestingEnvironment();
 
@@ -1028,7 +1029,7 @@ public class TestRepositoryAdmin {
     createAdditionalColumnDefinitions(configuration);
     // extract schema into external HBase Schema Archive files
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
-      new RepositoryAdmin(connection).exportSchema(exportAllFile, false);
+      new RepositoryAdmin(connection).exportSchema(exportAllFile);
     }
 
     initializeTestNamespaceAndTableObjects();
@@ -1039,7 +1040,7 @@ public class TestRepositoryAdmin {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile);
-      repositoryAdmin.exportSchema(exportAllComparisonFile, false);
+      repositoryAdmin.exportSchema(exportAllComparisonFile);
     }
     // both export files should be identical, except for timestamp in the comments
     final String TIMESTAMP_ATTR_REGEX = "File generated on \\[.....................?.?.?\\]";
@@ -1064,7 +1065,7 @@ public class TestRepositoryAdmin {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01);
-      repositoryAdmin.exportSchema(exportNamespaceImportedColDefsFile, false);
+      repositoryAdmin.exportSchema(exportNamespaceImportedColDefsFile);
     }
     // assure that only specified namespace (i.e. NAMESPACE01) has ColumnDefinitions
     Set<SchemaEntity> completeSchemaEntitySet
@@ -1132,7 +1133,7 @@ public class TestRepositoryAdmin {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE03_TABLE03);
-      repositoryAdmin.exportSchema(exportTableColDefsComparisonFile, false);
+      repositoryAdmin.exportSchema(exportTableColDefsComparisonFile);
     }
     // assure that only specified Table (i.e. NAMESPACE03_TABLE03) has ColumnDefinitions
     Set<SchemaEntity> tableColDefSchemaEntitySet
@@ -1163,7 +1164,7 @@ public class TestRepositoryAdmin {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01_TABLE01, CF01);
-      repositoryAdmin.exportSchema(exportColFamilyColDefsComparisonFile, false);
+      repositoryAdmin.exportSchema(exportColFamilyColDefsComparisonFile);
     }
     // assure that only specified ColFamily (i.e. NAMESPACE01_TABLE01, CF01) has ColumnDefinitions
     Set<SchemaEntity> colFamilyColDefSchemaEntitySet
@@ -1608,17 +1609,17 @@ public class TestRepositoryAdmin {
   }
 
   @Test
-  public void testGenerateReportOnInvalidColumnsViaDirectScan() throws Exception {
-    testGenerateReportOnInvalidColumns(false);
+  public void testOutputReportOnInvalidColumnsViaDirectScan() throws Exception {
+    testOutputReportOnInvalidColumns(false);
   }
 
   @Test
-  public void testGenerateReportOnInvalidColumnsUsingMapReduce() throws Exception {
-    testGenerateReportOnInvalidColumns(true);
+  public void testOutputReportOnInvalidColumnsUsingMapReduce() throws Exception {
+    testOutputReportOnInvalidColumns(true);
   }
 
-  public void testGenerateReportOnInvalidColumns(boolean useMapReduce) throws Exception {
-    System.out.println("#testGenerateReportOnInvalidColumnQualifiers "
+  public void testOutputReportOnInvalidColumns(boolean useMapReduce) throws Exception {
+    System.out.println("#testOutputReportOnInvalidColumnQualifiers "
             + (useMapReduce ? "USING MAPREDUCE " : "")
             + "has been invoked.");
 
@@ -1709,8 +1710,8 @@ public class TestRepositoryAdmin {
       fileForSummaryOfEmptyTable = new File(TARGET_DIRECTORY + INVALID_COLUMNS_EMPTY_TABLE);
     }
 
-    String reportGenerationFailure = INVALID_COLUMN_REPORT_FAILURE
-            + "RepositoryAdmin#generateReportOnInvalidColumnQualifiers method "
+    String reportGenerationFailure = COLUMN_INVALIDITY_REPORT_FAILURE
+            + "RepositoryAdmin#outputReportOnInvalidColumnQualifiers method "
             + "returned unexpected boolean value";
 
     // generate InvalidColumnQualifier reports
@@ -1744,376 +1745,376 @@ public class TestRepositoryAdmin {
 
     // read in reports and validate contents
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(1),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(3),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
           case 3:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(1),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               3, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.VerboseReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_03), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_03), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_2_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 3:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_04), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 4:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 5:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05),  record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05),  record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_9_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               5, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf01, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(1),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(3),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               2, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf01, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.VerboseReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_03), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_03), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_03), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_2_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 3:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_04), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 4:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(BAD_QUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               4, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf02, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(1),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               1, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf02, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.VerboseReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05),  record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05),  record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_9_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               1, recordCount);
     }
 
@@ -2148,198 +2149,198 @@ public class TestRepositoryAdmin {
 
     // read in reports and validate contents
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(2),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               1, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.VerboseReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_02), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_02), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               2, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf01, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Occurrences-count value not as expected",
                     String.valueOf(2),
-                    record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                    record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               1, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf01, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.VerboseReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.VerboseReportHeader.TABLE));
+                record.get(ColumnInvalidityReport.VerboseReportHeader.TABLE));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_02), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_02), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColFamily value not as expected",
                     Bytes.toString(CF01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " ColQualifier value not as expected",
                     Bytes.toString(COLQUALIFIER02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
         }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               2, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf02, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               0, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf02, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               0, recordCount);
     }
 
@@ -2374,213 +2375,213 @@ public class TestRepositoryAdmin {
 
     // read in reports and validate contents
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColFamily value not as expected",
                 Bytes.toString(CF02),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColQualifier value not as expected",
                 Bytes.toString(COLQUALIFIER03),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Occurrences-count value not as expected",
                 String.valueOf(3),
-                record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               1, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColFamily value not as expected",
                 Bytes.toString(CF02),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColQualifier value not as expected",
                 Bytes.toString(COLQUALIFIER03),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_02), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_02), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(BAD_URL01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_04), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(BAD_URL02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 3:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
        }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               3, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf01, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               0, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf01, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
         recordCount++;
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               0, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf02, StandardCharsets.UTF_8,
-            InvalidColumnReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.SummaryReportHeader.OCCURRENCES.toString() + "="
-//                + record.get(InvalidColumnReport.SummaryReportHeader.OCCURRENCES)
+//        System.out.println(record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE) + ":"
+//                + record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE) + ":"
+//                + record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY) + ":"
+//                + record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER) + " "
+//                + ColumnInvalidityReport.SummaryReportHeader.OCCURRENCES.toString() + "="
+//                + record.get(ColumnInvalidityReport.SummaryReportHeader.OCCURRENCES)
 //                );
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColFamily value not as expected",
                 Bytes.toString(CF02),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColQualifier value not as expected",
                 Bytes.toString(COLQUALIFIER03),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Occurrences-count value not as expected",
                 String.valueOf(3),
-                record.get(InvalidColumnReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               1, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf02, StandardCharsets.UTF_8,
-            InvalidColumnReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
       int recordCount = 0;
       for (CSVRecord record : parser) {
-//        System.out.println(record.get(InvalidColumnReport.VerboseReportHeader.NAMESPACE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.TABLE) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_FAMILY) + ":"
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_QUALIFIER) + " "
-//                + InvalidColumnReport.VerboseReportHeader.ROW_ID.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID) + " "
-//                + InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
-//                + record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE)
+//        System.out.println(record.get(ColumnInvalidityReport.VerboseReportHeader.NAMESPACE) + ":"
+//                + record.get(ColumnInvalidityReport.VerboseReportHeader.TABLE) + ":"
+//                + record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_FAMILY) + ":"
+//                + record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER) + " "
+//                + ColumnInvalidityReport.VerboseReportHeader.ROW_ID.toString() + "="
+//                + record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID) + " "
+//                + ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
+//                + record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE)
 //                );
         recordCount++;
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Namespace value not as expected",
                 NAMESPACE01_TABLE01.getNamespaceAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.NAMESPACE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " Table value not as expected",
                 NAMESPACE01_TABLE01.getQualifierAsString(),
-                record.get(InvalidColumnReport.SummaryReportHeader.TABLE));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColFamily value not as expected",
                 Bytes.toString(CF02),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_FAMILY));
-        assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                 + " ColQualifier value not as expected",
                 Bytes.toString(COLQUALIFIER03),
-                record.get(InvalidColumnReport.SummaryReportHeader.COLUMN_QUALIFIER));
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
         switch (recordCount) {
           case 1:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_02), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_02), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(BAD_URL01),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 2:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_04), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(BAD_URL02),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
           case 3:
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
-                    Bytes.toString(ROW_ID_05), record.get(InvalidColumnReport.VerboseReportHeader.ROW_ID));
-            assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Rec " + recordCount
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(InvalidColumnReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
             break;
        }
       }
-      assertEquals(INVALID_COLUMN_REPORT_FAILURE + "Record count in CSV file not as expected",
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
               3, recordCount);
     }
 
     clearTestingEnvironment();
-    System.out.println("#testGenerateReportOnInvalidColumnQualifiers "
+    System.out.println("#testOutputReportOnInvalidColumnQualifiers "
             + (useMapReduce ? "USING MAPREDUCE " : "")
             + "has run to completion.");
   }
@@ -2598,10 +2599,48 @@ public class TestRepositoryAdmin {
     }
   }
 
+  @Test
   public void testUtilityRunner() throws Exception {
     // UtilityRunner -u getColumnAuditors --table tableName -f testOutput.txt -h
     System.out.println("#testUtilityRunner has been invoked using WILDCARDED "
             + "EXCLUDE config properties.");
+    // file setup
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
+    final String TARGET_UTILITY_CHANGE_EVENTS_FILE = "temp.utility.change.events.csv";
+    final String TARGET_STANDARD_CHANGE_EVENTS_FILE = "temp.standard.change.events.csv";
+    final String TARGET_UTILITY_EXPORT_SCHEMA_FILE = "temp.utility.export.schema.xml";
+    final String TARGET_STANDARD_EXPORT_SCHEMA_FILE = "temp.standard.export.schema.xml";
+    final String TARGET_UTILITY_QUALIFIERS_DIRECT_FILE = "temp.utility.qualifiers.direct.csv";
+    final String TARGET_STANDARD_QUALIFIERS_DIRECT_FILE = "temp.standard.qualifiers.direct.csv";
+    final String TARGET_UTILITY_QUALIFIERS_MAPRED_FILE = "temp.utility.qualifiers.mapreduce.csv";
+    final String TARGET_STANDARD_QUALIFIERS_MAPRED_FILE = "temp.standard.qualifiers.mapreduce.csv";
+    File utilityChangeEventsFile;
+    File standardChangeEventsFile;
+    File utilityExportSchemaFile;
+    File standardExportSchemaFile;
+    File utilityQualifiersDirectFile;
+    File standardQualifiersDirectFile;
+    File utilityQualifiersMapreduceFile;
+    File standardQualifiersMapreduceFile;
+    try {
+      utilityChangeEventsFile = tempTestFolder.newFile(TARGET_UTILITY_CHANGE_EVENTS_FILE);
+      standardChangeEventsFile = tempTestFolder.newFile(TARGET_STANDARD_CHANGE_EVENTS_FILE);
+      utilityExportSchemaFile = tempTestFolder.newFile(TARGET_UTILITY_EXPORT_SCHEMA_FILE);
+      standardExportSchemaFile = tempTestFolder.newFile(TARGET_STANDARD_EXPORT_SCHEMA_FILE);
+      utilityQualifiersDirectFile = tempTestFolder.newFile(TARGET_UTILITY_QUALIFIERS_DIRECT_FILE);
+      standardQualifiersDirectFile = tempTestFolder.newFile(TARGET_STANDARD_QUALIFIERS_DIRECT_FILE);
+      utilityQualifiersMapreduceFile = tempTestFolder.newFile(TARGET_UTILITY_QUALIFIERS_MAPRED_FILE);
+      standardQualifiersMapreduceFile = tempTestFolder.newFile(TARGET_STANDARD_QUALIFIERS_MAPRED_FILE);
+    } catch (IllegalStateException e) { // standalone (non-JUnit) execution
+      utilityChangeEventsFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_CHANGE_EVENTS_FILE);
+      standardChangeEventsFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_CHANGE_EVENTS_FILE);
+      utilityExportSchemaFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_EXPORT_SCHEMA_FILE);
+      standardExportSchemaFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_EXPORT_SCHEMA_FILE);
+      utilityQualifiersDirectFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_QUALIFIERS_DIRECT_FILE);
+      standardQualifiersDirectFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_QUALIFIERS_DIRECT_FILE);
+      utilityQualifiersMapreduceFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_QUALIFIERS_MAPRED_FILE);
+      standardQualifiersMapreduceFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_QUALIFIERS_MAPRED_FILE);
+    }
 
     initializeTestNamespaceAndTableObjects();
     clearTestingEnvironment();
@@ -2612,24 +2651,78 @@ public class TestRepositoryAdmin {
     loadColumnData(configuration, true);
 
     String[] args = new String[]{
-      "-u",
-      UtilityRunner.GET_CHANGE_EVENTS_UTILITY,
-      // UtilityRunner.EXPORT_SCHEMA_UTILITY,
-      // UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN,
-      // UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE,
-      "--table", "default:testTable01", //NAMESPACE03_TABLE01.getNameAsString(),
-      "-f",
-      // "target/testGetChangeEvents.txt",
-      // "target/testExportSchema.xml",
-      "target/testGetColumnQualifiers.txt",
+      "-u",       UtilityRunner.GET_CHANGE_EVENTS_UTILITY,
+      "--table",  NAMESPACE03_TABLE01.getNameAsString(),
+      "-f",       utilityChangeEventsFile.getAbsolutePath()};
+    UtilityRunner.main(args);
+
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      ChangeEventMonitor monitor = repositoryAdmin.getChangeEventMonitor();
+      ChangeEventMonitor.exportChangeEventListToCsvFile(
+              monitor.getChangeEventsForTable(NAMESPACE03_TABLE01, true), standardChangeEventsFile);
+      assertEquals(UTILITY_RUNNER_FAILURE + "unexpected item count from UtilityRunner invocation of "
+              + UtilityRunner.GET_CHANGE_EVENTS_UTILITY,
+              Files.lines(standardChangeEventsFile.toPath()).count(),
+              Files.lines(utilityChangeEventsFile.toPath()).count());
+    }
+
+    args = new String[]{
+      "--utility",  UtilityRunner.EXPORT_SCHEMA_UTILITY,
+      "-t",         NAMESPACE03_TABLE01.getNameAsString(),
+      "--file",     utilityExportSchemaFile.getAbsolutePath(),
+      "--help"};
+    UtilityRunner.main(args);
+
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.exportSchema(standardExportSchemaFile, NAMESPACE03_TABLE01);
+      // both export files should be identical, except for timestamp in the comments
+      final String TIMESTAMP_ATTR_REGEX = "File generated on \\[.....................?.?.?\\]";
+      String originalHsaXmlContent = new String(Files.readAllBytes(standardExportSchemaFile.toPath()))
+              .replaceFirst(TIMESTAMP_ATTR_REGEX, "");
+      String comparisonHsaXmlContent = new String(Files.readAllBytes(utilityExportSchemaFile.toPath()))
+              .replaceFirst(TIMESTAMP_ATTR_REGEX, "");
+      assertEquals(UTILITY_RUNNER_FAILURE + "unexpected discrepancies in UtilityRunner invocation of "
+              + UtilityRunner.EXPORT_SCHEMA_UTILITY,
+              originalHsaXmlContent, comparisonHsaXmlContent);
+    }
+
+    args = new String[]{
+      "-u",  UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN,
+      "-t",  NAMESPACE01_TABLE01.getNameAsString(),
+      "-f",  utilityQualifiersDirectFile.getAbsolutePath(),
       "-h"};
     UtilityRunner.main(args);
 
-//    args = new String[]{
-//      "-u",  UtilityRunner.EXPORT_SCHEMA_UTILITY,
-//      "-t",  NAMESPACE03_TABLE01.getNameAsString(),
-//      "-f",  "target/testExportSchema.xml"};
-//    UtilityRunner.main(args);
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.outputReportOnColumnQualifiers(
+              standardQualifiersDirectFile, NAMESPACE01_TABLE01);
+      assertEquals(UTILITY_RUNNER_FAILURE
+              + "unexpected item count from UtilityRunner invocation of "
+              + UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN,
+              Files.lines(standardQualifiersDirectFile.toPath()).count(),
+              Files.lines(utilityQualifiersDirectFile.toPath()).count());
+    }
+
+    args = new String[]{
+      "-u",  UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE,
+      "-t",  NAMESPACE01_TABLE01.getNameAsString(),
+      "-f",  utilityQualifiersMapreduceFile.getAbsolutePath(),
+      "-h"};
+    UtilityRunner.main(args);
+
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.outputReportOnColumnQualifiers(
+              standardQualifiersMapreduceFile, NAMESPACE01_TABLE01);
+      assertEquals(UTILITY_RUNNER_FAILURE
+              + "unexpected item count from UtilityRunner invocation of "
+              + UtilityRunner.GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE,
+              Files.lines(standardQualifiersMapreduceFile.toPath()).count(),
+              Files.lines(utilityQualifiersMapreduceFile.toPath()).count());
+    }
 
     clearTestingEnvironment();
     System.out.println("#testUtilityRunner using WILDCARDED EXCLUDE config properties has "
@@ -2650,11 +2743,11 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
-    // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsViaDirectScan();
+    // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsViaDirectScan();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
-    // new TestRepositoryAdmin().testGenerateReportOnInvalidColumnsUsingMapReduce();
+    // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsUsingMapReduce();
     new TestRepositoryAdmin().testUtilityRunner();
   }
 }

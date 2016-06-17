@@ -54,6 +54,8 @@ public class TestMConnectionFactory {
             + "invocation of #createConnection method: "
             + Repository.REPOSITORY_TABLENAME.getNameAsString(),
             standardAdmin.tableExists(Repository.REPOSITORY_TABLENAME));
+
+    manuallyDropRepositoryStructures(standardConnection, standardAdmin);
   }
 
   static void manuallyDropRepositoryStructures(

@@ -63,7 +63,7 @@ class ColumnQualifierReport {
   private void outputReport() throws IOException {
     HBaseSchemaArchive hsa = new HBaseSchemaArchive(sourceNamespace, sourceTableName, repository);
 
-    StringBuilder headerCommentsBuilder = new StringBuilder("Report on Column Auditors");
+    StringBuilder headerCommentsBuilder = new StringBuilder("Report on ColumnAuditors");
     if (sourceNamespace == null && sourceTableName == null) {
       headerCommentsBuilder.append(" in ALL ColumnManager-included Tables in ALL Namespaces");
     } else {

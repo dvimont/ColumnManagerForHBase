@@ -38,7 +38,7 @@ import org.apache.log4j.Logger;
 /**
  * A <b>RepositoryAdmin</b> provides ColumnManager Repository maintenance and query facilities,
  * as well as column-metadata {@link #discoverColumnMetadata(boolean) discovery} and full-schema
- * {@link #exportSchema(java.io.File, boolean) export}/{@link #importSchema(java.io.File, boolean) import}
+ * {@link #exportSchema(java.io.File) export}/{@link #importSchema(java.io.File, boolean) import}
  * facilities; it is used as a complement to the standard
  * {@link org.apache.hadoop.hbase.client.Admin} interface to provide for maintenance of optional
  * {@link ColumnDefinition} structures and querying of {@link ColumnAuditor} structures.
@@ -121,7 +121,7 @@ public class RepositoryAdmin {
    */
   public static void uninstallRepositoryStructures(Admin hbaseAdmin) throws IOException {
     Repository.dropRepository(hbaseAdmin, Logger.getLogger(RepositoryAdmin.class.getName()));
-    InvalidColumnReport.dropTempReportNamespace(hbaseAdmin);
+    ColumnInvalidityReport.dropTempReportNamespace(hbaseAdmin);
   }
 
   /**
@@ -137,7 +137,7 @@ public class RepositoryAdmin {
    * @throws IOException if a remote or network exception occurs
    */
   public static void deleteTempReportTables(Admin hbaseAdmin) throws IOException {
-    InvalidColumnReport.dropTempReportTables(hbaseAdmin);
+    ColumnInvalidityReport.dropTempReportTables(hbaseAdmin);
   }
 
   /**
@@ -615,15 +615,13 @@ public class RepositoryAdmin {
    * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
    *
    * @param targetFile target file
-   * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
-   * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    * @throws XMLStreamException if an exception occurs in the context of JAXB processing
    */
-  public void exportSchema(File targetFile, boolean formatted)
+  public void exportSchema(File targetFile)
           throws IOException, JAXBException, XMLStreamException {
-    repository.exportSchema(null, null, targetFile, formatted);
+    repository.exportSchema(null, null, targetFile);
   }
 
   /**
@@ -637,18 +635,16 @@ public class RepositoryAdmin {
    *
    * @param targetFile target file
    * @param sourceNamespaceName namespace from which to export schema entities
-   * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
-   * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    * @throws XMLStreamException if an exception occurs in the context of JAXB processing
    * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void exportSchema(File targetFile, String sourceNamespaceName, boolean formatted)
+  public void exportSchema(File targetFile, String sourceNamespaceName)
           throws IOException, JAXBException, XMLStreamException,
           TableNotIncludedForProcessingException {
-    repository.exportSchema(sourceNamespaceName, null, targetFile, formatted);
+    repository.exportSchema(sourceNamespaceName, null, targetFile);
   }
 
   /**
@@ -662,19 +658,16 @@ public class RepositoryAdmin {
    *
    * @param targetFile target File
    * @param sourceTableName table to export (along with its component schema-entities)
-   * @param formatted if <b>true</b>, insert whitespace (linefeeds and hierarchical indentations)
-   * between XML elements to produce human-readable XML.
    * @throws IOException if a remote or network exception occurs
    * @throws JAXBException if an exception occurs in the context of JAXB processing
    * @throws XMLStreamException if an exception occurs in the context of JAXB processing
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void exportSchema(File targetFile, TableName sourceTableName, boolean formatted)
+  public void exportSchema(File targetFile, TableName sourceTableName)
           throws IOException, JAXBException, XMLStreamException,
           TableNotIncludedForProcessingException {
-    repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName,
-            targetFile, formatted);
+    repository.exportSchema(sourceTableName.getNamespaceAsString(), sourceTableName, targetFile);
   }
 
   /**
@@ -683,7 +676,7 @@ public class RepositoryAdmin {
    * Tables which are <a href="package-summary.html#config">included in ColumnManager processing</a>
    * will be imported.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -705,7 +698,7 @@ public class RepositoryAdmin {
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    * will be imported.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -730,7 +723,7 @@ public class RepositoryAdmin {
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    * will be imported.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -756,7 +749,7 @@ public class RepositoryAdmin {
    * Table/ColumnFamily which is
    * <a href="package-summary.html#config">included in ColumnManager processing</a>.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -776,7 +769,7 @@ public class RepositoryAdmin {
    * Table/ColumnFamily which is
    * <a href="package-summary.html#config">included in ColumnManager processing</a>.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -799,7 +792,7 @@ public class RepositoryAdmin {
    * Table/ColumnFamily which is
    * <a href="package-summary.html#config">included in ColumnManager processing</a>.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -823,7 +816,7 @@ public class RepositoryAdmin {
    * Table/ColumnFamily which is
    * <a href="package-summary.html#config">included in ColumnManager processing</a>.
    * <br><br>*An HSA file is created with the one of the
-   * {@link #exportSchema(java.io.File, boolean) #exportSchema} methods and adheres to
+   * {@link #exportSchema(java.io.File) #exportSchema} methods and adheres to
    * the XML Schema layout in <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">
    * HBaseSchemaArchive.xsd.xml</a>.
    *
@@ -969,7 +962,7 @@ public class RepositoryAdmin {
   public boolean outputReportOnInvalidColumnQualifiers(File targetFile, TableName tableName,
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return repository.outputReportOnInvalidColumns(InvalidColumnReport.ReportType.QUALIFIER,
+    return repository.outputReportOnInvalidColumns(ColumnInvalidityReport.ReportType.QUALIFIER,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
@@ -1027,7 +1020,7 @@ public class RepositoryAdmin {
   public boolean outputReportOnInvalidColumnLengths(File targetFile, TableName tableName,
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return repository.outputReportOnInvalidColumns(InvalidColumnReport.ReportType.LENGTH,
+    return repository.outputReportOnInvalidColumns(ColumnInvalidityReport.ReportType.LENGTH,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 
@@ -1085,7 +1078,7 @@ public class RepositoryAdmin {
   public boolean outputReportOnInvalidColumnValues(File targetFile, TableName tableName,
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return repository.outputReportOnInvalidColumns(InvalidColumnReport.ReportType.VALUE,
+    return repository.outputReportOnInvalidColumns(ColumnInvalidityReport.ReportType.VALUE,
             tableName, colFamily, targetFile, verbose, useMapreduce);
   }
 

@@ -380,8 +380,8 @@
  * <i>Table/ColumnFamily</i>, a CSV-formatted report listing columns which deviate from
  * those ColumnDefinitions (either in terms of qualifier-name, length, or value) may be
  * generated via the various
- * <a href="RepositoryAdmin.html#generateReportOnInvalidColumnQualifiers-java.io.File-org.apache.hadoop.hbase.TableName-boolean-boolean-">
- * RepositoryAdmin#generateReportOnInvalidColumn*</a> methods. If a method is run in
+ * <a href="RepositoryAdmin.html#outputReportOnInvalidColumnQualifiers-java.io.File-org.apache.hadoop.hbase.TableName-boolean-boolean-">
+ * RepositoryAdmin#outputReportOnInvalidColumn*</a> methods. If a method is run in
  * <i>verbose</i> mode, the outputted CSV file will include an entry (identified by the
  * fully-qualified column name and rowId) for each explicit invalid column that is found;
  * otherwise the report will contain a summary, giving a count of the invalidities associated
