@@ -39,6 +39,9 @@
  * <a href="#export-import">schema (metadata) export and import facilities</a>
  * for HBase <i>Namespace</i>, <i>Table</i>, and all table-component structures.<br><br>
  *
+ * <i>A basic</i> <b>COMMAND-LINE INTERFACE</b> <i>is also provided for direct invocation of
+ * a number of the above-listed functions without any need for Java coding.</i><br><br>
+ * 
  * Once it is installed and configured, standard usage of the ColumnManagerAPI in Java programs is
  * accomplished by simply substituting any reference to the standard HBase {@code ConnectionFactory}
  * class with a reference to the ColumnManager

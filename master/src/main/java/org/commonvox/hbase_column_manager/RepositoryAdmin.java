@@ -204,7 +204,7 @@ public class RepositoryAdmin {
     if (mcd == null) {
       return null;
     }
-    return RepositoryAdmin.this.getColumnAuditors(mtd, mcd);
+    return getColumnAuditors(mtd, mcd);
   }
 
   /**

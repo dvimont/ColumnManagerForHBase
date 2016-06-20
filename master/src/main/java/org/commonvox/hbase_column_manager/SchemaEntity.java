@@ -43,13 +43,11 @@ import org.apache.hadoop.hbase.util.Bytes;
 @XmlRootElement(name = "hBaseSchemaEntity")
 class SchemaEntity implements Comparable<SchemaEntity> {
 
-  // all simple fields are non-final Strings to facilitate straightforward JAXB marshal/unmarshal
+  // all fields are non-final to facilitate straightforward JAXB marshal/unmarshal
   @XmlAttribute
-  private String schemaEntityType; // full String used for explicit JAXB marshalling
+  private SchemaEntityType schemaEntityType;
   @XmlAttribute
   private String name;
-  @XmlAttribute
-  private String columnDefinitionsEnforced; // String (not boolean) so can be nullified for JAXB!
 
   private final Map<String, String> values = new HashMap<>(); // String entries for JAXB!
   private final Map<String, String> configurations = new HashMap<>();
@@ -66,8 +64,7 @@ class SchemaEntity implements Comparable<SchemaEntity> {
 
   SchemaEntity(byte entityType, byte[] name) {
     this.type = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType);
-    this.schemaEntityType
-            = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType).toString();
+    this.schemaEntityType = SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType);
     this.name = Bytes.toString(name);
   }
 
@@ -92,7 +89,6 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     for (Map.Entry<String, String> configEntry : entity.configurations.entrySet()) {
       this.configurations.put(configEntry.getKey(), configEntry.getValue());
     }
-    this.columnDefinitionsEnforced = entity.columnDefinitionsEnforced;
   }
 
   SchemaEntity(MTableDescriptor mtd) {
@@ -117,11 +113,10 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     for (Map.Entry<String, String> configEntry : mcd.getConfiguration().entrySet()) {
       this.configurations.put(configEntry.getKey(), configEntry.getValue());
     }
-    this.setColumnDefinitionsEnforced(mcd.columnDefinitionsEnforced());
   }
 
   byte getEntityRecordType() {
-    return SchemaEntityType.ENTITY_TYPE_LABEL_TO_BYTE_MAP.get(this.schemaEntityType);
+    return schemaEntityType.getRecordType();
   }
 
   SchemaEntityType getSchemaEntityType() {
@@ -272,14 +267,6 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     this.foreignKeyValue = foreignKeyValue;
   }
 
-  boolean getColumnDefinitionsEnforced() {
-    return Boolean.parseBoolean(this.columnDefinitionsEnforced);
-  }
-
-  final void setColumnDefinitionsEnforced(boolean enforced) {
-    this.columnDefinitionsEnforced = Boolean.toString(enforced);
-  }
-
   void addChild(SchemaEntity child) {
     if (children == null) {
       children = new TreeSet<>();
@@ -412,7 +399,6 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     int hash = 3;
     hash = 41 * hash + Objects.hashCode(this.schemaEntityType);
     hash = 41 * hash + Objects.hashCode(this.name);
-    hash = 41 * hash + Objects.hashCode(this.columnDefinitionsEnforced);
     hash = 41 * hash + Objects.hashCode(this.values);
     hash = 41 * hash + Objects.hashCode(this.configurations);
     hash = 41 * hash + Objects.hashCode(this.children);

@@ -29,7 +29,6 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
@@ -52,7 +51,7 @@ class HBaseSchemaArchive {
   private static final String BLANKS = "                    ";
   private static final int TAB = 3;
 
-  @XmlTransient // @XmlAttribute (Timestamp attribute now written to comment)
+  @XmlTransient // was @XmlAttribute (Timestamp attribute now written to comment)
   private final String fileTimestamp;
   @XmlElement(name = "hBaseSchemaEntity")
   private final Set<SchemaEntity> hBaseSchemaEntities = new LinkedHashSet<>();

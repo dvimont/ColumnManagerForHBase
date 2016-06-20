@@ -72,8 +72,7 @@ import org.apache.log4j.Logger;
 class Repository {
 
   private final Logger logger;
-  private static final Logger staticLogger
-          = Logger.getLogger(Repository.class.getName());
+  private static final Logger staticLogger = Logger.getLogger(Repository.class.getName());
   private final byte[] javaUsername;
   private final boolean columnManagerIsActivated;
   private Set<String> includedNamespaces;
@@ -382,6 +381,16 @@ class Repository {
     }
   }
 
+  private static Admin getNewAdmin(Connection hbaseConnection) throws IOException {
+    try (Admin admin = getStandardConnection(hbaseConnection).getAdmin()) {
+      return admin;
+    }
+  }
+
+  Admin getAdmin() {
+    return this.standardAdmin;
+  }
+
   boolean isActivated() {
     return columnManagerIsActivated;
   }
@@ -484,16 +493,6 @@ class Repository {
     return true;
   }
 
-  Admin getAdmin() {
-    return this.standardAdmin;
-  }
-
-  private static Admin getNewAdmin(Connection hbaseConnection) throws IOException {
-    try (Admin admin = getStandardConnection(hbaseConnection).getAdmin()) {
-      return admin;
-    }
-  }
-
   static boolean namespaceExists(Admin hbaseAdmin, NamespaceDescriptor nd)
           throws IOException {
     try {
@@ -553,8 +552,9 @@ class Repository {
   }
 
   /**
+   * Persist Namespace SchemaEntity in Repository
    *
-   * @param nd
+   * @param nd NamespaceDescriptor to persist in SchemaEntity format
    * @return foreign key value of repository row that holds namespace SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
@@ -572,8 +572,9 @@ class Repository {
   }
 
   /**
+   * Persist Table SchemaEntity in Repository
    *
-   * @param htd
+   * @param htd TableDescriptor to persist in SchemaEntity format
    * @return foreign key value of repository row that holds table SchemaEntity
    * @throws IOException if a remote or network exception occurs
    */
@@ -610,6 +611,14 @@ class Repository {
     return tableForeignKey;
   }
 
+  /**
+   * Persist ColumnFamily SchemaEntity in Repository
+   *
+   * @param tn TableName
+   * @param hcd HColumnDescriptor
+   * @return foreign key value of repository row that holds Column Family SchemaEntity
+   * @throws IOException
+   */
   byte[] putColumnFamilySchemaEntity(TableName tn, HColumnDescriptor hcd)
           throws IOException {
     if (!isIncludedTable(tn)) {
@@ -625,6 +634,7 @@ class Repository {
   }
 
   /**
+   * Persist ColumnFamily SchemaEntity in Repository
    *
    * @param tableForeignKey
    * @param hcd
@@ -637,15 +647,8 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(hcd.getValues(), hcd.getConfiguration());
 
-    byte[] colFamilyForeignKey
-            = putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+    return putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
                     tableForeignKey, hcd.getName()), entityAttributeMap, false);
-
-    if (MColumnDescriptor.class.isAssignableFrom(hcd.getClass())) {
-      setColumnDefinitionsEnforced(((MColumnDescriptor)hcd).columnDefinitionsEnforced(),
-              SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, hcd.getName());
-    }
-    return colFamilyForeignKey;
   }
 
   /**
@@ -1163,6 +1166,13 @@ class Repository {
     return mColumnDescriptors;
   }
 
+  private MColumnDescriptor getMColumnDescriptor(byte[] tableForeignKey, byte[] colFamily)
+          throws IOException {
+    Result row = getActiveRow(
+            SchemaEntityType.COLUMN_FAMILY.getRecordType(), tableForeignKey, colFamily, null);
+    return row == null ? null : new MColumnDescriptor(deserializeSchemaEntity(row));
+  }
+
   Set<ColumnAuditor> getColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd)
           throws IOException {
     if (!isIncludedTable(htd.getTableName())) {
@@ -1233,8 +1243,6 @@ class Repository {
       byte[] value = colEntry.getValue();
       if (Bytes.equals(key, FOREIGN_KEY_COLUMN)) {
         entity.setForeignKey(colEntry.getValue());
-      } else if (Bytes.equals(key, COL_DEFINITIONS_ENFORCED_COLUMN)) {
-        entity.setColumnDefinitionsEnforced(Bytes.toBoolean(colEntry.getValue()));
       } else if (key.length > VALUE_COLUMN_PREFIX_BYTES.length
               && Bytes.startsWith(key, VALUE_COLUMN_PREFIX_BYTES)) {
         entity.setValue(Bytes.tail(key, key.length - VALUE_COLUMN_PREFIX_BYTES.length),
@@ -1422,23 +1430,8 @@ class Repository {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
-    return columnDefinitionsEnforced(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
-            getTableForeignKey(tableName), colFamily);
-  }
-
-  private boolean columnDefinitionsEnforced(
-          byte recordType, byte[] parentForeignKey, byte[] entityName)
-          throws IOException {
-    Result row = getActiveRow(
-            recordType, parentForeignKey, entityName, COL_DEFINITIONS_ENFORCED_COLUMN);
-    if (row == null || row.isEmpty()) {
-      return false;
-    }
-    byte[] colValue = row.getValue(REPOSITORY_CF, COL_DEFINITIONS_ENFORCED_COLUMN);
-    if (colValue == null || colValue.length == 0) {
-      return false;
-    }
-    return Bytes.toBoolean(colValue);
+    MColumnDescriptor mcd = getMColumnDescriptor(getTableForeignKey(tableName), colFamily);
+    return (mcd == null) ? false : mcd.columnDefinitionsEnforced();
   }
 
   void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
@@ -1446,17 +1439,14 @@ class Repository {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
-    setColumnDefinitionsEnforced(enabled, SchemaEntityType.COLUMN_FAMILY.getRecordType(),
-            getTableForeignKey(tableName), colFamily);
-  }
-
-  private void setColumnDefinitionsEnforced(
-          boolean enabled, byte recordType, byte[] parentForeignKey, byte[] entityName)
-          throws IOException {
-    if (columnDefinitionsEnforced(recordType, parentForeignKey, entityName) != enabled) {
-      repositoryTable.put(new Put(buildRowId(recordType, parentForeignKey, entityName))
-              .addColumn(REPOSITORY_CF, COL_DEFINITIONS_ENFORCED_COLUMN, Bytes.toBytes(enabled))
-              .addColumn(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY, javaUsername));
+    byte[] tableForeignKey = getTableForeignKey(tableName);
+    MColumnDescriptor mcd = getMColumnDescriptor(tableForeignKey, colFamily);
+    if (mcd == null) {
+      return;
+    }
+    if (mcd.columnDefinitionsEnforced() != enabled) {
+      mcd.setColumnDefinitionsEnforced(enabled);
+      putColumnFamilySchemaEntity(tableForeignKey, mcd, tableName);
     }
   }
 

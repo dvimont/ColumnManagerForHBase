@@ -1029,7 +1029,9 @@ public class TestRepositoryAdmin {
     createAdditionalColumnDefinitions(configuration);
     // extract schema into external HBase Schema Archive files
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
-      new RepositoryAdmin(connection).exportSchema(exportAllFile);
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.exportSchema(exportAllFile);
     }
 
     initializeTestNamespaceAndTableObjects();
@@ -1040,6 +1042,7 @@ public class TestRepositoryAdmin {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile);
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.exportSchema(exportAllComparisonFile);
     }
     // both export files should be identical, except for timestamp in the comments
@@ -1065,6 +1068,7 @@ public class TestRepositoryAdmin {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01);
+      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.exportSchema(exportNamespaceImportedColDefsFile);
     }
     // assure that only specified namespace (i.e. NAMESPACE01) has ColumnDefinitions
@@ -2738,7 +2742,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
     // new TestRepositoryAdmin().testExportImport();
-    // new TestRepositoryAdmin().testChangeEventMonitor();
+    new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
@@ -2748,6 +2752,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsUsingMapReduce();
-    new TestRepositoryAdmin().testUtilityRunner();
+    // new TestRepositoryAdmin().testUtilityRunner();
   }
 }

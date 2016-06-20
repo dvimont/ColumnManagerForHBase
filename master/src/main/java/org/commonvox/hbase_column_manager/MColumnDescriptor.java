@@ -41,8 +41,7 @@ class MColumnDescriptor extends HColumnDescriptor {
   private final Map<byte[], ColumnDefinition> columnDefinitions
           = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
   private byte[] foreignKeyValue;
-  private boolean columnDefinitionsEnforced;
-
+  private static final String COL_DEFINITIONS_ENFORCED_KEY = "_ColDefinitionsEnforced";
   /**
    *
    * @param colFamily Column Family name.
@@ -94,7 +93,6 @@ class MColumnDescriptor extends HColumnDescriptor {
   MColumnDescriptor(SchemaEntity entity) {
     super(entity.getName());
     this.setForeignKey(entity.getForeignKey());
-    this.columnDefinitionsEnforced = entity.getColumnDefinitionsEnforced();
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : entity.getValues().entrySet()) {
       this.setValue(valueEntry.getKey().copyBytes(), valueEntry.getValue().copyBytes());
@@ -193,11 +191,12 @@ class MColumnDescriptor extends HColumnDescriptor {
   }
 
   void setColumnDefinitionsEnforced(boolean enabled) {
-    this.columnDefinitionsEnforced = enabled;
+    this.setConfiguration(COL_DEFINITIONS_ENFORCED_KEY, String.valueOf(enabled));
   }
 
   boolean columnDefinitionsEnforced() {
-    return this.columnDefinitionsEnforced;
+    String enabledString = this.getConfigurationValue(COL_DEFINITIONS_ENFORCED_KEY);
+    return enabledString == null ? false : Boolean.valueOf(enabledString);
   }
 
   @Override
