@@ -563,12 +563,12 @@ class Repository {
     if (!isIncludedNamespace(nd.getName())) {
       return null;
     }
-    byte[] namespaceRowId
-            = buildRowId(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
+    RowId namespaceRowId
+            = new RowId(SchemaEntityType.NAMESPACE.getRecordType(), NAMESPACE_PARENT_FOREIGN_KEY,
                     Bytes.toBytes(nd.getName()));
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(EMPTY_VALUES, nd.getConfiguration());
-    return putSchemaEntity(namespaceRowId, entityAttributeMap, false);
+    return putSchemaEntity(namespaceRowId.getByteArray(), entityAttributeMap, false);
   }
 
   /**
@@ -584,13 +584,13 @@ class Repository {
     }
     byte[] namespaceForeignKey
             = getNamespaceForeignKey(htd.getTableName().getNamespace());
-    byte[] tableRowId
-            = buildRowId(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey,
+    RowId tableRowId
+            = new RowId(SchemaEntityType.TABLE.getRecordType(), namespaceForeignKey,
                     htd.getTableName().getName());
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(htd.getValues(), htd.getConfiguration());
     byte[] tableForeignKey
-            = putSchemaEntity(tableRowId, entityAttributeMap, false);
+            = putSchemaEntity(tableRowId.getByteArray(), entityAttributeMap, false);
 
     // Account for potentially deleted ColumnFamilies
     Set<byte[]> oldMcdNames = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
@@ -647,8 +647,8 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(hcd.getValues(), hcd.getConfiguration());
 
-    return putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
-                    tableForeignKey, hcd.getName()), entityAttributeMap, false);
+    return putSchemaEntity(new RowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+                    tableForeignKey, hcd.getName()).getByteArray(), entityAttributeMap, false);
   }
 
   /**
@@ -696,8 +696,8 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(columnAuditor.getValues(), columnAuditor.getConfiguration());
 
-    return putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-            colFamilyForeignKey, columnAuditor.getName()),
+    return putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+            colFamilyForeignKey, columnAuditor.getName()).getByteArray(),
             entityAttributeMap, false);
   }
 
@@ -774,8 +774,8 @@ class Repository {
         Map<byte[], byte[]> entityAttributeMap
                 = buildEntityAttributeMap(newColAuditor.getValues(),
                         newColAuditor.getConfiguration());
-        putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-                mcd.getForeignKey(), newColAuditor.getName()), entityAttributeMap,
+        putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                mcd.getForeignKey(), newColAuditor.getName()).getByteArray(), entityAttributeMap,
                 suppressUserName);
       }
     }
@@ -821,8 +821,8 @@ class Repository {
         Map<byte[], byte[]> entityAttributeMap
                 = buildEntityAttributeMap(newColAuditor.getValues(),
                         newColAuditor.getConfiguration());
-        putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-                mcd.getForeignKey(), colQualifier),
+        putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                mcd.getForeignKey(), colQualifier).getByteArray(),
                 entityAttributeMap, suppressUserName);
       }
     }
@@ -992,8 +992,8 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(colDef.getValues(), colDef.getConfiguration());
 
-    return putSchemaEntity(buildRowId(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
-            colFamilyForeignKey, colDef.getName()), entityAttributeMap, false);
+    return putSchemaEntity(new RowId(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
+            colFamilyForeignKey, colDef.getName()).getByteArray(), entityAttributeMap, false);
   }
 
   private Map<byte[], byte[]> buildEntityAttributeMap(
@@ -1235,9 +1235,8 @@ class Repository {
     if (row == null || row.isEmpty()) {
       return null;
     }
-    byte[] rowId = row.getRow();
-    SchemaEntity entity
-            = new SchemaEntity(rowId[0], extractNameFromRowId(rowId));
+    RowId rowId = new RowId(row.getRow());
+    SchemaEntity entity = new SchemaEntity(rowId.getEntityType(), rowId.getEntityName());
     for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_CF).entrySet()) {
       byte[] key = colEntry.getKey();
       byte[] value = colEntry.getValue();
@@ -1255,40 +1254,6 @@ class Repository {
       }
     }
     return entity;
-  }
-
-  private static byte[] buildRowId(byte recordType, byte[] parentForeignKey, byte[] entityName) {
-    ByteBuffer rowId;
-    if (entityName == null) {
-      rowId = ByteBuffer.allocate(1 + parentForeignKey.length);
-      rowId.put(recordType).put(parentForeignKey);
-    } else {
-      rowId = ByteBuffer.allocate(1 + parentForeignKey.length + entityName.length);
-      rowId.put(recordType).put(parentForeignKey).put(entityName);
-    }
-    return rowId.array();
-  }
-
-  /**
-   * If submitted entityName is null, stopRow will be concatenation of startRow and a byte-array of
-   * 0xff value bytes (making for a Scan intended to return one-to-many Rows, all with RowIds
-   * prefixed with the startRow value); if entityName is NOT null, stopRow will be concatenation of
-   * startRow and a byte-array of 0x00 value bytes (making for a Scan intended to return a single
-   * Row with RowId precisely equal to startRow value).
-   *
-   * @param startRowValue
-   * @param entityName may be null (see comments above)
-   * @return stopRow value
-   */
-  private byte[] buildStopRow(byte[] startRowValue, byte[] entityName) {
-    final byte[] fillerArray;
-    if (entityName == null) {
-      fillerArray = HEX_FF_ARRAY;
-    } else {
-      fillerArray = HEX_00_ARRAY;
-    }
-    return ByteBuffer.allocate(startRowValue.length + fillerArray.length)
-            .put(startRowValue).put(fillerArray).array();
   }
 
   private Result getActiveRow(byte recordType, byte[] parentForeignKey, byte[] entityName,
@@ -1324,9 +1289,9 @@ class Repository {
     if (parentForeignKey == null) {
       return null;
     }
-    byte[] startRow = buildRowId(recordType, parentForeignKey, entityName);
-    byte[] stopRow = buildStopRow(startRow, entityName);
-    Scan scanParms = new Scan(startRow, stopRow);
+    RowId startRowId = new RowId(recordType, parentForeignKey, entityName);
+    byte[] stopRowId = startRowId.getStopRowIdByteArray();
+    Scan scanParms = new Scan(startRowId.getByteArray(), stopRowId);
     if (getRowIdAndStatusOnly || columnToGet != null) {
       scanParms.addColumn(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
       scanParms.addColumn(REPOSITORY_CF, ENTITY_STATUS_COLUMN);
@@ -1361,7 +1326,8 @@ class Repository {
     if (parentForeignKey == null || entityName == null) {
       return null;
     }
-    Result row = repositoryTable.get(new Get(buildRowId(recordType, parentForeignKey, entityName)));
+    Result row = repositoryTable.get(
+            new Get(new RowId(recordType, parentForeignKey, entityName).getByteArray()));
     return row.isEmpty() ? null : row.getValue(REPOSITORY_CF, FOREIGN_KEY_COLUMN);
   }
 
@@ -1447,42 +1413,6 @@ class Repository {
     if (mcd.columnDefinitionsEnforced() != enabled) {
       mcd.setColumnDefinitionsEnforced(enabled);
       putColumnFamilySchemaEntity(tableForeignKey, mcd, tableName);
-    }
-  }
-
-  static byte[] extractNameFromRowId(byte[] rowId) {
-    if (rowId.length < 2) {
-      return null;
-    }
-    int position;
-    switch (SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(rowId[0])) {
-      case NAMESPACE:
-        position = 2;
-        break;
-      case TABLE:
-      case COLUMN_FAMILY:
-      case COLUMN_AUDITOR:
-      case COLUMN_DEFINITION:
-        position = 1 + UNIQUE_FOREIGN_KEY_LENGTH;
-        break;
-      default:
-        return null;
-    }
-    byte[] name = new byte[rowId.length - position];
-    ByteBuffer rowIdBuffer = ByteBuffer.wrap(rowId);
-    rowIdBuffer.position(position);
-    rowIdBuffer.get(name, 0, name.length);
-    return name;
-  }
-
-  static byte[] extractParentForeignKeyFromRowId(byte[] rowId) {
-    if (rowId.length < 2) {
-      return null;
-    }
-    if (rowId[0] == SchemaEntityType.NAMESPACE.getRecordType()) {
-      return NAMESPACE_PARENT_FOREIGN_KEY;
-    } else {
-      return Bytes.copy(rowId, 1, UNIQUE_FOREIGN_KEY_LENGTH);
     }
   }
 
@@ -1816,7 +1746,7 @@ class Repository {
         logger.info("Row type: "
                 + Bytes.toString(rowId).substring(0, 1));
         logger.info("  Row ID: " + getPrintableString(rowId));
-        logger.info("  Element name: " + Bytes.toString(extractNameFromRowId(rowId)));
+        logger.info("  Element name: " + Bytes.toString(new RowId(rowId).getEntityName()));
         for (Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> cfEntry : result.getMap().entrySet()) {
           logger.info("  Column Family: "
                   + Bytes.toString(cfEntry.getKey()));
@@ -1946,6 +1876,93 @@ class Repository {
       return true;
     } catch (NumberFormatException e) {
       return false;
+    }
+  }
+
+  static class RowId {
+    private final ByteBuffer rowIdByteBuffer;
+    private final byte entityType;
+    private final byte[] parentForeignKey;
+    private final byte[] entityName;
+
+    RowId (byte recordType, byte[] parentForeignKey, byte[] entityName) {
+      this.entityType = recordType;
+      this.parentForeignKey = parentForeignKey;
+      this.entityName = entityName;
+      if (this.entityName == null) {
+        rowIdByteBuffer = ByteBuffer.allocate(1 + this.parentForeignKey.length);
+        rowIdByteBuffer.put(recordType).put(this.parentForeignKey);
+      } else {
+        rowIdByteBuffer
+                = ByteBuffer.allocate(1 + this.parentForeignKey.length + this.entityName.length);
+        rowIdByteBuffer.put(this.entityType).put(this.parentForeignKey).put(this.entityName);
+      }
+    }
+
+    RowId (byte[] rowIdByteArray) {
+      if (rowIdByteArray.length < 2) {
+        throw new RuntimeException("Invalid RowId length (less than 2) encountered in "
+                + PRODUCT_NAME + " Repository Table processing.");
+      }
+      entityType = rowIdByteArray[0];
+      int entityNamePosition;
+      switch (SchemaEntityType.ENTITY_TYPE_BYTE_TO_ENUM_MAP.get(entityType)) {
+        case NAMESPACE:
+          entityNamePosition = 2;
+          parentForeignKey = NAMESPACE_PARENT_FOREIGN_KEY;
+          break;
+        case TABLE:
+        case COLUMN_FAMILY:
+        case COLUMN_AUDITOR:
+        case COLUMN_DEFINITION:
+          entityNamePosition = 1 + UNIQUE_FOREIGN_KEY_LENGTH;
+          parentForeignKey = Bytes.copy(rowIdByteArray, 1, UNIQUE_FOREIGN_KEY_LENGTH);
+          break;
+        default:
+          throw new RuntimeException("Invalid record type encountered in " + PRODUCT_NAME
+                  + " Repository Table processing: <" + String.valueOf(entityType) + ">");
+      }
+      entityName = new byte[rowIdByteArray.length - entityNamePosition];
+      rowIdByteBuffer = ByteBuffer.wrap(rowIdByteArray);
+      rowIdByteBuffer.position(entityNamePosition);
+      rowIdByteBuffer.get(entityName, 0, entityName.length);
+    }
+
+    byte[] getByteArray() {
+      return rowIdByteBuffer.array();
+    }
+
+    byte getEntityType() {
+      return entityType;
+    }
+
+    byte[] getParentForeignKey() {
+      return parentForeignKey;
+    }
+
+    byte[] getEntityName() {
+      return entityName;
+    }
+    
+    /**
+     * If submitted entityName is null, stopRowId will be concatenation of startRowId and a
+     * byte-array of 0xff value bytes (making for a Scan intended to return one-to-many Rows,
+     * all with RowIds prefixed with the startRowId value); if entityName is NOT null,
+     * stopRowId will be concatenation of startRowId and a byte-array of 0x00 value bytes
+     * (making for a Scan intended to return a single Row with RowId precisely equal to
+     * startRowId value).
+     *
+     * @return stopRowId value
+     */
+    byte[] getStopRowIdByteArray() {
+      final byte[] fillerArray;
+      if (entityName == null) {
+        fillerArray = HEX_FF_ARRAY;
+      } else {
+        fillerArray = HEX_00_ARRAY;
+      }
+      return ByteBuffer.allocate(rowIdByteBuffer.array().length + fillerArray.length)
+              .put(rowIdByteBuffer.array()).put(fillerArray).array();
     }
   }
 }

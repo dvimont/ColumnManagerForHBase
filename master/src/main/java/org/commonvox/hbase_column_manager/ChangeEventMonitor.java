@@ -101,10 +101,10 @@ public class ChangeEventMonitor {
   ChangeEventMonitor(Table repositoryTable) throws IOException {
     try (ResultScanner rows = repositoryTable.getScanner(new Scan().setMaxVersions())) {
       for (Result row : rows) {
-        byte[] rowId = row.getRow();
-        byte entityType = rowId[0];
-        byte[] entityName = Repository.extractNameFromRowId(rowId);
-        byte[] parentForeignKey = Repository.extractParentForeignKeyFromRowId(rowId);
+        Repository.RowId rowId = new Repository.RowId(row.getRow());
+        byte entityType = rowId.getEntityType();
+        byte[] entityName = rowId.getEntityName();
+        byte[] parentForeignKey = rowId.getParentForeignKey();
         byte[] entityForeignKey = row.getValue(Repository.REPOSITORY_CF, Repository.FOREIGN_KEY_COLUMN);
         Map<Long, byte[]> userNameKeyedByTimestampMap = new HashMap<>();
         for (Cell userNameCell : row.getColumnCells(
