@@ -112,6 +112,10 @@ public class RepositoryAdmin {
     return Repository.getRepositoryMaxVersions(hbaseAdmin);
   }
 
+  static boolean repositoryTableExists(Admin admin) throws IOException {
+    return Repository.repositoryTableExists(admin);
+  }
+
   /**
    * Disable and delete Repository table and drop Repository namespace (for uninstall or reinstall
    * of ColumnManager).

@@ -176,10 +176,6 @@ class Repository {
     String columnManagerActivatedStatus
             = conf.get(HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED,
                     HBASE_CONFIG_PARM_VALUE_COLMANAGER_DEACTIVATED);
-    String[] includedTablesArray
-            = conf.getStrings(HBASE_CONFIG_PARM_KEY_COLMANAGER_INCLUDED_TABLES);
-    String[] excludedTablesArray
-            = conf.getStrings(HBASE_CONFIG_PARM_KEY_COLMANAGER_EXCLUDED_TABLES);
     logger.info(PRODUCT_NAME + " Repository instance being instantiated by object of "
             + originatingObject.getClass().getSimpleName() + " class.");
     logger.info(PRODUCT_NAME + " config parameter: " + HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED
@@ -195,16 +191,7 @@ class Repository {
         discoverSchema(false,false);
       }
     } else {
-      columnManagerIsActivated = false;
-      repositoryTable = null;
-      logger.info(PRODUCT_NAME + " Repository is NOT ACTIVATED.");
-      includedNamespaces = null;
-      includedEntireNamespaces = null;
-      includedTables = null;
-      excludedNamespaces = null;
-      excludedEntireNamespaces = null;
-      excludedTables = null;
-      return;
+      throw new ColumnManagerIOException(PRODUCT_NAME + " Repository is NOT ACTIVATED.") {};
     }
   }
 
@@ -288,6 +275,10 @@ class Repository {
 
   Table getRepositoryTable() {
     return repositoryTable;
+  }
+
+  static boolean repositoryTableExists(Admin standardAdmin) throws IOException {
+    return standardAdmin.tableExists(REPOSITORY_TABLENAME);
   }
 
   /**
@@ -1943,7 +1934,7 @@ class Repository {
     byte[] getEntityName() {
       return entityName;
     }
-    
+
     /**
      * If submitted entityName is null, stopRowId will be concatenation of startRowId and a
      * byte-array of 0xff value bytes (making for a Scan intended to return one-to-many Rows,

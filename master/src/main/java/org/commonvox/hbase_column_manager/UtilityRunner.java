@@ -17,7 +17,6 @@ package org.commonvox.hbase_column_manager;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.util.Set;
 import java.util.TreeSet;
 import javax.xml.bind.JAXBException;
@@ -28,8 +27,11 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Logger;
 
@@ -44,9 +46,12 @@ class UtilityRunner {
   private static final Logger LOG = Logger.getLogger(UtilityRunner.class.getName());
   private static final Option UTILITY_OPTION;
   private static final Option TABLE_OPTION;
+  private static final Option TABLE_OPTION_NOT_REQUIRED;
   private static final Option FILE_OPTION;
+  private static final Option FILE_OPTION_NOT_REQUIRED;
   private static final Option HELP_OPTION;
-  private static final Options OPTIONS;
+  private static final Options OPTIONS_SET_2;
+  private static final Options OPTIONS_SET_1;
   private static final HelpFormatter HELP_FORMATTER;
   private static final String BAR = "====================";
   public static final String EXPORT_SCHEMA_UTILITY = "exportSchema";
@@ -55,16 +60,18 @@ class UtilityRunner {
   public static final String GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE
           = "getColumnQualifiersViaMapReduce";
   public static final String GET_CHANGE_EVENTS_UTILITY = "getChangeEventsForTable";
+  public static final String UNINSTALL_REPOSITORY = "uninstallRepository";
   private static final Set<String> UTILITY_LIST;
   static {
     HELP_FORMATTER = new HelpFormatter();
-    HELP_FORMATTER.setOptionComparator(null); // show options in order they were added to OPTIONS
+    HELP_FORMATTER.setOptionComparator(null); // show options in order added to OPTIONS_SET_2
     UTILITY_LIST = new TreeSet<>();
     UTILITY_LIST.add(EXPORT_SCHEMA_UTILITY);
     UTILITY_LIST.add(IMPORT_SCHEMA_UTILITY);
     UTILITY_LIST.add(GET_CHANGE_EVENTS_UTILITY);
     UTILITY_LIST.add(GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN);
     UTILITY_LIST.add(GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE);
+    UTILITY_LIST.add(UNINSTALL_REPOSITORY);
     StringBuilder validUtilities = new StringBuilder();
     for (String utility : UTILITY_LIST) {
       if (validUtilities.length() > 0) {
@@ -77,15 +84,24 @@ class UtilityRunner {
             .optionalArg(false).build();
     TABLE_OPTION = Option.builder("t").longOpt("table").hasArg().required(true)
             .desc("Fully-qualified table name.").optionalArg(false).build();
+    TABLE_OPTION_NOT_REQUIRED = (Option)TABLE_OPTION.clone();
+    TABLE_OPTION_NOT_REQUIRED.setRequired(false);
     FILE_OPTION = Option.builder("f").longOpt("file").hasArg().required(true)
             .desc("Source/target file.").optionalArg(false).build();
+    FILE_OPTION_NOT_REQUIRED = (Option)FILE_OPTION.clone();
+    FILE_OPTION_NOT_REQUIRED.setRequired(false);
     HELP_OPTION = Option.builder("h").longOpt("help").hasArg(false).required(false)
             .desc("Display help message.").build();
-    OPTIONS = new Options();
-    OPTIONS.addOption(UTILITY_OPTION);
-    OPTIONS.addOption(TABLE_OPTION);
-    OPTIONS.addOption(FILE_OPTION);
-    OPTIONS.addOption(HELP_OPTION);
+    OPTIONS_SET_1 = new Options();
+    OPTIONS_SET_1.addOption(UTILITY_OPTION);
+    OPTIONS_SET_1.addOption(TABLE_OPTION_NOT_REQUIRED);
+    OPTIONS_SET_1.addOption(FILE_OPTION_NOT_REQUIRED);
+    OPTIONS_SET_1.addOption(HELP_OPTION);
+    OPTIONS_SET_2 = new Options();
+    OPTIONS_SET_2.addOption(UTILITY_OPTION);
+    OPTIONS_SET_2.addOption(TABLE_OPTION);
+    OPTIONS_SET_2.addOption(FILE_OPTION);
+    OPTIONS_SET_2.addOption(HELP_OPTION);
   }
 
   UtilityRunner(String[] args) throws Exception, ParseException, IOException, JAXBException {
@@ -98,7 +114,7 @@ class UtilityRunner {
     CommandLineParser parser = new DefaultParser();
     CommandLine commandLine;
     try {
-      commandLine = parser.parse(OPTIONS, args);
+      commandLine = parser.parse(OPTIONS_SET_1, args);
     } catch (ParseException pe) {
       LOG.error(pe.getClass().getSimpleName() + " encountered: " + pe.getMessage());
       printHelp();
@@ -107,15 +123,31 @@ class UtilityRunner {
     if (commandLine.hasOption(HELP_OPTION.getLongOpt())) {
       printHelp();
     }
-    StringBuilder parmInfo = new StringBuilder(this.getClass().getSimpleName()
-            + " has been invoked with the following <option=argument> combinations:");
-    for (Option option : commandLine.getOptions()) {
-      parmInfo.append(" <").append(option.getLongOpt())
-              .append(option.getValue() == null ? "" : ("=" + option.getValue())).append(">");
-    }
-    LOG.info(parmInfo);
-
     String selectedUtility = commandLine.getOptionValue(UTILITY_OPTION.getOpt());
+    if (!UTILITY_LIST.contains(selectedUtility)) {
+      throw new ParseException("Invalid utility argument submitted: <" + selectedUtility + ">");
+    }
+
+    if (selectedUtility.equals(UNINSTALL_REPOSITORY)) {
+      logParmInfo(commandLine);
+      LOG.info(this.getClass().getSimpleName()
+              + " is invoking the following utility: <" + selectedUtility + ">");
+      try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
+        RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
+      }
+      return;
+    }
+
+    try {
+      parser = new DefaultParser();
+      commandLine = parser.parse(OPTIONS_SET_2, args);
+    } catch (ParseException pe) {
+      LOG.error(pe.getClass().getSimpleName() + " encountered: " + pe.getMessage());
+      printHelp();
+      throw pe;
+    }
+    logParmInfo(commandLine);
+
     String selectedTableString = commandLine.getOptionValue(TABLE_OPTION.getOpt());
     String selectedNamespaceString = "";
     if (selectedTableString.endsWith(Repository.ALL_TABLES_WILDCARD_INDICATOR)) {
@@ -126,10 +158,12 @@ class UtilityRunner {
       }
     }
     String selectedFileString = commandLine.getOptionValue(FILE_OPTION.getOpt());
-    if (!UTILITY_LIST.contains(selectedUtility)) {
-      throw new ParseException("Invalid utility argument submitted: <" + selectedUtility + ">");
-    }
-    try (Connection mConnection = MConnectionFactory.createConnection()) {
+
+    Configuration mConf = MConfiguration.create();
+    // invoking UtilityRunner overrides possible inactive state of ColumnManager
+    mConf.setBoolean(Repository.HBASE_CONFIG_PARM_KEY_COLMANAGER_ACTIVATED, true);
+
+    try (Connection mConnection = MConnectionFactory.createConnection(mConf)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection);
       // Note that selectedUtility will validate selectedTableString and selectedFileString
       File selectedFile = new File(selectedFileString);
@@ -199,6 +233,16 @@ class UtilityRunner {
     }
   }
 
+  private void logParmInfo(CommandLine commandLine) {
+    StringBuilder parmInfo = new StringBuilder(this.getClass().getSimpleName()
+            + " has been invoked with the following <option=argument> combinations:");
+    for (Option option : commandLine.getOptions()) {
+      parmInfo.append(" <").append(option.getLongOpt())
+              .append(option.getValue() == null ? "" : ("=" + option.getValue())).append(">");
+    }
+    LOG.info(parmInfo);
+  }
+
   private void printHelp() {
     System.out.println(BAR);
     HELP_FORMATTER.printHelp("java [-options] -cp <hbase-classpath-entries> " + this.getClass().getName(),
@@ -207,7 +251,7 @@ class UtilityRunner {
                     + "local HBase installation.)"
                     + "\n\nArguments for " + Repository.PRODUCT_NAME + " "
                     + this.getClass().getSimpleName() + ":\n" + BAR,
-            OPTIONS, BAR + "\n\n", true);
+            OPTIONS_SET_2, BAR + "\n\n", true);
   }
 
   /**

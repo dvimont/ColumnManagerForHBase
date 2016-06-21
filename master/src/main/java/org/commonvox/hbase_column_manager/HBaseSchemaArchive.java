@@ -53,7 +53,7 @@ class HBaseSchemaArchive {
 
   @XmlTransient // was @XmlAttribute (Timestamp attribute now written to comment)
   private final String fileTimestamp;
-  @XmlElement(name = "hBaseSchemaEntity")
+  @XmlElement(name="hBaseSchemaEntity")
   private final Set<SchemaEntity> hBaseSchemaEntities = new LinkedHashSet<>();
 //  @XmlTransient
 //  private final String ROOT_ELEMENT = "hBaseSchemaArchive";

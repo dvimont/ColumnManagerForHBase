@@ -29,8 +29,8 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
-import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
+import javax.xml.bind.annotation.XmlType;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -40,7 +40,8 @@ import org.apache.hadoop.hbase.util.Bytes;
  * @author Daniel Vimont
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "hBaseSchemaEntity")
+// @XmlRootElement(name = "hBaseSchemaEntity")
+@XmlType(name="hBaseSchemaEntity")
 class SchemaEntity implements Comparable<SchemaEntity> {
 
   // all fields are non-final to facilitate straightforward JAXB marshal/unmarshal
@@ -51,8 +52,8 @@ class SchemaEntity implements Comparable<SchemaEntity> {
 
   private final Map<String, String> values = new HashMap<>(); // String entries for JAXB!
   private final Map<String, String> configurations = new HashMap<>();
-  @XmlElementWrapper(name = "children")
-  @XmlElement(name = "hBaseSchemaEntity")
+  @XmlElementWrapper(name="childEntities")
+  @XmlElement(name="hBaseSchemaEntity")
   private TreeSet<SchemaEntity> children = null; // TreeSet stipulated for ordered unmarshalling!!
   @XmlTransient
   private byte[] foreignKeyValue;

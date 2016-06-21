@@ -19,10 +19,12 @@ package org.commonvox.hbase_column_manager;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import javax.xml.bind.annotation.XmlType;
 
 /**
  * Enum for all the types of metadata entities tracked and managed in the ColumnManager repository.
  */
+@XmlType
 enum SchemaEntityType {
 
   /**

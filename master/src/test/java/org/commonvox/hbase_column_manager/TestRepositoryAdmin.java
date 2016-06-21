@@ -2728,6 +2728,18 @@ public class TestRepositoryAdmin {
               Files.lines(utilityQualifiersMapreduceFile.toPath()).count());
     }
 
+    args = new String[]{
+      "-u",  UtilityRunner.UNINSTALL_REPOSITORY,
+    };
+    UtilityRunner.main(args);
+
+    try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
+      assertTrue(UTILITY_RUNNER_FAILURE
+              + "processing failure in UtilityRunner invocation of "
+              + UtilityRunner.UNINSTALL_REPOSITORY,
+              !RepositoryAdmin.repositoryTableExists(standardAdmin));
+    }
+
     clearTestingEnvironment();
     System.out.println("#testUtilityRunner using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
@@ -2741,8 +2753,8 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
-    // new TestRepositoryAdmin().testExportImport();
-    new TestRepositoryAdmin().testChangeEventMonitor();
+    new TestRepositoryAdmin().testExportImport();
+    // new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();

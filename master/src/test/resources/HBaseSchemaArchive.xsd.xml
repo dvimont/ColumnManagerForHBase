@@ -3,15 +3,13 @@
 
   <xs:element name="hBaseSchemaArchive" type="hBaseSchemaArchive"/>
 
-  <xs:element name="hBaseSchemaEntity" type="schemaEntity"/>
-
   <xs:complexType name="hBaseSchemaArchive">
     <xs:sequence>
-      <xs:element ref="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="hBaseSchemaEntity" type="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 
-  <xs:complexType name="schemaEntity">
+  <xs:complexType name="hBaseSchemaEntity">
     <xs:sequence>
       <xs:element name="values">
         <xs:complexType>
@@ -41,10 +39,10 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
-      <xs:element name="children" minOccurs="0">
+      <xs:element name="childEntities" minOccurs="0">
         <xs:complexType>
           <xs:sequence>
-            <xs:element ref="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="hBaseSchemaEntity" type="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
           </xs:sequence>
         </xs:complexType>
       </xs:element>
