@@ -3,15 +3,13 @@
 
   <xs:element name="hBaseSchemaArchive" type="hBaseSchemaArchive"/>
 
-  <xs:element name="hBaseSchemaEntity" type="schemaEntity"/>
-
   <xs:complexType name="hBaseSchemaArchive">
     <xs:sequence>
-      <xs:element ref="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="hBaseSchemaEntity" type="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
 
-  <xs:complexType name="schemaEntity">
+  <xs:complexType name="hBaseSchemaEntity">
     <xs:sequence>
       <xs:element name="values">
         <xs:complexType>
@@ -41,17 +39,26 @@
           </xs:sequence>
         </xs:complexType>
       </xs:element>
-      <xs:element name="children" minOccurs="0">
+      <xs:element name="childEntities" minOccurs="0">
         <xs:complexType>
           <xs:sequence>
-            <xs:element ref="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="hBaseSchemaEntity" type="hBaseSchemaEntity" minOccurs="0" maxOccurs="unbounded"/>
           </xs:sequence>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
-    <xs:attribute name="schemaEntityType" type="xs:string"/>
+    <xs:attribute name="schemaEntityType" type="schemaEntityType"/>
     <xs:attribute name="name" type="xs:string"/>
-    <xs:attribute name="columnDefinitionsEnforced" type="xs:string"/>
   </xs:complexType>
+
+  <xs:simpleType name="schemaEntityType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="NAMESPACE"/>
+      <xs:enumeration value="TABLE"/>
+      <xs:enumeration value="COLUMN_FAMILY"/>
+      <xs:enumeration value="COLUMN_AUDITOR"/>
+      <xs:enumeration value="COLUMN_DEFINITION"/>
+    </xs:restriction>
+  </xs:simpleType>
 </xs:schema>
 
