@@ -83,7 +83,9 @@ class UtilityRunner {
             .desc("Utility to run. Valid <arg> values are as follows:" + validUtilities)
             .optionalArg(false).build();
     TABLE_OPTION = Option.builder("t").longOpt("table").hasArg().required(true)
-            .desc("Fully-qualified table name.").optionalArg(false).build();
+            .desc("Fully-qualified table name; or submit '*' in place of table "
+                    + "qualifier (e.g., 'myNamespace:*') to process all tables in a given "
+                    + "namespace.").optionalArg(false).build();
     TABLE_OPTION_NOT_REQUIRED = (Option)TABLE_OPTION.clone();
     TABLE_OPTION_NOT_REQUIRED.setRequired(false);
     FILE_OPTION = Option.builder("f").longOpt("file").hasArg().required(true)
@@ -91,7 +93,7 @@ class UtilityRunner {
     FILE_OPTION_NOT_REQUIRED = (Option)FILE_OPTION.clone();
     FILE_OPTION_NOT_REQUIRED.setRequired(false);
     HELP_OPTION = Option.builder("h").longOpt("help").hasArg(false).required(false)
-            .desc("Display help message.").build();
+            .desc("Display this help message.").build();
     OPTIONS_SET_1 = new Options();
     OPTIONS_SET_1.addOption(UTILITY_OPTION);
     OPTIONS_SET_1.addOption(TABLE_OPTION_NOT_REQUIRED);
@@ -245,13 +247,19 @@ class UtilityRunner {
 
   private void printHelp() {
     System.out.println(BAR);
-    HELP_FORMATTER.printHelp("java [-options] -cp <hbase-classpath-entries> " + this.getClass().getName(),
-            "\n(Note that <hbase-classpath-entries> must include "
-                    + "$HBASE_HOME/lib/*:$HBASE_HOME/conf, where $HBASE_HOME is the path to the "
-                    + "local HBase installation.)"
-                    + "\n\nArguments for " + Repository.PRODUCT_NAME + " "
-                    + this.getClass().getSimpleName() + ":\n" + BAR,
-            OPTIONS_SET_2, BAR + "\n\n", true);
+    String commandLineSyntax
+            = "java [-options] -cp <hbase-classpath-entries> " + this.getClass().getName();
+    String header = "\n    *** Note that <hbase-classpath-entries> must include\n"
+            + "    ***   $HBASE_HOME/lib/*:$HBASE_HOME/conf, where $HBASE_HOME\n"
+            + "    ***   is the path to the local HBase installation."
+            + "\n\nArguments for " + Repository.PRODUCT_NAME + " "+ this.getClass().getSimpleName()
+            + ":\n" + BAR;
+    String footer = BAR + "\n\nFOR EXAMPLE, the exportSchema function might be invoked as "
+            + "follows from within the directory containing the *utility.jar:\n\n"
+            + "    java -cp *:$HBASE_HOME/lib/*:$HBASE_HOME/conf\n"
+            + "        org.commonvox.hbase_column_manager.UtilityRunner\n"
+            + "        -u exportSchema -t myNamespace:myTable -f myOutputFile.xml";
+    HELP_FORMATTER.printHelp(commandLineSyntax, header, OPTIONS_SET_2, footer, true);
   }
 
   /**

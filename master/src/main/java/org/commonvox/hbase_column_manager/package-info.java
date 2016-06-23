@@ -39,9 +39,10 @@
  * <a href="#export-import">schema (metadata) export and import facilities</a>
  * for HBase <i>Namespace</i>, <i>Table</i>, and all table-component structures.<br><br>
  *
- * <i>A basic</i> <b>COMMAND-LINE INTERFACE</b> <i>is also provided for direct invocation of
- * a number of the above-listed functions without any need for Java coding.</i><br><br>
- * 
+ * <i>A basic</i> <b><a href="#command-line">COMMAND-LINE INTERFACE</a></b> <i>is also provided
+ * for direct invocation of a number of the above-listed functions without any need for
+ * Java coding.</i><br><br>
+ *
  * Once it is installed and configured, standard usage of the ColumnManagerAPI in Java programs is
  * accomplished by simply substituting any reference to the standard HBase {@code ConnectionFactory}
  * class with a reference to the ColumnManager
@@ -64,18 +65,15 @@
  * <ul>
  * <li><b>GUI interface:</b>
  * A JavaFX-based GUI interface could be built atop the ColumnManagerAPI, for administrative use on
- * Mac, Linux, and Windows desktops.
- * </li>
- * <li><b>Command-line invocation for some administrative functions:</b>
- * For the convenience of HBase administrators, particularly those who are not Java coders, it
- * may be advisable to make certain <a href="RepositoryAdmin.html">RepositoryAdmin</a> functions
- * available via command-line invocation (i.e. through an executable UtilityRunner).
+ * Mac, Linux, and Windows desktops. Note that in the current release, a
+ * <a href="#command-line">COMMAND-LINE INTERFACE</a>
+ * is provided for some of the most crucial administrative functions.
  * </li>
  * </ul>
  * <hr>
  * This package transparently complements the standard HBase API provided by the Apache Software
- * Foundation in the packages {@code org.apache.hadoop.hbase} and
- * {@code org.apache.hadoop.hbase.client}.
+ * Foundation in the packages <b>{@code org.apache.hadoop.hbase}</b> and
+ * <b>{@code org.apache.hadoop.hbase.client}</b>.
  * <br>
  * <br>
  * <br>
@@ -89,6 +87,7 @@
  * <li><a href="#column-auditing">COLUMN AUDITING IN REAL-TIME</a></li>
  * <li><a href="#query">QUERYING THE REPOSITORY</a></li>
  * <li><a href="#admin">ADMINISTRATIVE TOOLS</a>
+ * <li><a href="#command-line">COMMAND-LINE INVOCATION</a>
  * </ol>
  *
  * <a name="prereq"></a>
@@ -121,9 +120,10 @@
  * may be downloaded from GitHub and included in the IDE environment's compile and run-time
  * classpath configurations.
  * <br><br>
- * In the context of a Maven project, a dependency may be set as follows:
+ * In the context of a Maven project, a dependency may be set in the project's {@code pom.xml}
+ * file as follows:
  * <br>
- * <pre>{@code      [MAVEN DEPENDENCY EXAMPLE TO BE INSERTED HERE .]}</pre>
+ * <pre>{@code      [[MAVEN DEPENDENCY EXAMPLE TO BE INSERTED HERE.]]}</pre>
  * <br>
  * <br>
  * <a name="activate"></a>
@@ -444,6 +444,10 @@
  * components into HBase (creating any Namespaces or Tables not already found in HBase).<br><br>
  * *An HSA file adheres to the XML Schema layout in
  * <a href="doc-files/HBaseSchemaArchive.xsd.xml" target="_blank">HBaseSchemaArchive.xsd.xml</a>.
+ * <i>Note: Consistent with the HBase project's usage of XML, HBaseSchemaArchive XML documents
+ * are not defined within a specific XML-namespace. In the context of XML processing in this
+ * package, the requirement that a non-default XML-namespace be specified would seem to offer no
+ * obvious benefit.</i>
  * </BLOCKQUOTE>
  * </li>
  * <li>Set "maxVersions" for ColumnManager Repository
@@ -460,5 +464,84 @@
  * </BLOCKQUOTE>
  * </li>
  * </ul>
+ *
+ * <a name="command-line"></a>
+ * <hr style="height:3px;color:black;background-color:black">
+ * <b>IX. <u>COMMAND-LINE INVOCATION</u></b>
+ * <BLOCKQUOTE>
+ * The UtilityRunner facility is provided for direct command-line invocation of a subset of
+ * administrative functions. It allows invocation of these functions without the need to
+ * perform <a href="#install">installation</a> or <a href="#config">configuration</a> of the
+ * full package. The following administrative functions are available via UtilityRunner:
+ * <ul>
+ * <li><b>exportSchema</b>: invokes the
+ * <a href="RepositoryAdmin.html#exportSchema-java.io.File-org.apache.hadoop.hbase.TableName-">
+ * RepositoryAdmin#exportSchema</a> method for a specified <i>Table</i> or <i>Namespace</i>.</li>
+ * <li><b>getChangeEvents</b>: invokes one of the
+ * <a href="ChangeEventMonitor.html#getChangeEventsForTable-org.apache.hadoop.hbase.TableName-boolean-">
+ * ChangeEventMonitor#getChangeEvents*</a> methods for a specified <i>Table</i> or <i>Namespace</i>.</li>
+ * <li><b>getColumnQualifiers</b>: invokes
+ * <a href="RepositoryAdmin.html#discoverColumnMetadata-org.apache.hadoop.hbase.TableName-boolean-">
+ * Column Qualifier discovery</a> for the specified <i>Table</i> or <i>Namespace</i>, and then invokes the
+ * <a href="RepositoryAdmin.html#outputReportOnColumnQualifiers-java.io.File-org.apache.hadoop.hbase.TableName-">
+ * RepositoryAdmin#outputReportOnColumnQualifiers</a> method to output the results to the
+ * specified file.</li>
+ * <li><b>getColumnQualifiersViaMapReduce</b>: performs the same tasks as the
+ * {@code getColumnQualifiers} function outlined above, but uses
+ * <a href="RepositoryAdmin.html#discoverColumnMetadata-org.apache.hadoop.hbase.TableName-boolean-">
+ * mapreduce to perform Column Qualifier discovery</a>.</li>
+ * <li><b>importSchema</b>: invokes the
+ * <a href="RepositoryAdmin.html#importSchema-java.io.File-org.apache.hadoop.hbase.TableName-boolean-">
+ * RepositoryAdmin#importSchema</a> method for a specified <i>Table</i> or <i>Namespace</i>.</li>
+ * <li><b>uninstallRepository</b>: invokes the
+ * <a href="RepositoryAdmin.html#uninstallRepositoryStructures-org.apache.hadoop.hbase.client.Admin-">
+ * RepositoryAdmin#uninstallRepositoryStructures</a> method to remove the Repository Table and
+ * any subsidiary HBase artifacts which are generated in execution of any of the above
+ * functions.</li>
+ * </ul>
+ *
+ * <u>TO USE -- DOWNLOAD THE UTILITY JAR AND INVOKE DESIRED FUNCTIONS</u>:
+ * <ul>
+ * <li>The {@code *utility.jar} file corresponding to your currently-installed version of HBase
+ * must be <a href="https://github.com/dvimont/ColumnManager/releases" target="_blank">
+ * downloaded from Github</a>. <i>(For example, {@code hbase-column-manager-1.0.3-beta-utility.jar}
+ * would be used with an HBase 1.0.3 installation.)</i>
+ * </li>
+ * <li>
+ * Command-line invocation of UtilityRunner functions may then be performed from within the
+ * directory containing the *utility.jar, as outlined in the following usage instructions, which
+ * are outputted by the UtilityRunner's help function:
+ * </li>
+ * </ul>
+ * <pre>      {@code ====================
+ *       usage: java [-options] -cp <hbase-classpath-entries>
+ *              org.commonvox.hbase_column_manager.UtilityRunner -u <arg> -t <arg>
+ *              -f <arg> [-h]
+ *
+ *           *** Note that <hbase-classpath-entries> must include
+ *           *** $HBASE_HOME/lib/*:$HBASE_HOME/conf, where $HBASE_HOME
+ *           *** is the path to the local HBase installation.
+ *
+ *       Arguments for ColumnManagerAPI UtilityRunner:
+ *       ====================
+ *        -u,--utility <arg>   Utility to run. Valid <arg> values are as follows:
+ *                             exportSchema, getChangeEventsForTable,
+ *                             getColumnQualifiers,
+ *                             getColumnQualifiersViaMapReduce, importSchema,
+ *                             uninstallRepository
+ *        -t,--table <arg>     Fully-qualified table name; or submit '*' in place
+ *                             of table qualifier (e.g., 'myNamespace:*') to
+ *                             process all tables in a given namespace.
+ *        -f,--file <arg>      Source/target file.
+ *        -h,--help            Display this help message.
+ *       ====================
+ *
+ *       FOR EXAMPLE, the exportSchema function might be invoked as follows from
+ *       within the directory containing the *utility.jar:
+ *
+ *           java -cp *:$HBASE_HOME/lib/*:$HBASE_HOME/conf
+ *               org.commonvox.hbase_column_manager.UtilityRunner
+ *               -u exportSchema -t myNamespace:myTable -f myOutputFile.xml }</pre>
+ * </BLOCKQUOTE>
  */
 package org.commonvox.hbase_column_manager;

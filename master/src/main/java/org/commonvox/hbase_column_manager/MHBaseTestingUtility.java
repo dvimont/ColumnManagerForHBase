@@ -31,8 +31,8 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
  * HBaseTestingUtility</a>.
  * <br><br>
  * <b>IMPORTANT NOTE: This class is only viable with the HBase 2.0 (or later) implementation of
- * ColumnManagerAPI;
- * in pre-2.0 implementations, this class will throw an UnsupportedOperationException.</b>
+ * ColumnManagerAPI; in pre-2.0 implementations, use of this class will result in an
+ * UnsupportedOperationException being thrown.</b>
  *
  * @author Daniel Vimont
  */

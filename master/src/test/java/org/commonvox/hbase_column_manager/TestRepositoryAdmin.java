@@ -25,7 +25,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -2753,7 +2752,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
-    new TestRepositoryAdmin().testExportImport();
+    // new TestRepositoryAdmin().testExportImport();
     // new TestRepositoryAdmin().testChangeEventMonitor();
     // new TestRepositoryAdmin().testRepositoryMaxVersions();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
@@ -2764,6 +2763,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsUsingMapReduce();
-    // new TestRepositoryAdmin().testUtilityRunner();
+    new TestRepositoryAdmin().testUtilityRunner();
   }
 }
