@@ -967,7 +967,7 @@ public class RepositoryAdmin {
           byte[] colFamily, boolean verbose, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
     return repository.outputReportOnInvalidColumns(ColumnInvalidityReport.ReportType.QUALIFIER,
-            tableName, colFamily, targetFile, verbose, useMapreduce);
+            tableName, colFamily, targetFile, verbose, false, useMapreduce);
   }
 
   /**
@@ -984,6 +984,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column length, along with a count of the
    * number of rows in which that column contains an invalid column length.
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
    * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
@@ -992,10 +994,10 @@ public class RepositoryAdmin {
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean outputReportOnInvalidColumnLengths(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce)
+          boolean verbose, boolean includeAllCells, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
     return outputReportOnInvalidColumnLengths(
-            targetFile, tableName, null, verbose, useMapreduce);
+            targetFile, tableName, null, verbose, includeAllCells, useMapreduce);
   }
 
   /**
@@ -1014,6 +1016,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column length, along with a count of the
    * number of rows in which that column contains an invalid column length.
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
    * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
@@ -1022,10 +1026,10 @@ public class RepositoryAdmin {
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean outputReportOnInvalidColumnLengths(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce)
+          byte[] colFamily, boolean verbose, boolean includeAllCells, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
     return repository.outputReportOnInvalidColumns(ColumnInvalidityReport.ReportType.LENGTH,
-            tableName, colFamily, targetFile, verbose, useMapreduce);
+            tableName, colFamily, targetFile, verbose, includeAllCells, useMapreduce);
   }
 
   /**
@@ -1043,6 +1047,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column value, along with a count of the
    * number of rows in which that column contains an invalid column value.
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
    * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
@@ -1051,9 +1057,10 @@ public class RepositoryAdmin {
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean outputReportOnInvalidColumnValues(File targetFile, TableName tableName,
-          boolean verbose, boolean useMapreduce)
+          boolean verbose, boolean includeAllCells, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    return outputReportOnInvalidColumnValues(targetFile, tableName, null, verbose, useMapreduce);
+    return outputReportOnInvalidColumnValues(targetFile, tableName, null,
+            verbose, includeAllCells, useMapreduce);
   }
 
   /**
@@ -1072,6 +1079,8 @@ public class RepositoryAdmin {
    * found; otherwise the report will contain a summary, with one line for each column found
    * to contain at least a single instance of an invalid column value, along with a count of the
    * number of rows in which that column contains an invalid column value.
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, analysis will be done on servers via mapreduce jobs;
    * otherwise, analysis is done via direct-scan
    * @return {@code true} if invalid column qualifiers found; otherwise, {@code false}
@@ -1080,10 +1089,10 @@ public class RepositoryAdmin {
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
   public boolean outputReportOnInvalidColumnValues(File targetFile, TableName tableName,
-          byte[] colFamily, boolean verbose, boolean useMapreduce)
+          byte[] colFamily, boolean verbose, boolean includeAllCells, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
     return repository.outputReportOnInvalidColumns(ColumnInvalidityReport.ReportType.VALUE,
-            tableName, colFamily, targetFile, verbose, useMapreduce);
+            tableName, colFamily, targetFile, verbose, includeAllCells, useMapreduce);
   }
 
   /**

@@ -82,13 +82,15 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
   private final Table tempReportTable; // table to which analysis metadata is written
   private final File targetFile;
   private final boolean verboseReport;
+  private final boolean includeAllCells;
   private final boolean invokedByMapper;
   private final ReportType reportType;
   enum ReportType {QUALIFIER, LENGTH, VALUE};
 
   ColumnInvalidityReport(ReportType reportType, Connection connection,
           MTableDescriptor sourceTableDescriptor,
-          byte[] sourceColFamily, File targetFile, boolean verbose, boolean useMapreduce)
+          byte[] sourceColFamily, File targetFile,
+          boolean verbose, boolean includeAllCells, boolean useMapreduce)
           throws Exception {
     this.reportType = reportType;
     this.targetFile = targetFile;
@@ -108,9 +110,10 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
                             + new Timestamp(System.currentTimeMillis()).toString().
                                     replaceAll("[\\.\\-: ]", ""));
     standardAdmin.createTable(new HTableDescriptor(tempReportTableName).
-            addFamily(new HColumnDescriptor(TEMP_REPORT_CF)));
+            addFamily(new HColumnDescriptor(TEMP_REPORT_CF).setMaxVersions(100)));
     tempReportTable = standardConnection.getTable(tempReportTableName);
     verboseReport = verbose;
+    this.includeAllCells = includeAllCells;
     invokedByMapper = false;
     if (useMapreduce) {
       collectReportMetadataViaMapreduce();
@@ -123,7 +126,8 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
    * This constructor invoked in MapReduce context from ColumnInvalidityReportMapper#setup.
    */
   ColumnInvalidityReport(ReportType reportType, Connection connection,
-          MTableDescriptor sourceTableDescriptor, TableName tempReportTableName, boolean verbose)
+          MTableDescriptor sourceTableDescriptor, TableName tempReportTableName,
+          boolean verbose, boolean includeAllCells)
           throws IOException {
     this.reportType = reportType;
     this.targetFile = null;
@@ -138,6 +142,7 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
     sourceColFamily = null; // not needed by Mapper; only referenced by Tool in Scan setup.
     tempReportTable = standardConnection.getTable(tempReportTableName);
     verboseReport = verbose;
+    this.includeAllCells = includeAllCells;
     invokedByMapper = true;
   }
 
@@ -153,6 +158,9 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
     if (!verboseReport && !reportType.equals(ReportType.VALUE)) {
       scan.setFilter(new KeyOnlyFilter(true));
     }
+    if (includeAllCells) {
+      scan.setMaxVersions();
+    }
     if (sourceColFamily != null) {
       scan.addFamily(sourceColFamily);
     }
@@ -167,51 +175,55 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
    * This method directly invoked by ColumnInvalidityReportMapper during MapReduce processing
    */
   void doSourceRowProcessing (Result row) throws IOException {
-    for (Entry<byte[], NavigableMap<byte[],byte[]>> familyToColumnsMapEntry :
-            row.getNoVersionMap().entrySet()) {
+    //  NavigableMap<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>
+    for (Entry<byte[], NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyToColumnsMapEntry
+            : row.getMap().entrySet()) {
       MColumnDescriptor mcd = sourceMtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
       if (mcd == null || mcd.getColumnDefinitions().isEmpty()) { // no def? everything's valid!
         continue;
       }
-      for (Entry<byte[],byte[]> colEntry : familyToColumnsMapEntry.getValue().entrySet()) {
+      for (Entry<byte[],NavigableMap<Long,byte[]>> colEntry
+              : familyToColumnsMapEntry.getValue().entrySet()) {
         byte[] colQualifier = colEntry.getKey();
-        byte[] colValue = colEntry.getValue();
         ColumnDefinition colDef = mcd.getColumnDefinition(colQualifier);
-        boolean invalidRow = false;
-        switch (reportType) {
-          case QUALIFIER:
-            if (colDef == null) {
-              invalidRow = true;
-            }
-            break;
-          case LENGTH:
-            if (colDef != null && colDef.getColumnLength() > 0) {
-              if (verboseReport) {
-                if (colValue.length > colDef.getColumnLength()) {
-                  invalidRow = true;
-                }
-              } else {
-                if (Bytes.toInt(colValue) > colDef.getColumnLength()) {
-                  invalidRow = true;
-                }
-              }
-            }
-            break;
-          case VALUE:
-            if (colDef != null && !colDef.getColumnValidationRegex().isEmpty()) {
-              if (!Bytes.toString(colValue).matches(colDef.getColumnValidationRegex())) {
+        for (Entry<Long,byte[]> cellEntry : colEntry.getValue().entrySet()) {
+          byte[] cellValue = cellEntry.getValue();
+          boolean invalidRow = false;
+          switch (reportType) {
+            case QUALIFIER:
+              if (colDef == null) {
                 invalidRow = true;
               }
-            }
-            break;
-        }
-        if (invalidRow) {
-          // upserts a user-column-specific report row with invalid user-column metadata
-          tempReportTable.put(new Put(buildRowId(mcd.getName(), colQualifier))
-                  .addColumn(TEMP_REPORT_CF, row.getRow(),
-                          (colValue.length < 200 ? colValue :
-                                  Bytes.add(Bytes.head(colValue, 200),
-                                          Bytes.toBytes("[value-truncated]")))));
+              break;
+            case LENGTH:
+              if (colDef != null && colDef.getColumnLength() > 0) {
+                if (verboseReport) {
+                  if (cellValue.length > colDef.getColumnLength()) {
+                    invalidRow = true;
+                  }
+                } else {
+                  if (Bytes.toInt(cellValue) > colDef.getColumnLength()) {
+                    invalidRow = true;
+                  }
+                }
+              }
+              break;
+            case VALUE:
+              if (colDef != null && !colDef.getColumnValidationRegex().isEmpty()) {
+                if (!Bytes.toString(cellValue).matches(colDef.getColumnValidationRegex())) {
+                  invalidRow = true;
+                }
+              }
+              break;
+          }
+          if (invalidRow) {
+            // upserts a user-column-specific report row with invalid user-column metadata
+            tempReportTable.put(new Put(buildRowId(mcd.getName(), colQualifier))
+                    .addColumn(TEMP_REPORT_CF, row.getRow(), cellEntry.getKey(),
+                            (cellValue.length < 200 ? cellValue :
+                                    Bytes.add(Bytes.head(cellValue, 200),
+                                            Bytes.toBytes("[value-truncated]")))));
+          }
         }
       }
     }
@@ -247,11 +259,11 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
     NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, INVALID_OCCURRENCE_COUNT}
 
   enum VerboseReportHeader {
-     NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, ROW_ID, COLUMN_VALUE}
+     NAMESPACE, TABLE, COLUMN_FAMILY, COLUMN_QUALIFIER, ROW_ID, CELL_TIMESTAMP, CELL_VALUE}
 
   private void outputReport() throws IOException {
     CSVFormat csvFormat = (verboseReport ? VERBOSE_CSV_FORMAT : SUMMARY_CSV_FORMAT);
-    try (ResultScanner rows = tempReportTable.getScanner(new Scan());
+    try (ResultScanner rows = tempReportTable.getScanner(new Scan().setMaxVersions());
             CSVPrinter csvPrinter = csvFormat.withHeaderComments((verboseReport ? "VERBOSE" : "SUMMARY")
                             + " Report on Invalid Column " + this.reportType + "S in Table <"
                             + sourceTable.getName().getNameAsString()
@@ -262,16 +274,21 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
                             new Date())
                             .print(new FileWriter(targetFile))) {
       for (Result row : rows) {
-        NavigableMap<byte[],byte[]> tempReportColumnMap = row.getFamilyMap(TEMP_REPORT_CF);
         String[] reportLineComponents = parseRowId(row.getRow());
+        NavigableMap<byte[],NavigableMap<Long,byte[]>> tempReportColumnMap
+                = row.getMap().firstEntry().getValue(); // .get(TEMP_REPORT_CF);
         if (verboseReport) { // print line for each invalid occurrence found
-          for (Entry<byte[],byte[]> tempReportColumn : tempReportColumnMap.entrySet()) {
-            for (String reportLineComponent : reportLineComponents) {
-              csvPrinter.print(reportLineComponent);
+          for (Entry<byte[],NavigableMap<Long,byte[]>> tempReportColumn
+                  : tempReportColumnMap.entrySet()) {
+            for (Entry<Long,byte[]> tempReportCell : tempReportColumn.getValue().entrySet()) {
+              for (String reportLineComponent : reportLineComponents) {
+                csvPrinter.print(reportLineComponent);
+              }
+              csvPrinter.print(Repository.getPrintableString(tempReportColumn.getKey())); // userRowId
+              csvPrinter.print(tempReportCell.getKey()); // cell timestamp
+              csvPrinter.print(Repository.getPrintableString(tempReportCell.getValue())); // colVal
+              csvPrinter.println();
             }
-            csvPrinter.print(Repository.getPrintableString(tempReportColumn.getKey())); // userRowId
-            csvPrinter.print(Repository.getPrintableString(tempReportColumn.getValue())); // colVal
-            csvPrinter.println();
           }
         } else { // print summary line giving count of invalid occurrences
           for (String reportLineComponent : reportLineComponents) {
@@ -332,6 +349,7 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
     argList.add(ColumnInvalidityReportTool.REPORT_TYPE_ARG_KEY + reportType.name());
     argList.add(ColumnInvalidityReportTool.REPORT_TEMP_TABLE_ARG_KEY + tempReportTable.getName());
     argList.add(ColumnInvalidityReportTool.REPORT_VERBOSE_ARG_KEY + verboseReport);
+    argList.add(ColumnInvalidityReportTool.INCLUDE_ALL_CELLS_ARG_KEY + includeAllCells);
 
     int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnInvalidityReportTool(),
             argList.toArray(new String[argList.size()]));
@@ -347,6 +365,8 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
             = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.type";
     static final String REPORT_VERBOSE_CONF_KEY
             = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.verbose";
+    static final String INCLUDE_ALL_CELLS_CONF_KEY
+            = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.include_all_cells";
     static final String REPORT_TEMP_TABLE_CONF_KEY
             = Repository.COLMANAGER_MAP_CONF_KEY_PREFIX + "report.target.temptable";
     static final String REPORT_TYPE_ARG_KEY
@@ -355,10 +375,13 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
             = Repository.ARG_KEY_PREFIX + REPORT_TEMP_TABLE_CONF_KEY + Repository.ARG_DELIMITER;
     static final String REPORT_VERBOSE_ARG_KEY
             = Repository.ARG_KEY_PREFIX + REPORT_VERBOSE_CONF_KEY + Repository.ARG_DELIMITER;
+    static final String INCLUDE_ALL_CELLS_ARG_KEY
+            = Repository.ARG_KEY_PREFIX + INCLUDE_ALL_CELLS_CONF_KEY + Repository.ARG_DELIMITER;
 
     private String sourceTableNameString = null;
     private byte[] sourceColFamily = null;
     private boolean verboseReport = false;
+    private boolean includeAllCells = false;
     private ColumnInvalidityReport.ReportType reportType;
 
     Job createSubmittableJob(final String[] args) throws IOException {
@@ -379,6 +402,9 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
 
       if (!verboseReport && !reportType.equals(ReportType.VALUE)) {
         scan.setFilter(new KeyOnlyFilter(true));
+      }
+      if (includeAllCells) {
+        scan.setMaxVersions();
       }
       if (sourceColFamily != null) {
         scan.addFamily(sourceColFamily);
@@ -416,6 +442,9 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
             break;
           case REPORT_VERBOSE_CONF_KEY:
             verboseReport = keyValuePair[1].equalsIgnoreCase(Boolean.TRUE.toString());
+            break;
+          case INCLUDE_ALL_CELLS_CONF_KEY:
+            includeAllCells = keyValuePair[1].equalsIgnoreCase(Boolean.TRUE.toString());
             break;
           case REPORT_TYPE_CONF_KEY:
             reportType = ColumnInvalidityReport.ReportType.valueOf(keyValuePair[1]);
@@ -462,6 +491,7 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
     private MTableDescriptor sourceMtd;
     private TableName tempReportTableName; // table to which analysis metadata is written
     private boolean verboseReport;
+    private boolean includeAllCells;
     private ReportType reportType;
     private ColumnInvalidityReport columnInvalidityReport;
 
@@ -479,9 +509,11 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
                 jobConfig.get(ColumnInvalidityReportTool.REPORT_TEMP_TABLE_CONF_KEY));
         verboseReport = jobConfig.get(ColumnInvalidityReportTool.REPORT_VERBOSE_CONF_KEY)
                 .equalsIgnoreCase(Boolean.TRUE.toString());
+        includeAllCells = jobConfig.get(ColumnInvalidityReportTool.INCLUDE_ALL_CELLS_CONF_KEY)
+                .equalsIgnoreCase(Boolean.TRUE.toString());
         columnInvalidityReport = new ColumnInvalidityReport(
                 reportType, columnManagerConnection.getStandardConnection(), sourceMtd,
-                tempReportTableName, verboseReport);
+                tempReportTableName, verboseReport, includeAllCells);
       } catch (Exception e) {
         columnManagerConnection = null;
         repository = null;

@@ -1644,10 +1644,13 @@ public class TestRepositoryAdmin {
     final byte[] BAD_QUALIFIER02 = Bytes.toBytes("very_bad_qualifier");
     final byte[] GOOD_URL01 = Bytes.toBytes("https://google.com");
     final byte[] BAD_URL01 = Bytes.toBytes("ftp://google.com");
-    final byte[] BAD_URL02 = Bytes.toBytes("not_even_close");
+    final byte[] BAD_URL02 = Bytes.toBytes("another_invalid_value");
+    final byte[] BAD_URL03 = Bytes.toBytes("not_even_close");
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       try (Table namespace01Table01 = connection.getTable(NAMESPACE01_TABLE01)) {
         // put two rows with valid column qualifiers
+        namespace01Table01.put(new Put(ROW_ID_04).
+                addColumn(CF02, COLQUALIFIER03, BAD_URL01));          // invalid value
         namespace01Table01.put(new Put(ROW_ID_01).
                 addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
                 addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG).
@@ -1656,13 +1659,15 @@ public class TestRepositoryAdmin {
                 addColumn(CF01, COLQUALIFIER01, VALUE_9_BYTES_LONG).
                 addColumn(CF01, COLQUALIFIER02, VALUE_82_BYTES_LONG). // invalid length
                 addColumn(CF02, COLQUALIFIER03, BAD_URL01));          // invalid value
+        namespace01Table01.put(new Put(ROW_ID_04).
+                addColumn(CF02, COLQUALIFIER03, BAD_URL02));          // invalid value
         // put two rows with invalid column qualifiers (3 bad qualifiers in all)
         namespace01Table01.put(new Put(ROW_ID_03).
                 addColumn(CF01, BAD_QUALIFIER01, VALUE_5_BYTES_LONG).  // invalid qualifier
                 addColumn(CF01, BAD_QUALIFIER02, VALUE_2_BYTES_LONG)); // invalid qualifier
         namespace01Table01.put(new Put(ROW_ID_04).
                 addColumn(CF01, BAD_QUALIFIER02, VALUE_82_BYTES_LONG). // invalid qualifier
-                addColumn(CF02, COLQUALIFIER03, BAD_URL02));          // invalid value
+                addColumn(CF02, COLQUALIFIER03, BAD_URL03));          // invalid value
         // put one with one good column qualifier and two bad ones
         namespace01Table01.put(new Put(ROW_ID_05).
                 addColumn(CF02, COLQUALIFIER02, VALUE_9_BYTES_LONG). // invalid qualifier (for CF02)
@@ -1838,7 +1843,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 2:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -1855,7 +1860,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_2_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 3:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -1872,7 +1877,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 4:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -1889,7 +1894,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 5:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -1906,7 +1911,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_9_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
         }
       }
@@ -1991,7 +1996,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 2:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2008,7 +2013,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_2_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 3:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2025,7 +2030,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 4:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2042,7 +2047,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
         }
       }
@@ -2113,7 +2118,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_9_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
         }
       }
@@ -2126,25 +2131,25 @@ public class TestRepositoryAdmin {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, useMapReduce));
+                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForVerboseTable01,NAMESPACE01_TABLE01,  true, useMapReduce));
+                      fileForVerboseTable01,NAMESPACE01_TABLE01,  true, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, useMapReduce));
+                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, useMapReduce));
+                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, useMapReduce));
+                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, useMapReduce));
+                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, false, useMapReduce));
       try {
         repositoryAdmin.outputReportOnInvalidColumnLengths(
-                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, useMapReduce);
+                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, false, useMapReduce);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
@@ -2214,7 +2219,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 2:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2231,7 +2236,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
         }
       }
@@ -2302,7 +2307,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 2:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2319,7 +2324,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_82_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
         }
       }
@@ -2352,25 +2357,25 @@ public class TestRepositoryAdmin {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, useMapReduce));
+                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, useMapReduce));
+                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, true, useMapReduce));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, useMapReduce));
+                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, useMapReduce));
+                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, useMapReduce));
+                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, useMapReduce));
+                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, false, useMapReduce));
       try {
         repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, useMapReduce);
+                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, false, useMapReduce);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
@@ -2436,7 +2441,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(BAD_URL01),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 2:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2444,22 +2449,40 @@ public class TestRepositoryAdmin {
                     Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
-                    Bytes.toString(BAD_URL02),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    Bytes.toString(BAD_URL03),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 3:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL02),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 4:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL01),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 5:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
                     Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
        }
       }
       assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
-              3, recordCount);
+              5, recordCount);
     }
 
     try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf01, StandardCharsets.UTF_8,
@@ -2529,8 +2552,8 @@ public class TestRepositoryAdmin {
 //                + record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_QUALIFIER) + " "
 //                + ColumnInvalidityReport.VerboseReportHeader.ROW_ID.toString() + "="
 //                + record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID) + " "
-//                + ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE.toString() + "="
-//                + record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE)
+//                + ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE.toString() + "="
+//                + record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE)
 //                );
         recordCount++;
         assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2557,7 +2580,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(BAD_URL01),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 2:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2565,8 +2588,8 @@ public class TestRepositoryAdmin {
                     Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
-                    Bytes.toString(BAD_URL02),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    Bytes.toString(BAD_URL03),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
           case 3:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
@@ -2575,7 +2598,7 @@ public class TestRepositoryAdmin {
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
                     Bytes.toString(VALUE_5_BYTES_LONG),
-                    record.get(ColumnInvalidityReport.VerboseReportHeader.COLUMN_VALUE));
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
             break;
        }
       }
@@ -2758,11 +2781,11 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
-    // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsViaDirectScan();
+     new TestRepositoryAdmin().testOutputReportOnInvalidColumnsViaDirectScan();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsUsingMapReduce();
-    new TestRepositoryAdmin().testUtilityRunner();
+    // new TestRepositoryAdmin().testUtilityRunner();
   }
 }

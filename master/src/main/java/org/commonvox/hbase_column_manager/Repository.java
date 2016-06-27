@@ -1778,7 +1778,7 @@ class Repository {
 
   boolean outputReportOnInvalidColumns (ColumnInvalidityReport.ReportType reportType,
           TableName tableName, byte[] colFamily, File targetFile, boolean verbose,
-          boolean useMapreduce) throws Exception {
+          boolean includeAllCells, boolean useMapreduce) throws Exception {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -1794,7 +1794,8 @@ class Repository {
               "No ColumnDefinitions found for columnFamily");
     }
     try (ColumnInvalidityReport columnInvalidityReport = new ColumnInvalidityReport(
-            reportType, hbaseConnection, mtd, colFamily, targetFile, verbose, useMapreduce)) {
+            reportType, hbaseConnection, mtd, colFamily, targetFile,
+            verbose, includeAllCells, useMapreduce)) {
       return !columnInvalidityReport.isEmpty();
     }
   }

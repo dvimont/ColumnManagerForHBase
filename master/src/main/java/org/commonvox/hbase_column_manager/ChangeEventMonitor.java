@@ -105,14 +105,16 @@ public class ChangeEventMonitor {
         byte entityType = rowId.getEntityType();
         byte[] entityName = rowId.getEntityName();
         byte[] parentForeignKey = rowId.getParentForeignKey();
-        byte[] entityForeignKey = row.getValue(Repository.REPOSITORY_CF, Repository.FOREIGN_KEY_COLUMN);
+        byte[] entityForeignKey
+                = row.getValue(Repository.REPOSITORY_CF, Repository.FOREIGN_KEY_COLUMN);
         Map<Long, byte[]> userNameKeyedByTimestampMap = new HashMap<>();
         for (Cell userNameCell : row.getColumnCells(
                 Repository.REPOSITORY_CF, Repository.JAVA_USERNAME_PROPERTY_KEY)) {
           userNameKeyedByTimestampMap.put(userNameCell.getTimestamp(),
                   Bytes.getBytes(CellUtil.getValueBufferShallowCopy(userNameCell)));
         }
-        for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> cfEntry : row.getMap().entrySet()) {
+        for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> cfEntry
+                : row.getMap().entrySet()) {
           for (Map.Entry<byte[], NavigableMap<Long, byte[]>> colEntry
                   : cfEntry.getValue().entrySet()) {
             byte[] attributeName = colEntry.getKey();
@@ -200,8 +202,8 @@ public class ChangeEventMonitor {
   }
 
   /**
-   * Get a Set of all {@link ChangeEvent}s in the ColumnManager repository in the default (timestamp)
-   * order.
+   * Get a Set of all {@link ChangeEvent}s in the ColumnManager repository in the default
+   * (timestamp) order.
    *
    * @return complete list of {@link ChangeEvent}s in timestamp order
    */
@@ -366,9 +368,9 @@ public class ChangeEventMonitor {
 
   /**
    * Get the {@link ChangeEvent}s pertaining to a specified Entity (e.g., a specific <i>Table</i>),
-   * in timestamp order. Note that some parameters will not apply to some {@link SchemaEntityType}s (e.g.
-   * columnFamily does not apply when entityType is {@code TABLE}), in which case {@code null}s may
-   * be submitted for inapplicable parameters.
+   * in timestamp order. Note that some parameters will not apply to some {@link SchemaEntityType}s
+   * (e.g. columnFamily does not apply when entityType is {@code TABLE}), in which case
+   * {@code null}s may be submitted for inapplicable parameters.
    *
    * @param entityType type of Entity for which {@code ChangeEvent} list is to be produced
    * @param namespaceName Name of <i>Namespace</i> which pertains to the Entity
