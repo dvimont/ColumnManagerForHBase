@@ -20,17 +20,21 @@ import java.util.Map;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 
 /**
- * A <b>ColumnDefinition</b> (managed via a number of {@code RepositoryAdmin}  {@link RepositoryAdmin#addColumnDefinition(org.apache.hadoop.hbase.TableName, byte[],
+ * A <b>ColumnDefinition</b> (managed via a number of {@code RepositoryAdmin}
+ * {@link RepositoryAdmin#addColumnDefinition(org.apache.hadoop.hbase.TableName, byte[],
  * org.commonvox.hbase_column_manager.ColumnDefinition)
- * add}, {@link RepositoryAdmin#getColumnDefinitions(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
- * get}, and {@link RepositoryAdmin#deleteColumnDefinition(org.apache.hadoop.hbase.TableName, byte[], byte[])
+ * add},
+ * {@link RepositoryAdmin#getColumnDefinitions(org.apache.hadoop.hbase.HTableDescriptor, org.apache.hadoop.hbase.HColumnDescriptor)
+ * get},
+ * and {@link RepositoryAdmin#deleteColumnDefinition(org.apache.hadoop.hbase.TableName, byte[], byte[])
  * delete} methods) contains administrator-maintained settings pertaining to a specific
  * <i>Column Qualifier</i> within a <i>Column Family</i> of a
  * <a href="package-summary.html#config">ColumnManager-included</a> <i>Table</i>;<br>
- * when a <i>Column Family</i> has its  {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+ * when a <i>Column Family</i> has its
+ * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
  * ColumnDefinitionsEnforced} setting {@code enabled}, then (a) any <i>Column Qualifier</i>
- * submitted in a {@code put} (i.e., insert/update) to the <i>Table:Column-Family</i> must
- * correspond to an existing {@code ColumnDefinition}, and (b) the corresponding
+ * submitted in a {@link org.apache.hadoop.hbase.client.Mutation Put} to that <i>Column Family</i>
+ * must correspond to an existing {@code ColumnDefinition}, and (b) the corresponding
  * <i>Column value</i> submitted must pass all validations (if any) stipulated by the
  * {@code ColumnDefinition}.
  */

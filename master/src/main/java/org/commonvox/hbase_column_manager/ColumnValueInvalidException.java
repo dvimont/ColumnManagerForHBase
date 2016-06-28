@@ -22,8 +22,8 @@ import org.apache.hadoop.hbase.util.Bytes;
  * Thrown when a <i>Column Family</i> has its
  * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
  * ColumnDefinitionsEnforced} setting enabled, and the <i>Column value</i> submitted in a
- * {@code put} (i.e., insert/update) to the
- * <i>Table:Column-Family</i> does NOT pass a validation stipulated by the
+ * {@link org.apache.hadoop.hbase.client.Mutation Put} to the
+ * <i>Column Family</i> does NOT pass a validation stipulated by the
  * <i>Column</i>'s corresponding {@link ColumnDefinition}.
  *
  * @author Daniel Vimont
