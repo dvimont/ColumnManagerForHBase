@@ -110,7 +110,7 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
                             + new Timestamp(System.currentTimeMillis()).toString().
                                     replaceAll("[\\.\\-: ]", ""));
     standardAdmin.createTable(new HTableDescriptor(tempReportTableName).
-            addFamily(new HColumnDescriptor(TEMP_REPORT_CF).setMaxVersions(100)));
+            addFamily(new HColumnDescriptor(TEMP_REPORT_CF).setMaxVersions(9999)));
     tempReportTable = standardConnection.getTable(tempReportTableName);
     verboseReport = verbose;
     this.includeAllCells = includeAllCells;
@@ -175,7 +175,6 @@ class ColumnInvalidityReport implements Closeable, AutoCloseable {
    * This method directly invoked by ColumnInvalidityReportMapper during MapReduce processing
    */
   void doSourceRowProcessing (Result row) throws IOException {
-    //  NavigableMap<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>
     for (Entry<byte[], NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyToColumnsMapEntry
             : row.getMap().entrySet()) {
       MColumnDescriptor mcd = sourceMtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());

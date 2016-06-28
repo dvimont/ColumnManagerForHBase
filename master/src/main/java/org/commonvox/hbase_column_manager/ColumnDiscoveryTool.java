@@ -42,6 +42,7 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
 
   private static final Log LOG = LogFactory.getLog(ColumnDiscoveryTool.class);
   String sourceTableNameString = null;
+  boolean includeAllCells = false;
 
   Job createSubmittableJob(final String[] args) throws IOException {
     if (!parseArguments(args)) {
@@ -57,6 +58,9 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
     scan.setCaching(getConf().getInt(TableInputFormat.SCAN_CACHEDROWS, 500));
     scan.setCacheBlocks(false);  // should be false for scanning in MapReduce jobs
     scan.setFilter(new KeyOnlyFilter(true));
+    if (includeAllCells) {
+      scan.setMaxVersions();
+    }
     TableMapReduceUtil.initTableMapperJob(
             sourceTableNameString,
             scan,
@@ -73,13 +77,28 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
     if (args.length < 1) {
       return false;
     }
-    if (args[0].startsWith(Repository.TABLE_NAME_ARG_KEY)) {
-      sourceTableNameString = args[0].substring(Repository.TABLE_NAME_ARG_KEY.length());
-      return true;
-    } else {
-      System.err.println("ERROR: Invalid argument '" + args[0] + "'");
+    for (String arg : args) {
+      String[] keyValuePair = arg.substring(
+              Repository.ARG_KEY_PREFIX.length()).split(Repository.ARG_DELIMITER);
+      if (keyValuePair == null || keyValuePair.length != 2) {
+        LOG.warn("ERROR in MapReduce " + this.getClass().getSimpleName()
+                + " submission: Invalid argument '" + arg + "'");
+        return false;
+      }
+      switch (keyValuePair[0]) {
+        case Repository.TABLE_NAME_CONF_KEY:
+          sourceTableNameString = keyValuePair[1];
+          break;
+        case Repository.INCLUDE_ALL_CELLS_CONF_KEY:
+          includeAllCells = keyValuePair[1].equalsIgnoreCase(Boolean.TRUE.toString());
+          break;
+      }
+    }
+    if (sourceTableNameString == null) {
+      System.err.println("ERROR: Required TABLE argument is missing.");
       return false;
     }
+    return true;
   }
 
   /**

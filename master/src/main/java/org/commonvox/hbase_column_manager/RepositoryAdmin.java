@@ -37,7 +37,7 @@ import org.apache.log4j.Logger;
 
 /**
  * A <b>RepositoryAdmin</b> provides ColumnManager Repository maintenance and query facilities,
- * as well as column-metadata {@link #discoverColumnMetadata(boolean) discovery} and full-schema
+ * as well as column-metadata {@link #discoverColumnMetadata(boolean, boolean) discovery} and full-schema
  * {@link #exportSchema(java.io.File) export}/{@link #importSchema(java.io.File, boolean) import}
  * facilities; it is used as a complement to the standard
  * {@link org.apache.hadoop.hbase.client.Admin} interface to provide for maintenance of optional
@@ -83,7 +83,7 @@ public class RepositoryAdmin {
           throws IOException {
     Repository.createRepositoryNamespace(hbaseAdmin);
     Repository.createRepositoryTable(hbaseAdmin);
-    new RepositoryAdmin(hbaseAdmin.getConnection()).repository.discoverSchema(false, false);
+    new RepositoryAdmin(hbaseAdmin.getConnection()).repository.discoverSchema(false, false, false);
   }
 
   /**
@@ -536,12 +536,15 @@ public class RepositoryAdmin {
    * {@link org.apache.hadoop.conf.Configuration} parameter
    * {@link org.apache.hadoop.hbase.mapreduce.TableInputFormat#SCAN_CACHEDROWS}.
    *
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, discovery is done via mapreduce; otherwise, discovery
    * is done via direct-scan
    * @throws IOException if a remote or network exception occurs
    */
-  public void discoverColumnMetadata(boolean useMapreduce) throws Exception {
-    repository.discoverSchema(true, useMapreduce);
+  public void discoverColumnMetadata(boolean includeAllCells, boolean useMapreduce)
+          throws Exception {
+    repository.discoverSchema(true, includeAllCells, useMapreduce);
   }
 
   /**
@@ -563,15 +566,18 @@ public class RepositoryAdmin {
    * @param namespace Namespace for which schema metadata is to be discovered; submitted
    * namespace must have at least one <i>Table</i> that is
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, discovery is done via mapreduce; otherwise, discovery
    * is done via direct-scan
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if no Tables from the Namespace are
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void discoverColumnMetadata(String namespace, boolean useMapreduce)
+  public void discoverColumnMetadata(
+          String namespace, boolean includeAllCells, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    repository.discoverSchema(namespace, true, useMapreduce);
+    repository.discoverSchema(namespace, true, includeAllCells, useMapreduce);
   }
 
   /**
@@ -591,15 +597,18 @@ public class RepositoryAdmin {
    * @param tableName <i>Table</i> for which schema metadata is to be discovered; submitted
    * <i>Table</i> must be
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   * @param includeAllCells if {@code true}, analysis will include ALL cells for each column;
+   * otherwise, analysis will only include the most recent cell.
    * @param useMapreduce if {@code true}, discovery is done via mapreduce; otherwise, discovery
    * is done via direct-scan
    * @throws IOException if a remote or network exception occurs
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void discoverColumnMetadata(TableName tableName, boolean useMapreduce)
+  public void discoverColumnMetadata(
+          TableName tableName, boolean includeAllCells, boolean useMapreduce)
           throws Exception, TableNotIncludedForProcessingException {
-    repository.discoverSchema(tableName, true, useMapreduce);
+    repository.discoverSchema(tableName, true, includeAllCells, useMapreduce);
   }
 
   // make this method public if needs dictate
@@ -856,7 +865,7 @@ public class RepositoryAdmin {
   /**
    * Generates and outputs a CSV-formatted report on all {@link ColumnAuditor}s that have been
    * {@link ColumnAuditor captured} or
-   * {@link RepositoryAdmin#discoverColumnMetadata(boolean) discovered}
+   * {@link RepositoryAdmin#discoverColumnMetadata(boolean, boolean) discovered}
    * pertaining to all <a href="package-summary.html#config">ColumnManager-included</a> user
    * <i>Tables</i> within the submitted <i>Namespace</i>.
    *
@@ -875,7 +884,7 @@ public class RepositoryAdmin {
   /**
    * Generates and outputs a CSV-formatted report on all {@link ColumnAuditor}s that have been
    * {@link ColumnAuditor captured} or
-   * {@link RepositoryAdmin#discoverColumnMetadata(boolean) discovered}
+   * {@link RepositoryAdmin#discoverColumnMetadata(boolean, boolean) discovered}
    * pertaining to the submitted user <i>Table</i>.
    *
    * @param targetFile file to which the CSV file is to be outputted
@@ -895,7 +904,7 @@ public class RepositoryAdmin {
   /**
    * Generates and outputs a CSV-formatted report on all {@link ColumnAuditor}s that have been
    * {@link ColumnAuditor captured} or
-   * {@link RepositoryAdmin#discoverColumnMetadata(boolean) discovered}
+   * {@link RepositoryAdmin#discoverColumnMetadata(boolean, boolean) discovered}
    * pertaining to the submitted <i>Column Family</i> within the submitted user <i>Table</i>.
    *
    * @param targetFile file to which the CSV file is to be outputted

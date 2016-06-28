@@ -405,6 +405,24 @@ public class TestRepositoryAdmin {
   }
 
   @Test
+  public void testColumnDiscoveryWithIncludeAllCells() throws Exception {
+    System.out.println("#testColumnDiscoveryWithIncludeAllCells has been invoked using WILDCARDED "
+            + "EXCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+    loadColumnDataMultipleCells(configuration, true);
+    doColumnDiscoveryIncludeAllCells(configuration, false);
+    verifyColumnAuditing(configuration);
+    System.out.println("#testColumnDiscoveryWithIncludeAllCells using WILDCARDED EXCLUDE"
+            + " config properties has run to completion.");
+  }
+
+  @Test
   public void testColumnDiscoveryWithWildcardedExcludesUsingMapReduce() throws Exception {
     System.out.println("#testColumnDiscovery has been invoked using WILDCARDED "
             + "EXCLUDE config properties WITH MAPREDUCE.");
@@ -420,6 +438,24 @@ public class TestRepositoryAdmin {
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties "
             + "WITH MAPREDUCE has run to completion.");
+  }
+
+  @Test
+  public void testColumnDiscoveryWithIncludeAllCellsUsingMapReduce() throws Exception {
+    System.out.println("#testColumnDiscoveryWithIncludeAllCellsUsingMapReduce has been invoked"
+            + " using WILDCARDED EXCLUDE config properties.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+    loadColumnDataMultipleCells(configuration, true);
+    doColumnDiscoveryIncludeAllCells(configuration, true); // useMapReduce == true
+    verifyColumnAuditing(configuration);
+    System.out.println("#testColumnDiscoveryWithIncludeAllCellsUsingMapReduce using "
+            + "WILDCARDED EXCLUDE config properties has run to completion.");
   }
 
   @Test
@@ -591,10 +627,96 @@ public class TestRepositoryAdmin {
     }
   }
 
+  private void loadColumnDataMultipleCells(Configuration configuration, boolean bypassColumnManager)
+          throws IOException {
+
+    if (bypassColumnManager) {
+      try (Connection standardConnection = ConnectionFactory.createConnection(configuration)) {
+        loadColumnsMultipleCells(standardConnection);
+      }
+    } else {
+      try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+        loadColumnsMultipleCells(mConnection);
+      }
+    }
+  }
+
+  private void loadColumnsMultipleCells(Connection connection) throws IOException {
+    // put rows into Table which is INCLUDED for auditing
+    try (Table table01InNamespace01 = connection.getTable(NAMESPACE01_TABLE01)) {
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_01).
+              addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER02, VALUE_5_BYTES_LONG));
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, COLQUALIFIER01, VALUE_82_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER03, VALUE_9_BYTES_LONG).
+              addColumn(CF02, COLQUALIFIER04, VALUE_82_BYTES_LONG));
+      table01InNamespace01.put(putList);
+      putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, COLQUALIFIER01, VALUE_2_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG).
+              addColumn(CF02, COLQUALIFIER04, VALUE_2_BYTES_LONG));
+      table01InNamespace01.put(putList);
+    }
+
+    try (Table table01InNamespace03 = connection.getTable(NAMESPACE03_TABLE01)) {
+
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_04).
+              addColumn(CF01, COLQUALIFIER03, VALUE_82_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER01, VALUE_9_BYTES_LONG));
+      table01InNamespace03.put(putList);
+      putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_04).
+              addColumn(CF01, COLQUALIFIER03, VALUE_2_BYTES_LONG).
+              addColumn(CF01, COLQUALIFIER01, VALUE_5_BYTES_LONG));
+      table01InNamespace03.put(putList);
+    }
+
+    // put two rows into Table in Namespace which is NOT included for ColumnManager auditing
+    try (Table table01InNamespace02 = connection.getTable(NAMESPACE02_TABLE01)) {
+
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_01).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_82_BYTES_LONG));
+      table01InNamespace02.put(putList);
+      putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_01).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG));
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_2_BYTES_LONG));
+      table01InNamespace02.put(putList);
+    }
+
+    // put one row into Table which is explicitly NOT included for ColumnManager auditing
+    try (Table table02InNamespace03 = connection.getTable(NAMESPACE03_TABLE02)) {
+
+      List<Put> putList = new ArrayList<>();
+      putList.add(new Put(ROW_ID_03).
+              addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_9_BYTES_LONG).
+              addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE, VALUE_5_BYTES_LONG));
+      table02InNamespace03.put(putList);
+    }
+  }
+
   private void doColumnDiscovery(Configuration configuration, boolean useMapReduce)
           throws Exception {
     new RepositoryAdmin(MConnectionFactory.createConnection(configuration))
-            .discoverColumnMetadata(useMapReduce);
+            .discoverColumnMetadata(false, useMapReduce);
+  }
+
+  private void doColumnDiscoveryIncludeAllCells(Configuration configuration, boolean useMapReduce)
+          throws Exception {
+    new RepositoryAdmin(MConnectionFactory.createConnection(configuration))
+            .discoverColumnMetadata(true, useMapReduce);
   }
 
   private void verifyColumnAuditing(Configuration configuration) throws IOException {
@@ -2360,7 +2482,7 @@ public class TestRepositoryAdmin {
                       fileForSummaryTable01, NAMESPACE01_TABLE01, false, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               repositoryAdmin.outputReportOnInvalidColumnValues(
-                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, true, useMapReduce));
+                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, false, useMapReduce));
       assertTrue(reportGenerationFailure,
               !repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, false, useMapReduce));
@@ -2376,6 +2498,226 @@ public class TestRepositoryAdmin {
       try {
         repositoryAdmin.outputReportOnInvalidColumnValues(
                       fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, false, useMapReduce);
+        fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+    }
+
+    // read in reports and validate contents
+    try (CSVParser parser = CSVParser.parse(fileForSummaryTable01, StandardCharsets.UTF_8,
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColFamily value not as expected",
+                Bytes.toString(CF02),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColQualifier value not as expected",
+                Bytes.toString(COLQUALIFIER03),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Occurrences-count value not as expected",
+                String.valueOf(3),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+      }
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
+              1, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForVerboseTable01, StandardCharsets.UTF_8,
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColFamily value not as expected",
+                Bytes.toString(CF02),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColQualifier value not as expected",
+                Bytes.toString(COLQUALIFIER03),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+        switch (recordCount) {
+          case 1:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_02), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL01),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 2:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL03),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 3:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_5_BYTES_LONG),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+       }
+      }
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
+              3, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf01, StandardCharsets.UTF_8,
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+      }
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
+              0, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf01, StandardCharsets.UTF_8,
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+      }
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
+              0, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForSummaryTable01Cf02, StandardCharsets.UTF_8,
+            ColumnInvalidityReport.SUMMARY_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColFamily value not as expected",
+                Bytes.toString(CF02),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColQualifier value not as expected",
+                Bytes.toString(COLQUALIFIER03),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Occurrences-count value not as expected",
+                String.valueOf(3),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.INVALID_OCCURRENCE_COUNT));
+      }
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
+              1, recordCount);
+    }
+
+    try (CSVParser parser = CSVParser.parse(fileForVerboseTable01Cf02, StandardCharsets.UTF_8,
+            ColumnInvalidityReport.VERBOSE_CSV_FORMAT.withSkipHeaderRecord())) {
+      int recordCount = 0;
+      for (CSVRecord record : parser) {
+        recordCount++;
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Namespace value not as expected",
+                NAMESPACE01_TABLE01.getNamespaceAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.NAMESPACE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " Table value not as expected",
+                NAMESPACE01_TABLE01.getQualifierAsString(),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.TABLE));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColFamily value not as expected",
+                Bytes.toString(CF02),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_FAMILY));
+        assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                + " ColQualifier value not as expected",
+                Bytes.toString(COLQUALIFIER03),
+                record.get(ColumnInvalidityReport.SummaryReportHeader.COLUMN_QUALIFIER));
+        switch (recordCount) {
+          case 1:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_02), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL01),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 2:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL03),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 3:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(VALUE_5_BYTES_LONG),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+       }
+      }
+      assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
+              3, recordCount);
+    }
+
+    // generate InvalidColumnValue reports WITH includeAllCells == TRUE!!
+    try (Connection connection = ConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForSummaryTable01, NAMESPACE01_TABLE01, false, true, useMapReduce));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForVerboseTable01, NAMESPACE01_TABLE01, true, true, useMapReduce));
+      assertTrue(reportGenerationFailure,
+              !repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForSummaryTable01Cf01, NAMESPACE01_TABLE01, CF01, false, true, useMapReduce));
+      assertTrue(reportGenerationFailure,
+              !repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForVerboseTable01Cf01, NAMESPACE01_TABLE01, CF01, true, true, useMapReduce));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForSummaryTable01Cf02, NAMESPACE01_TABLE01, CF02, false, true, useMapReduce));
+      assertTrue(reportGenerationFailure,
+              repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForVerboseTable01Cf02, NAMESPACE01_TABLE01, CF02, true, true, useMapReduce));
+      try {
+        repositoryAdmin.outputReportOnInvalidColumnValues(
+                      fileForSummaryOfEmptyTable, NAMESPACE02_TABLE03, false, true, useMapReduce);
         fail(reportGenerationFailure + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
@@ -2594,6 +2936,24 @@ public class TestRepositoryAdmin {
           case 3:
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL02),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 4:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
+                    Bytes.toString(ROW_ID_04), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " Column value not as expected",
+                    Bytes.toString(BAD_URL01),
+                    record.get(ColumnInvalidityReport.VerboseReportHeader.CELL_VALUE));
+            break;
+          case 5:
+            assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
+                    + " RowId value not as expected",
                     Bytes.toString(ROW_ID_05), record.get(ColumnInvalidityReport.VerboseReportHeader.ROW_ID));
             assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Rec " + recordCount
                     + " Column value not as expected",
@@ -2603,7 +2963,7 @@ public class TestRepositoryAdmin {
        }
       }
       assertEquals(COLUMN_INVALIDITY_REPORT_FAILURE + "Record count in CSV file not as expected",
-              3, recordCount);
+              5, recordCount);
     }
 
     clearTestingEnvironment();
@@ -2770,6 +3130,8 @@ public class TestRepositoryAdmin {
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCells();
+    new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
@@ -2781,7 +3143,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingNamespaces();
     // new TestRepositoryAdmin().testRepositorySyncCheckForMissingTables();
     // new TestRepositoryAdmin().testRepositorySyncCheckForAttributeDiscrepancies();
-     new TestRepositoryAdmin().testOutputReportOnInvalidColumnsViaDirectScan();
+    // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsViaDirectScan();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();

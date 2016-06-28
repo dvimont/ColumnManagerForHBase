@@ -133,6 +133,9 @@ class Repository {
   static final String ARG_DELIMITER = "=";
   static final String TABLE_NAME_ARG_KEY = ARG_KEY_PREFIX + TABLE_NAME_CONF_KEY + ARG_DELIMITER;
   static final String COLFAMILY_ARG_KEY = ARG_KEY_PREFIX + COLFAMILY_CONF_KEY + ARG_DELIMITER;
+  static final String INCLUDE_ALL_CELLS_CONF_KEY = "include_all_cells";
+  static final String INCLUDE_ALL_CELLS_ARG_KEY
+          = ARG_KEY_PREFIX + INCLUDE_ALL_CELLS_CONF_KEY + ARG_DELIMITER;
 
   private static final String SYNC_ERROR_MSG
           = "SYNCHRONIZATION ERROR FOUND IN " + PRODUCT_NAME + " REPOSITORY. ";
@@ -188,7 +191,7 @@ class Repository {
       repositoryTable = initializeRepositoryTable();
       doSyncCheck();
       if (newInstallation) {
-        discoverSchema(false,false);
+        discoverSchema(false, false, false);
       }
     } else {
       throw new ColumnManagerIOException(PRODUCT_NAME + " Repository is NOT ACTIVATED.") {};
@@ -785,37 +788,72 @@ class Repository {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
-    for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
-      NavigableMap<byte[], byte[]> columnMap = row.getFamilyMap(mcd.getName());
-      for (Entry<byte[], byte[]> colEntry : columnMap.entrySet()) {
+//    for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
+//      NavigableMap<byte[], byte[]> columnMap = row.getFamilyMap(mcd.getName());
+    for (Entry<byte[], NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyToColumnsMapEntry
+            : row.getMap().entrySet()) {
+      MColumnDescriptor mcd = mtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
+      for (Entry<byte[],NavigableMap<Long,byte[]>> colEntry
+              : familyToColumnsMapEntry.getValue().entrySet()) {
         byte[] colQualifier = colEntry.getKey();
-        int colValueLength;
-        if (keyOnlyFilterUsed) {
-          colValueLength = Bytes.toInt(colEntry.getValue()); // colValue *length* returned as value
-        } else {
-          colValueLength = colEntry.getValue().length;
+        for (Entry<Long,byte[]> cellEntry : colEntry.getValue().entrySet()) {
+          int colValueLength;
+          if (keyOnlyFilterUsed) {
+            colValueLength = Bytes.toInt(cellEntry.getValue()); // value *length* returned as value
+          } else {
+            colValueLength = cellEntry.getValue().length;
+          }
+          ColumnAuditor oldColAuditor = getColumnAuditor(mcd.getForeignKey(), colQualifier);
+          if (oldColAuditor != null && colValueLength <= oldColAuditor.getMaxValueLengthFound()) {
+            continue;
+          }
+          ColumnAuditor newColAuditor = new ColumnAuditor(colQualifier);
+          if (oldColAuditor == null || colValueLength > oldColAuditor.getMaxValueLengthFound()) {
+            newColAuditor.setMaxValueLengthFound(colValueLength);
+          } else {
+            newColAuditor.setMaxValueLengthFound(oldColAuditor.getMaxValueLengthFound());
+          }
+          boolean suppressUserName = false;
+          if (oldColAuditor != null) {
+            suppressUserName = true;
+          }
+          Map<byte[], byte[]> entityAttributeMap
+                  = buildEntityAttributeMap(newColAuditor.getValues(),
+                          newColAuditor.getConfiguration());
+          putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                  mcd.getForeignKey(), colQualifier).getByteArray(),
+                  entityAttributeMap, suppressUserName);
         }
-        ColumnAuditor oldColAuditor = getColumnAuditor(mcd.getForeignKey(), colQualifier);
-        if (oldColAuditor != null && colValueLength <= oldColAuditor.getMaxValueLengthFound()) {
-          continue;
-        }
-        ColumnAuditor newColAuditor = new ColumnAuditor(colQualifier);
-        if (oldColAuditor == null || colValueLength > oldColAuditor.getMaxValueLengthFound()) {
-          newColAuditor.setMaxValueLengthFound(colValueLength);
-        } else {
-          newColAuditor.setMaxValueLengthFound(oldColAuditor.getMaxValueLengthFound());
-        }
-        boolean suppressUserName = false;
-        if (oldColAuditor != null) {
-          suppressUserName = true;
-        }
-        Map<byte[], byte[]> entityAttributeMap
-                = buildEntityAttributeMap(newColAuditor.getValues(),
-                        newColAuditor.getConfiguration());
-        putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-                mcd.getForeignKey(), colQualifier).getByteArray(),
-                entityAttributeMap, suppressUserName);
       }
+//      for (Entry<byte[], byte[]> colEntry : columnMap.entrySet()) {
+//        byte[] colQualifier = colEntry.getKey();
+//        int colValueLength;
+//        if (keyOnlyFilterUsed) {
+//          colValueLength = Bytes.toInt(colEntry.getValue()); // colValue *length* returned as value
+//        } else {
+//          colValueLength = colEntry.getValue().length;
+//        }
+//        ColumnAuditor oldColAuditor = getColumnAuditor(mcd.getForeignKey(), colQualifier);
+//        if (oldColAuditor != null && colValueLength <= oldColAuditor.getMaxValueLengthFound()) {
+//          continue;
+//        }
+//        ColumnAuditor newColAuditor = new ColumnAuditor(colQualifier);
+//        if (oldColAuditor == null || colValueLength > oldColAuditor.getMaxValueLengthFound()) {
+//          newColAuditor.setMaxValueLengthFound(colValueLength);
+//        } else {
+//          newColAuditor.setMaxValueLengthFound(oldColAuditor.getMaxValueLengthFound());
+//        }
+//        boolean suppressUserName = false;
+//        if (oldColAuditor != null) {
+//          suppressUserName = true;
+//        }
+//        Map<byte[], byte[]> entityAttributeMap
+//                = buildEntityAttributeMap(newColAuditor.getValues(),
+//                        newColAuditor.getConfiguration());
+//        putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+//                mcd.getForeignKey(), colQualifier).getByteArray(),
+//                entityAttributeMap, suppressUserName);
+//      }
     }
   }
 
@@ -1530,7 +1568,9 @@ class Repository {
     }
   }
 
-  void discoverSchema(boolean includeColumnQualifiers, boolean useMapReduce) throws IOException {
+  void discoverSchema(
+          boolean includeColumnQualifiers, boolean includeAllCells, boolean useMapReduce)
+          throws IOException {
     for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
@@ -1541,12 +1581,13 @@ class Repository {
                 || standardAdmin.isTableDisabled(htd.getTableName())) {
           continue;
         }
-        discoverSchema(htd.getTableName(), includeColumnQualifiers, useMapReduce);
+        discoverSchema(htd.getTableName(), includeColumnQualifiers, includeAllCells, useMapReduce);
       }
     }
   }
 
-  void discoverSchema(String namespace, boolean includeColumnQualifiers, boolean useMapReduce)
+  void discoverSchema(String namespace,
+          boolean includeColumnQualifiers, boolean includeAllCells, boolean useMapReduce)
           throws IOException {
     NamespaceDescriptor nd = getAdmin().getNamespaceDescriptor(namespace); // Exception if not found
     if (!isIncludedNamespace(namespace)) {
@@ -1561,23 +1602,25 @@ class Repository {
               || standardAdmin.isTableDisabled(htd.getTableName())) {
         continue;
       }
-      discoverSchema(htd.getTableName(), includeColumnQualifiers, useMapReduce);
+      discoverSchema(htd.getTableName(), includeColumnQualifiers, includeAllCells, useMapReduce);
     }
   }
 
 
-  void discoverSchema(TableName tableName, boolean includeColumnQualifiers, boolean useMapReduce)
+  void discoverSchema(TableName tableName,
+          boolean includeColumnQualifiers, boolean includeAllCells, boolean useMapReduce)
           throws IOException {
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
     putTableSchemaEntity(standardAdmin.getTableDescriptor(tableName));
     if (includeColumnQualifiers) {
-      discoverColumnMetadata(tableName, useMapReduce);
+      discoverColumnMetadata(tableName, includeAllCells, useMapReduce);
     }
   }
 
-  private void discoverColumnMetadata(TableName tableName, boolean useMapReduce)
+  private void discoverColumnMetadata(
+          TableName tableName, boolean includeAllCells, boolean useMapReduce)
           throws IOException {
     MTableDescriptor mtd = getMTableDescriptor(tableName);
     if (mtd == null) {
@@ -1587,7 +1630,8 @@ class Repository {
     if (useMapReduce) {
       try {
         int jobCompletionCode = ToolRunner.run(MConfiguration.create(), new ColumnDiscoveryTool(),
-                  new String[]{TABLE_NAME_ARG_KEY + tableName.getNameAsString()});
+                  new String[]{TABLE_NAME_ARG_KEY + tableName.getNameAsString(),
+                    INCLUDE_ALL_CELLS_ARG_KEY + includeAllCells});
         if (jobCompletionCode != 0) {
           logger.warn("Mapreduce process failure in " + ColumnDiscoveryTool.class.getSimpleName());
         }
@@ -1595,15 +1639,16 @@ class Repository {
         if (IOException.class.isAssignableFrom(e.getClass())) {
           throw (IOException)e;
         } else {
-          IOException mapreduceExceptionWrapper = new IOException("Mapreduce process failure");
-          mapreduceExceptionWrapper.initCause(e);
-          throw mapreduceExceptionWrapper;
+          throw new IOException("Mapreduce process failure", e);
         }
       }
     } else {
       Table table = hbaseConnection.getTable(tableName);
-      try (ResultScanner rows
-              = table.getScanner(new Scan().setFilter(new KeyOnlyFilter(true)))) {
+      Scan colScan = new Scan().setFilter(new KeyOnlyFilter(true));
+      if (includeAllCells) {
+        colScan.setMaxVersions();
+      }
+      try (ResultScanner rows = table.getScanner(colScan)) {
         for (Result row : rows) {
           putColumnAuditorSchemaEntities(mtd, row, true);
         }

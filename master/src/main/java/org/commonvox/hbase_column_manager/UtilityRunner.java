@@ -213,21 +213,23 @@ class UtilityRunner {
           break;
         case GET_COLUMN_QUALIFIERS_UTILITY_DIRECT_SCAN:
           if (selectedNamespaceString.isEmpty()) {
-            repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), false);
+            repositoryAdmin.discoverColumnMetadata(
+                    TableName.valueOf(selectedTableString), true, false);
             repositoryAdmin.outputReportOnColumnQualifiers(
                     selectedFile, TableName.valueOf(selectedTableString));
           } else {
-            repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, false);
+            repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, true, false);
             repositoryAdmin.outputReportOnColumnQualifiers(selectedFile, selectedNamespaceString);
           }
           break;
         case GET_COLUMN_QUALIFIERS_UTILITY_MAP_REDUCE:
           if (selectedNamespaceString.isEmpty()) {
-            repositoryAdmin.discoverColumnMetadata(TableName.valueOf(selectedTableString), true);
+            repositoryAdmin.discoverColumnMetadata(
+                    TableName.valueOf(selectedTableString), true, true);
             repositoryAdmin.outputReportOnColumnQualifiers(
                     selectedFile, TableName.valueOf(selectedTableString));
           } else {
-            repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, true);
+            repositoryAdmin.discoverColumnMetadata(selectedNamespaceString, true, true);
             repositoryAdmin.outputReportOnColumnQualifiers(selectedFile, selectedNamespaceString);
           }
           break;
