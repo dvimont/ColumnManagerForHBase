@@ -23,20 +23,21 @@
   <parent>
     <groupId>org.commonvox</groupId>
     <artifactId>hbase-column-manager-parent-pom</artifactId>
-    <version>1.0</version>
+    <version>1.0-beta-01</version>
   </parent>
 
   <properties>
     <hbaseVersion>1.0.3</hbaseVersion>
   </properties>
   <artifactId>hbase-column-manager</artifactId>
-  <version>${hbaseVersion}-beta</version>
+  <version>1.0.3-beta-01</version>
   <packaging>jar</packaging>
 
   <name>CommonVox tools for HBase™ - ColumnManagerAPI for HBase™</name>
   <description>ColumnManagerAPI for HBase™ is a METADATA REPOSITORY SYSTEM for
       HBase 1.x with options for: (1) COLUMN AUDITING (2) COLUMN-DEFINITION
       ENFORCEMENT (3) SCHEMA CHANGE MONITORING, and (4) SCHEMA EXPORT/IMPORT</description>
+  <url>http://github.com/dvimont/ColumnManagerForHBase</url>
 
   <dependencies>
     <!-- Dependency for hbase-testing-util must precede compile-scoped dependencies. -->

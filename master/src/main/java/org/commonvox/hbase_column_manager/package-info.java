@@ -16,7 +16,7 @@
  */
 /**
  * <hr><b>ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a></b>
- * provides an extended <i>METADATA REPOSITORY SYSTEM for HBase 1.x</i>
+ * provides an extended <i>METADATA REPOSITORY SYSTEM for HBase</i>
  * with options for:<br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures Column metadata
