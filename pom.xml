@@ -170,10 +170,6 @@
                                   <include>commons-cli:commons-cli</include>
                             </includes>
                         </artifactSet>
-                        <!-- do not replace original jar -->
-                        <shadedArtifactAttached>true</shadedArtifactAttached>
-                        <!-- instead of '-shade', use '-utility' for shaded jar suffix -->
-                        <shadedClassifierName>utility</shadedClassifierName>
                     </configuration>
                 </execution>
             </executions>
