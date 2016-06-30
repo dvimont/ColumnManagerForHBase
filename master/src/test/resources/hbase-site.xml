@@ -21,6 +21,7 @@
  */
 -->
 <configuration>
+<!--
 	<property>
 		<name>hbase.rootdir</name>
 		<value>${user.home}/hbaseData</value>
@@ -29,4 +30,5 @@
 		<name>hbase.zookeeper.property.dataDir</name>
 		<value>${user.home}/hbaseZooData</value>
 	</property>
+-->
 </configuration>
