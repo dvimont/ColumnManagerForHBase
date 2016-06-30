@@ -3127,7 +3127,7 @@ public class TestRepositoryAdmin {
   }
 
   public void setupEnvironmentForExternalUtilityTest() throws Exception {
-    System.out.println("#testUtilityRunner has been invoked using WILDCARDED "
+    System.out.println("#setupEnvironmentForExternalUtilityTest has been invoked using WILDCARDED "
             + "EXCLUDE config properties.");
     // file setup
     final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
