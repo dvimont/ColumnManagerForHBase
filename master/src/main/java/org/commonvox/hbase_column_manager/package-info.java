@@ -509,8 +509,8 @@
  * </li>
  * <li>
  * Command-line invocation of UtilityRunner functions may then be performed from within the
- * directory containing the *utility.jar, as outlined in the following usage instructions, which
- * are outputted by the UtilityRunner's help function:
+ * directory containing the ColumnManager JAR file, as outlined in the following usage instructions,
+ * which are outputted by the UtilityRunner's help function:
  * </li>
  * </ul>
  * <pre>      {@code ====================
@@ -537,7 +537,7 @@
  *       ====================
  *
  *       FOR EXAMPLE, the exportSchema function might be invoked as follows from
- *       within the directory containing the *utility.jar:
+ *       within the directory containing the ColumnManager JAR file:
  *
  *           java -cp *:$HBASE_HOME/lib/*:$HBASE_HOME/conf
  *               org.commonvox.hbase_column_manager.UtilityRunner

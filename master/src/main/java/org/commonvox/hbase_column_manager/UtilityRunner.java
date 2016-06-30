@@ -257,7 +257,7 @@ class UtilityRunner {
             + "\n\nArguments for " + Repository.PRODUCT_NAME + " "+ this.getClass().getSimpleName()
             + ":\n" + BAR;
     String footer = BAR + "\n\nFOR EXAMPLE, the exportSchema function might be invoked as "
-            + "follows from within the directory containing the *utility.jar:\n\n"
+            + "follows from within the directory containing the ColumnManager JAR file:\n\n"
             + "    java -cp *:$HBASE_HOME/lib/*:$HBASE_HOME/conf\n"
             + "        org.commonvox.hbase_column_manager.UtilityRunner\n"
             + "        -u exportSchema -t myNamespace:myTable -f myOutputFile.xml";
