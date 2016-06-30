@@ -115,7 +115,7 @@
  * <b>Step 1: Get the required JAR files via download or by setting Maven project dependencies</b>
  * <br>
  * The most recently released versions of
- * <b><a href="https://github.com/dvimont/ColumnManager/releases" target="_blank">
+ * <b><a href="https://github.com/dvimont/ColumnManagerForHBase/releases" target="_blank">
  * the JAR files for ColumnManager</a></b>
  * may be downloaded from GitHub and included in the IDE environment's compile and run-time
  * classpath configurations.
@@ -500,11 +500,11 @@
  * functions.</li>
  * </ul>
  *
- * <u>TO USE -- DOWNLOAD THE UTILITY JAR AND INVOKE DESIRED FUNCTIONS</u>:
+ * <u>TO USE -- DOWNLOAD THE ColumnManager JAR AND INVOKE DESIRED FUNCTIONS</u>:
  * <ul>
- * <li>The {@code *utility.jar} file corresponding to your currently-installed version of HBase
- * must be <a href="https://github.com/dvimont/ColumnManager/releases" target="_blank">
- * downloaded from Github</a>. <i>(For example, {@code hbase-column-manager-1.0.3-beta-utility.jar}
+ * <li>The {@code JAR} file corresponding to your currently-installed version of HBase
+ * must be <a href="https://github.com/dvimont/ColumnManagerForHBase/releases" target="_blank">
+ * downloaded from Github</a>. <i>(For example, {@code hbase-column-manager-1.0.3-beta-01.jar}
  * would be used with an HBase 1.0.3 installation.)</i>
  * </li>
  * <li>
