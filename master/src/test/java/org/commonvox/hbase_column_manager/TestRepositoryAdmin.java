@@ -3127,11 +3127,51 @@ public class TestRepositoryAdmin {
             + "run to completion.");
   }
 
+  public void setupEnvironmentForExternalUtilityTest() throws Exception {
+    System.out.println("#testUtilityRunner has been invoked using WILDCARDED "
+            + "EXCLUDE config properties.");
+    // file setup
+    final String TARGET_DIRECTORY = "target/"; // for standalone (non-JUnit) execution
+    final String TARGET_UTILITY_CHANGE_EVENTS_FILE = "temp.utility.change.events.csv";
+    final String TARGET_STANDARD_CHANGE_EVENTS_FILE = "temp.standard.change.events.csv";
+    final String TARGET_UTILITY_EXPORT_SCHEMA_FILE = "temp.utility.export.schema.xml";
+    final String TARGET_STANDARD_EXPORT_SCHEMA_FILE = "temp.standard.export.schema.xml";
+    final String TARGET_UTILITY_QUALIFIERS_DIRECT_FILE = "temp.utility.qualifiers.direct.csv";
+    final String TARGET_STANDARD_QUALIFIERS_DIRECT_FILE = "temp.standard.qualifiers.direct.csv";
+    final String TARGET_UTILITY_QUALIFIERS_MAPRED_FILE = "temp.utility.qualifiers.mapreduce.csv";
+    final String TARGET_STANDARD_QUALIFIERS_MAPRED_FILE = "temp.standard.qualifiers.mapreduce.csv";
+    File utilityChangeEventsFile;
+    File standardChangeEventsFile;
+    File utilityExportSchemaFile;
+    File standardExportSchemaFile;
+    File utilityQualifiersDirectFile;
+    File standardQualifiersDirectFile;
+    File utilityQualifiersMapreduceFile;
+    File standardQualifiersMapreduceFile;
+
+    utilityChangeEventsFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_CHANGE_EVENTS_FILE);
+    standardChangeEventsFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_CHANGE_EVENTS_FILE);
+    utilityExportSchemaFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_EXPORT_SCHEMA_FILE);
+    standardExportSchemaFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_EXPORT_SCHEMA_FILE);
+    utilityQualifiersDirectFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_QUALIFIERS_DIRECT_FILE);
+    standardQualifiersDirectFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_QUALIFIERS_DIRECT_FILE);
+    utilityQualifiersMapreduceFile = new File(TARGET_DIRECTORY + TARGET_UTILITY_QUALIFIERS_MAPRED_FILE);
+    standardQualifiersMapreduceFile = new File(TARGET_DIRECTORY + TARGET_STANDARD_QUALIFIERS_MAPRED_FILE);
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+    loadColumnData(configuration, true);
+  }
+
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCells();
-    new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
@@ -3149,5 +3189,6 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsUsingMapReduce();
     // new TestRepositoryAdmin().testUtilityRunner();
+    new TestRepositoryAdmin().setupEnvironmentForExternalUtilityTest();
   }
 }
