@@ -95,11 +95,6 @@
   <build>
     <sourceDirectory>${developmentDirectory}src/main/java</sourceDirectory>
     <testSourceDirectory>${developmentDirectory}src/test/java</testSourceDirectory>
-    <resources>
-      <resource>
-        <directory>${developmentDirectory}src/main/resources</directory>
-      </resource>
-    </resources>
     <testResources>
       <testResource>
         <directory>${developmentDirectory}src/test/resources</directory>
