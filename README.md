@@ -10,4 +10,4 @@ A basic COMMAND-LINE INTERFACE is also provided for direct invocation of a numbe
 
 ### Detailed Javadocs documentation for this project may be viewed here: http://dvimont.github.io/ColumnManagerForHBase/
 
-**NOTE that this project is currently in final stages of initial development, with core design and coding completed. Currently, extensive test code is being added to the project. Upon final release, jars will be available at GitHub, and all artifacts will be made available from the Maven Central Repository.**
+**NOTE that this project is currently in final stages of initial development, with core design and coding completed. Currently, JARs compatible with HBase 1.0.x are available on GitHub, JARs compatible with HBase 1.1.x and 1.2.x are being prepared, and all artifacts will soon be published to the Maven Central Repository.**
