@@ -38,6 +38,9 @@ import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.SnapshotDescription;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.SnapshotDescription.Type;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.SnapshotResponse;
+import org.apache.hadoop.hbase.quotas.QuotaFilter;
+import org.apache.hadoop.hbase.quotas.QuotaRetriever;
+import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
 import org.apache.hadoop.hbase.snapshot.HBaseSnapshotException;
 import org.apache.hadoop.hbase.snapshot.RestoreSnapshotException;
@@ -824,4 +827,31 @@ class MAdmin implements Admin {
   public int hashCode() {
     return wrappedHbaseAdmin.hashCode();
   }
+
+  // beginning of overrides of methods introduced in HBase 1.1.0
+  @Override
+  public boolean isBalancerEnabled() throws IOException {
+    return wrappedHbaseAdmin.isBalancerEnabled();
+  }
+
+  @Override
+  public long getLastMajorCompactionTimestamp(TableName tn) throws IOException {
+    return wrappedHbaseAdmin.getLastMajorCompactionTimestamp(tn);
+  }
+
+  @Override
+  public long getLastMajorCompactionTimestampForRegion(byte[] bytes) throws IOException {
+    return wrappedHbaseAdmin.getLastMajorCompactionTimestampForRegion(bytes);
+  }
+
+  @Override
+  public void setQuota(QuotaSettings qs) throws IOException {
+    wrappedHbaseAdmin.setQuota(qs);
+  }
+
+  @Override
+  public QuotaRetriever getQuotaRetriever(QuotaFilter qf) throws IOException {
+    return wrappedHbaseAdmin.getQuotaRetriever(qf);
+  }
+  // end of overrides of methods introduced in HBase 1.1.0
 }
