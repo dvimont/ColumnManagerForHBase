@@ -346,7 +346,7 @@
  * When <a href="#activate">ColumnManager is activated</a> and <a href="#usage">usage has been
  * properly configured</a>,
  * <a href="ColumnAuditor.html">ColumnAuditor</a> metadata is gathered and persisted in the
- * Repository at runtime as Mutations (i.e. puts, appends, increments) are submitted via the
+ * Repository at runtime when Mutations (i.e. puts, appends, increments) are submitted via the
  * API to any <a href="#config">ColumnManager-included</a> <i>Table</i>.
  * All such metadata is then retrievable via the
  * <a href="RepositoryAdmin.html#getColumnAuditors-org.apache.hadoop.hbase.HTableDescriptor-org.apache.hadoop.hbase.HColumnDescriptor-">
