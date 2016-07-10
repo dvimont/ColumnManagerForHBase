@@ -484,4 +484,26 @@ class MTable implements Table {
   public int hashCode() {
     return wrappedTable.hashCode();
   }
+
+  // beginning of overrides of methods introduced in HBase 1.1.5
+  @Override
+  public void setOperationTimeout(int i) {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public int getOperationTimeout() {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public void setRpcTimeout(int i) {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+
+  @Override
+  public int getRpcTimeout() {
+    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+  }
+  // end of overrides of methods introduced in HBase 1.1.5
 }
