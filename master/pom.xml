@@ -28,6 +28,7 @@
 
   <properties>
     <hbaseVersion>1.2.1</hbaseVersion>
+    <maven.deploy.skip>true</maven.deploy.skip>
   </properties>
   <artifactId>hbase-column-manager</artifactId>
   <version>1.2-master-beta-01</version>
