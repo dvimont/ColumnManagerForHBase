@@ -68,7 +68,6 @@
     </developer>
   </developers>
 
-  <!-- this may need to go into individual child projects (except for master, which does not get deployed)
   <distributionManagement>
     <snapshotRepository>
       <id>ossrh</id>
@@ -79,7 +78,6 @@
       <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
     </repository>
   </distributionManagement>
-  -->
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
