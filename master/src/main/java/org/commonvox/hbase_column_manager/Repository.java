@@ -87,6 +87,8 @@ class Repository {
 
   static final String PRODUCT_NAME = "ColumnManagerAPI";
   static final byte[] JAVA_USERNAME_PROPERTY_KEY = Bytes.toBytes("user.name");
+  private static final String REPOSITORY_NOT_ACTIVATED_MSG
+          = PRODUCT_NAME + " Repository is NOT ACTIVATED.";
 
   // The following HBASE_CONFIG_PARM* keys & values used in hbase-site.xml
   //   or hbase-column-manager.xml to activate ColumnManager, include Tables for processing, etc.
@@ -159,8 +161,6 @@ class Repository {
   private static final byte[] ACTIVE_STATUS = Bytes.toBytes("A");
   private static final byte[] DELETED_STATUS = Bytes.toBytes("D");
   static final byte[] FOREIGN_KEY_COLUMN = Bytes.toBytes("_ForeignKey");
-  private static final byte[] COL_DEFINITIONS_ENFORCED_COLUMN
-          = Bytes.toBytes("_ColDefinitionsEnforced");
   private static final byte[] HEX_00_ARRAY = new byte[16];
   private static final byte[] HEX_FF_ARRAY = new byte[16];
 
@@ -194,7 +194,10 @@ class Repository {
         discoverSchema(false, false, false);
       }
     } else {
-      throw new ColumnManagerIOException(PRODUCT_NAME + " Repository is NOT ACTIVATED.") {};
+//      throw new ColumnManagerIOException(PRODUCT_NAME + " Repository is NOT ACTIVATED.") {};
+      columnManagerIsActivated = false;
+      repositoryTable = null;
+      logger.info(PRODUCT_NAME + " Repository is NOT ACTIVATED.");
     }
   }
 
@@ -1431,6 +1434,9 @@ class Repository {
 
   void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -1568,9 +1574,12 @@ class Repository {
     }
   }
 
-  void discoverSchema(
+  final void discoverSchema(
           boolean includeColumnQualifiers, boolean includeAllCells, boolean useMapReduce)
           throws IOException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     for (NamespaceDescriptor nd : standardAdmin.listNamespaceDescriptors()) {
       if (!isIncludedNamespace(nd.getName())) {
         continue;
@@ -1586,9 +1595,12 @@ class Repository {
     }
   }
 
-  void discoverSchema(String namespace,
+  final void discoverSchema(String namespace,
           boolean includeColumnQualifiers, boolean includeAllCells, boolean useMapReduce)
           throws IOException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     NamespaceDescriptor nd = getAdmin().getNamespaceDescriptor(namespace); // Exception if not found
     if (!isIncludedNamespace(namespace)) {
       throw new TableNotIncludedForProcessingException(
@@ -1607,9 +1619,12 @@ class Repository {
   }
 
 
-  void discoverSchema(TableName tableName,
+  final void discoverSchema(TableName tableName,
           boolean includeColumnQualifiers, boolean includeAllCells, boolean useMapReduce)
           throws IOException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
@@ -1676,6 +1691,9 @@ class Repository {
 
   void exportSchema(String sourceNamespace, TableName sourceTableName, File targetFile)
           throws IOException, JAXBException, XMLStreamException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     validateNamespaceTableNameIncludedForProcessing(sourceNamespace, sourceTableName);
     String allLiteral = "";
     if ((sourceNamespace == null || sourceNamespace.isEmpty())
@@ -1701,6 +1719,9 @@ class Repository {
           byte[] colFamilyFilter, boolean includeColumnAuditors,
           boolean bypassNamespacesTablesAndCFs)
           throws IOException, JAXBException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     validateNamespaceTableNameIncludedForProcessing(namespaceFilter, tableNameFilter);
     submitImportMessagesToLogger(sourceHsaFile, namespaceFilter, tableNameFilter,
             colFamilyFilter, includeColumnAuditors, bypassNamespacesTablesAndCFs);
@@ -1807,6 +1828,9 @@ class Repository {
   boolean outputReportOnColumnQualifiers (
           String namespace, TableName tableName, byte[] colFamily, File targetFile)
           throws IOException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     if (tableName == null && !isIncludedNamespace(namespace)) {
       throw new TableNotIncludedForProcessingException(
               Bytes.toBytes(namespace + ALL_TABLES_WILDCARD_INDICATOR),
@@ -1824,6 +1848,9 @@ class Repository {
   boolean outputReportOnInvalidColumns (ColumnInvalidityReport.ReportType reportType,
           TableName tableName, byte[] colFamily, File targetFile, boolean verbose,
           boolean includeAllCells, boolean useMapreduce) throws Exception {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
     if (!isIncludedTable(tableName)) {
       throw new TableNotIncludedForProcessingException(tableName.getName(), null);
     }
