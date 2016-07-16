@@ -38,8 +38,7 @@
          TESTING should be done separately for each build after having started up an instance of hbase
          using that build's corresponding hbase release.  -->
     <module>master</module>
-    <module>1.2.0</module>
-    <module>1.2.1</module>
+    <module>1.2.2</module>
   </modules>
 
   <licenses>

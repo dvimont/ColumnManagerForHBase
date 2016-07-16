@@ -484,4 +484,26 @@ class MTable implements Table {
   public int hashCode() {
     return wrappedTable.hashCode();
   }
+
+  // beginning of overrides of methods introduced in HBase 1.2.2
+  @Override
+  public void setOperationTimeout(int i) {
+    wrappedTable.setOperationTimeout(i);
+  }
+
+  @Override
+  public int getOperationTimeout() {
+    return wrappedTable.getOperationTimeout();
+  }
+
+  @Override
+  public void setRpcTimeout(int i) {
+    wrappedTable.setRpcTimeout(i);
+  }
+
+  @Override
+  public int getRpcTimeout() {
+    return wrappedTable.getRpcTimeout();
+  }
+  // end of overrides of methods introduced in HBase 1.2.2
 }
