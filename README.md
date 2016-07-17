@@ -8,8 +8,10 @@
 
 A basic COMMAND-LINE INTERFACE is also provided for direct invocation of a number of the above-listed functions without any need for Java coding.
 
+### This project is hosted on GitHub: https://github.com/dvimont/ColumnManagerForHBase
+
 ### Detailed Javadocs documentation for this project may be viewed here: http://dvimont.github.io/ColumnManagerForHBase/
 
-**NOTE that this project is currently in final stages of initial development, with core design and coding completed. Currently, JARs compatible with HBase 1.0.x are available on GitHub, JARs compatible with HBase 1.1.x and 1.2.x are being prepared, and all artifacts will soon be published to the Maven Central Repository.**
+### All versions/distributions of ColumnManager for HBase (compatible with all HBase 1.x releases) are available via the Maven Central Repository: http://bit.ly/ColumnManagerMaven
 
 ![ColumnManager era comparison](http://dvimont.github.io/ColumnManagerForHBase/org/commonvox/hbase_column_manager/doc-files/ColumnManager_era_comparison.jpg "This Era is Reminiscent of Another")
