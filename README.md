@@ -8,7 +8,7 @@
 
 A basic COMMAND-LINE INTERFACE is also provided for direct invocation of a number of the above-listed functions without any need for Java coding.
 
-** * coming soon in beta-03: discovery of number-of-occurrences for each unique column-qualifier in a table. **
+**\* coming soon in beta-03: discovery of number-of-occurrences for each unique column-qualifier in a table.**
 
 ### This project is hosted on GitHub: https://github.com/dvimont/ColumnManagerForHBase
 
