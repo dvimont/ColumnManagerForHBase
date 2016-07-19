@@ -20,7 +20,7 @@
  * with options for:<br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures Column metadata
- * (qualifier-name and max-length for each unique column-qualifier)
+ * (qualifier-name and max-length for each unique column-qualifier<b>*</b>)
  * -- either via <a href="#column-auditing">real-time auditing</a>
  * as <i>Tables</i> are updated, or via a <a href="#discovery">discovery facility</a>
  * (direct-scan or mapreduce) for previously-existing <i>Tables</i>;<br>
@@ -43,6 +43,9 @@
  * for direct invocation of a number of the above-listed functions without any need for
  * Java coding.</i><br><br>
  *
+ * <b>* coming soon in beta-03: discovery of number-of-occurrences for each unique column-qualifier
+ * in a table (i.e., number of rows upon which a given column-qualifier is found).</b><br><br>
+ *
  * Once it is installed and configured, standard usage of the ColumnManagerAPI in Java programs is
  * accomplished by simply substituting any reference to the standard HBase {@code ConnectionFactory}
  * class with a reference to the ColumnManager
@@ -63,6 +66,12 @@
  * Apache Software Foundation</a>.</i><br><br>
  * <hr><b>FUTURE ENHANCEMENTS MAY INCLUDE:</b>
  * <ul>
+ * <li><b>Additional metadata persisted in ColumnAuditor:</b>
+ * In the <b>beta-03</b> release, <a href="ColumnAuditor.html">ColumnAuditor</a> metadata
+ * discovery will be enhanced to include the number of rows upon which each column-qualifier is
+ * found, and formerly package-private ColumnAuditor methods will be made public to allow users
+ * to persist other column-oriented metadata of their choosing.
+ * </li>
  * <li><b>GUI interface:</b>
  * A JavaFX-based GUI interface could be built atop the ColumnManagerAPI, for administrative use on
  * Mac, Linux, and Windows desktops. Note that in the current release, a
