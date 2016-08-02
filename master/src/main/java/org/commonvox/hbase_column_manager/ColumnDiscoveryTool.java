@@ -159,7 +159,7 @@ class ColumnDiscoveryTool extends Configured implements Tool  {
               || columnManagerConnection.isAborted() || repository == null || mtd == null) {
         return;
       }
-      repository.putColumnAuditorSchemaEntities(mtd, value, true);
+      repository.putDiscoveredColumnAuditors(mtd, value, true);
     }
   }
 }

@@ -20,10 +20,11 @@
  * with options for:<br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures Column metadata
- * (qualifier-name and max-length for each unique column-qualifier<b>*</b>)
+ * (qualifier-name and max-length for each unique column-qualifier)
  * -- either via <a href="#column-auditing">real-time auditing</a>
  * as <i>Tables</i> are updated, or via a <a href="#discovery">discovery facility</a>
- * (direct-scan or mapreduce) for previously-existing <i>Tables</i>;<br>
+ * (direct-scan or mapreduce) for previously-existing <i>Tables</i>; the discovery process also
+ * captures column-occurrences count and cell-occurrences count for each unique column-qualifier;<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(2) <b>COLUMN-DEFINITION FACILITIES</b> --
  * administratively-managed <a href="ColumnDefinition.html">ColumnDefinitions</a>
  * (stipulating valid qualifier-name, column length, and/or value) may be created and
@@ -42,9 +43,6 @@
  * <i>A basic</i> <b><a href="#command-line">COMMAND-LINE INTERFACE</a></b> <i>is also provided
  * for direct invocation of a number of the above-listed functions without any need for
  * Java coding.</i><br><br>
- *
- * <b>* coming soon in beta-03: discovery of number-of-occurrences for each unique column-qualifier
- * in a table (i.e., number of rows upon which a given column-qualifier is found).</b><br><br>
  *
  * Once it is installed and configured, standard usage of the ColumnManagerAPI in Java programs is
  * accomplished by simply substituting any reference to the standard HBase {@code ConnectionFactory}
