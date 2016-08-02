@@ -96,8 +96,8 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     this(SchemaEntityType.TABLE.getRecordType(), mtd.getNameAsString());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mtd.getValues().entrySet()) {
-      this.values.put(Bytes.toString(valueEntry.getKey().copyBytes()),
-              Bytes.toString(valueEntry.getValue().copyBytes()));
+      this.values.put(Bytes.toString(valueEntry.getKey().get()),
+              Bytes.toString(valueEntry.getValue().get()));
     }
     for (Map.Entry<String, String> configEntry : mtd.getConfiguration().entrySet()) {
       this.configurations.put(configEntry.getKey(), configEntry.getValue());
@@ -108,8 +108,8 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     this(SchemaEntityType.COLUMN_FAMILY.getRecordType(), mcd.getNameAsString());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : mcd.getValues().entrySet()) {
-      this.values.put(Bytes.toString(valueEntry.getKey().copyBytes()),
-              Bytes.toString(valueEntry.getValue().copyBytes()));
+      this.values.put(Bytes.toString(valueEntry.getKey().get()),
+              Bytes.toString(valueEntry.getValue().get()));
     }
     for (Map.Entry<String, String> configEntry : mcd.getConfiguration().entrySet()) {
       this.configurations.put(configEntry.getKey(), configEntry.getValue());
@@ -153,10 +153,14 @@ class SchemaEntity implements Comparable<SchemaEntity> {
   Map<ImmutableBytesWritable, ImmutableBytesWritable> getValues() {
     Map<ImmutableBytesWritable, ImmutableBytesWritable> valuesImmutable = new HashMap<>();
     for (Entry<String, String> entry : values.entrySet()) {
-      valuesImmutable.put(new ImmutableBytesWritable(entry.getKey().getBytes()),
-              new ImmutableBytesWritable(entry.getValue().getBytes()));
+        valuesImmutable.put(new ImmutableBytesWritable(entry.getKey().getBytes()),
+                new ImmutableBytesWritable(entry.getValue().getBytes()));
     }
     return valuesImmutable;
+  }
+
+  Map<String, String> getValuesStringMap() {
+    return values;
   }
 
   /**
@@ -167,7 +171,17 @@ class SchemaEntity implements Comparable<SchemaEntity> {
    */
   byte[] getValue(byte[] key) {
     String valueAsString = values.get(Bytes.toString(key));
-    return (valueAsString == null) ? null : valueAsString.getBytes();
+    if (valueAsString == null) {
+      return null;
+    }
+    if ((key.length > Repository.COUNTER_COLUMN_PREFIX_BYTES.length
+              && Bytes.startsWith(key, Repository.COUNTER_COLUMN_PREFIX_BYTES))
+            || (key.length > Repository.TIMESTAMP_KEY_PREFIX_BYTES.length
+                  && Bytes.startsWith(key, Repository.TIMESTAMP_KEY_PREFIX_BYTES))) {
+      return Bytes.toBytes(Long.valueOf(valueAsString)); // counters & timestamps are long
+    } else {
+      return valueAsString.getBytes();
+    }
   }
 
   /**
@@ -177,8 +191,9 @@ class SchemaEntity implements Comparable<SchemaEntity> {
    * @return the value as String
    */
   String getValue(String key) {
-    byte[] value = getValue(Bytes.toBytes(key));
-    return (value == null) ? null : Bytes.toString(value);
+//    byte[] value = getValue(Bytes.toBytes(key));
+//    return (value == null) ? null : Bytes.toString(value);
+    return values.get(key);
   }
 
   /**
@@ -187,7 +202,8 @@ class SchemaEntity implements Comparable<SchemaEntity> {
    * @param key the key of entry to remove
    */
   void remove(final byte[] key) {
-    values.remove(new ImmutableBytesWritable(key));
+    // values.remove(new ImmutableBytesWritable(key));
+    values.remove(Bytes.toString(key));
   }
 
   /**
@@ -201,18 +217,35 @@ class SchemaEntity implements Comparable<SchemaEntity> {
     if (value == null) {
       remove(Bytes.toBytes(key));
     } else {
-      setValue(Bytes.toBytes(key), Bytes.toBytes(value));
+//      setValue(Bytes.toBytes(key), Bytes.toBytes(value));
+      values.put(key, value);
     }
     return this;
   }
 
   SchemaEntity setValue(byte[] key, byte[] value) {
-    values.put(Bytes.toString(key), Bytes.toString(value));
+    String keyString = Bytes.toString(key);
+    if ((key.length > Repository.COUNTER_COLUMN_PREFIX_BYTES.length
+              && Bytes.startsWith(key, Repository.COUNTER_COLUMN_PREFIX_BYTES))
+            || (key.length > Repository.TIMESTAMP_KEY_PREFIX_BYTES.length
+                  && Bytes.startsWith(key, Repository.TIMESTAMP_KEY_PREFIX_BYTES))) {
+      values.put(keyString, String.valueOf(Bytes.toLong(value))); // counters & timestamps are long
+    } else {
+      values.put(keyString, Bytes.toString(value));
+    }
     return this;
   }
 
   SchemaEntity setValue(final ImmutableBytesWritable key, final ImmutableBytesWritable value) {
-    values.put(Bytes.toString(key.copyBytes()), Bytes.toString(value.copyBytes()));
+    String keyString = Bytes.toString(key.get());
+    if ((key.getLength() > Repository.COUNTER_COLUMN_PREFIX_BYTES.length
+              && Bytes.startsWith(key.get(), Repository.COUNTER_COLUMN_PREFIX_BYTES))
+            || (key.getLength() > Repository.TIMESTAMP_KEY_PREFIX_BYTES.length
+                  && Bytes.startsWith(key.get(), Repository.TIMESTAMP_KEY_PREFIX_BYTES))) {
+      values.put(keyString, String.valueOf(Bytes.toLong(value.get()))); // counters/timestamps long
+    } else {
+      values.put(keyString, Bytes.toString(value.get()));
+    }
     return this;
   }
 
