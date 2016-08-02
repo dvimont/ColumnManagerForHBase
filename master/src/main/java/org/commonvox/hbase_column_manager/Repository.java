@@ -121,7 +121,15 @@ class Repository {
   private static final byte[] CONFIG_COLUMN_PREFIX_BYTES = Bytes.toBytes(CONFIG_COLUMN_PREFIX);
   private static final String VALUE_COLUMN_PREFIX = "Value__";
   private static final byte[] VALUE_COLUMN_PREFIX_BYTES = Bytes.toBytes(VALUE_COLUMN_PREFIX);
-  static final byte[] MAX_VALUE_COLUMN_NAME
+  static final String COUNTER_COLUMN_PREFIX = "Counter__";
+  static final byte[] COUNTER_COLUMN_PREFIX_BYTES = Bytes.toBytes(COUNTER_COLUMN_PREFIX);
+  static final byte[] COL_COUNTER_QUALIFIER = Bytes.toBytes(COUNTER_COLUMN_PREFIX + "column");
+  static final byte[] CELL_COUNTER_QUALIFIER = Bytes.toBytes(COUNTER_COLUMN_PREFIX + "cell");
+  static final String TIMESTAMP_KEY_PREFIX = "Timestamp__";
+  static final byte[] TIMESTAMP_KEY_PREFIX_BYTES = Bytes.toBytes(TIMESTAMP_KEY_PREFIX);
+  static final byte[] COL_COUNTER_TIMESTAMP_KEY = Bytes.toBytes(TIMESTAMP_KEY_PREFIX + "column_counter");
+  static final byte[] CELL_COUNTER_TIMESTAMP_KEY = Bytes.toBytes(TIMESTAMP_KEY_PREFIX + "cell_counter");
+  static final byte[] MAX_VALUE_QUALIFIER
           = ByteBuffer.allocate(VALUE_COLUMN_PREFIX.length() + ColumnAuditor.MAX_VALUE_LENGTH_KEY.length())
           .put(VALUE_COLUMN_PREFIX_BYTES).put(Bytes.toBytes(ColumnAuditor.MAX_VALUE_LENGTH_KEY))
           .array();
@@ -698,6 +706,13 @@ class Repository {
             entityAttributeMap, false);
   }
 
+  /**
+   * Invoked by MTableMultiplexer.
+   *
+   * @param tableName TableName
+   * @param mutations List of Mutations
+   * @throws IOException if a remote or network exception occurs
+   */
   void putColumnAuditorSchemaEntities(TableName tableName, List<? extends Mutation> mutations)
           throws IOException {
     if (!isIncludedTable(tableName)) {
@@ -709,6 +724,13 @@ class Repository {
     }
   }
 
+  /**
+   * Invoked by MTableMultiplexer.
+   *
+   * @param tableName TableName
+   * @param mutation Mutation
+   * @throws IOException if a remote or network exception occurs
+   */
   void putColumnAuditorSchemaEntities(TableName tableName, Mutation mutation)
           throws IOException {
     if (!isIncludedTable(tableName)) {
@@ -717,6 +739,13 @@ class Repository {
     putColumnAuditorSchemaEntities(getMTableDescriptor(tableName), mutation);
   }
 
+  /**
+   * Invoked by MTable for real-time audit of mutations.
+   *
+   * @param mtd MTableDescriptor
+   * @param mutations RowMutations
+   * @throws IOException if a remote or network exception occurs
+   */
   void putColumnAuditorSchemaEntities(MTableDescriptor mtd, RowMutations mutations)
           throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
@@ -727,6 +756,13 @@ class Repository {
     }
   }
 
+  /**
+   * Invoked by MBufferedMutator
+   *
+   * @param mtd MTableDescriptor
+   * @param mutations RowMutations
+   * @throws IOException if a remote or network exception occurs
+   */
   void putColumnAuditorSchemaEntities(MTableDescriptor mtd, List<? extends Mutation> mutations)
           throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
@@ -786,20 +822,21 @@ class Repository {
    * @param row Result object from which {@link ColumnAuditor} SchemaEntity is extracted
    * @throws IOException if a remote or network exception occurs
    */
-  void putColumnAuditorSchemaEntities(
+  void putDiscoveredColumnAuditors(
           MTableDescriptor mtd, Result row, boolean keyOnlyFilterUsed) throws IOException {
     if (!isIncludedTable(mtd.getTableName())) {
       return;
     }
-//    for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
-//      NavigableMap<byte[], byte[]> columnMap = row.getFamilyMap(mcd.getName());
     for (Entry<byte[], NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyToColumnsMapEntry
             : row.getMap().entrySet()) {
       MColumnDescriptor mcd = mtd.getMColumnDescriptor(familyToColumnsMapEntry.getKey());
       for (Entry<byte[],NavigableMap<Long,byte[]>> colEntry
               : familyToColumnsMapEntry.getValue().entrySet()) {
         byte[] colQualifier = colEntry.getKey();
-        for (Entry<Long,byte[]> cellEntry : colEntry.getValue().entrySet()) {
+        byte[] rowId = new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                mcd.getForeignKey(), colQualifier).getByteArray();
+        Set<Entry<Long,byte[]>> cellEntries = colEntry.getValue().entrySet();
+        for (Entry<Long,byte[]> cellEntry : cellEntries) {
           int colValueLength;
           if (keyOnlyFilterUsed) {
             colValueLength = Bytes.toInt(cellEntry.getValue()); // value *length* returned as value
@@ -823,41 +860,46 @@ class Repository {
           Map<byte[], byte[]> entityAttributeMap
                   = buildEntityAttributeMap(newColAuditor.getValues(),
                           newColAuditor.getConfiguration());
-          putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-                  mcd.getForeignKey(), colQualifier).getByteArray(),
-                  entityAttributeMap, suppressUserName);
+          putSchemaEntity(rowId, entityAttributeMap, suppressUserName);
+        }
+        repositoryTable.incrementColumnValue(rowId, REPOSITORY_CF, COL_COUNTER_QUALIFIER, 1);
+        repositoryTable.incrementColumnValue(
+                rowId, REPOSITORY_CF, CELL_COUNTER_QUALIFIER, cellEntries.size());
+      }
+    }
+  }
+
+  /**
+   * Invoked administratively to persist administrator-managed {@link ColumnAuditor}s in
+   * Repository.
+   *
+   * @param tableName name of <i>Table</i> to which {@link ColumnDefinition}s are to be added
+   * @param colFamily <i>Column Family</i> to which {@link ColumnDefinition}>s are to be added
+   * @param colAuditors List of {@link ColumnAuditor}s to be added or modified
+   * @return true if all puts complete successfully
+   * @throws IOException if a remote or network exception occurs
+   */
+  boolean putColumnAuditorSchemaEntities(
+          TableName tableName, byte[] colFamily, List<ColumnAuditor> colAuditors)
+          throws IOException {
+    if (!isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
+    boolean allPutsCompleted = false;
+    byte[] colFamilyForeignKey = getForeignKey(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+            getTableForeignKey(tableName),
+            colFamily);
+    if (colFamilyForeignKey != null) {
+      allPutsCompleted = true;
+      for (ColumnAuditor colDefinition : colAuditors) {
+        byte[] columnForeignKey
+                = putColumnAuditorSchemaEntity(colFamilyForeignKey, colDefinition);
+        if (columnForeignKey == null) {
+          allPutsCompleted = false;
         }
       }
-//      for (Entry<byte[], byte[]> colEntry : columnMap.entrySet()) {
-//        byte[] colQualifier = colEntry.getKey();
-//        int colValueLength;
-//        if (keyOnlyFilterUsed) {
-//          colValueLength = Bytes.toInt(colEntry.getValue()); // colValue *length* returned as value
-//        } else {
-//          colValueLength = colEntry.getValue().length;
-//        }
-//        ColumnAuditor oldColAuditor = getColumnAuditor(mcd.getForeignKey(), colQualifier);
-//        if (oldColAuditor != null && colValueLength <= oldColAuditor.getMaxValueLengthFound()) {
-//          continue;
-//        }
-//        ColumnAuditor newColAuditor = new ColumnAuditor(colQualifier);
-//        if (oldColAuditor == null || colValueLength > oldColAuditor.getMaxValueLengthFound()) {
-//          newColAuditor.setMaxValueLengthFound(colValueLength);
-//        } else {
-//          newColAuditor.setMaxValueLengthFound(oldColAuditor.getMaxValueLengthFound());
-//        }
-//        boolean suppressUserName = false;
-//        if (oldColAuditor != null) {
-//          suppressUserName = true;
-//        }
-//        Map<byte[], byte[]> entityAttributeMap
-//                = buildEntityAttributeMap(newColAuditor.getValues(),
-//                        newColAuditor.getConfiguration());
-//        putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-//                mcd.getForeignKey(), colQualifier).getByteArray(),
-//                entityAttributeMap, suppressUserName);
-//      }
     }
+    return allPutsCompleted;
   }
 
   void validateColumns(MTableDescriptor mtd, Mutation mutation) throws IOException {
@@ -1032,10 +1074,17 @@ class Repository {
           Map<ImmutableBytesWritable, ImmutableBytesWritable> values,
           Map<String, String> configuration) {
     Map<byte[], byte[]> entityAttributeMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
-    for (Entry<ImmutableBytesWritable, ImmutableBytesWritable> tableValueEntry
-            : values.entrySet()) {
-      byte[] attributeKeySuffix = tableValueEntry.getKey().copyBytes();
-      byte[] attributeValue = tableValueEntry.getValue().copyBytes();
+    for (Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry : values.entrySet()) {
+      byte[] attributeKeySuffix = valueEntry.getKey().get();
+      byte[] attributeValue = valueEntry.getValue().get();
+      if (attributeKeySuffix.length > COUNTER_COLUMN_PREFIX_BYTES.length
+              && Bytes.startsWith(attributeKeySuffix, COUNTER_COLUMN_PREFIX_BYTES)) {
+        continue; // bypass all counters
+      }
+      if (attributeKeySuffix.length > TIMESTAMP_KEY_PREFIX_BYTES.length
+              && Bytes.startsWith(attributeKeySuffix, TIMESTAMP_KEY_PREFIX_BYTES)) {
+        continue; // bypass all timestamps
+      }
       ByteBuffer attributeKey
               = ByteBuffer.allocate(VALUE_COLUMN_PREFIX_BYTES.length + attributeKeySuffix.length);
       attributeKey.put(VALUE_COLUMN_PREFIX_BYTES).put(attributeKeySuffix);
@@ -1269,20 +1318,38 @@ class Repository {
     }
     RowId rowId = new RowId(row.getRow());
     SchemaEntity entity = new SchemaEntity(rowId.getEntityType(), rowId.getEntityName());
-    for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_CF).entrySet()) {
-      byte[] key = colEntry.getKey();
-      byte[] value = colEntry.getValue();
-      if (Bytes.equals(key, FOREIGN_KEY_COLUMN)) {
-        entity.setForeignKey(colEntry.getValue());
-      } else if (key.length > VALUE_COLUMN_PREFIX_BYTES.length
-              && Bytes.startsWith(key, VALUE_COLUMN_PREFIX_BYTES)) {
-        entity.setValue(Bytes.tail(key, key.length - VALUE_COLUMN_PREFIX_BYTES.length),
-                value);
-      } else if (key.length > CONFIG_COLUMN_PREFIX_BYTES.length
-              && Bytes.startsWith(key, CONFIG_COLUMN_PREFIX_BYTES)) {
-        entity.setConfiguration(
-                Bytes.toString(Bytes.tail(key, key.length - CONFIG_COLUMN_PREFIX_BYTES.length)),
-                Bytes.toString(colEntry.getValue()));
+//    for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_CF).entrySet()) {
+//      byte[] key = colEntry.getKey();
+    // full #getMap required to extract timestamps of counter columns
+    for (Entry<byte[], NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyToCellsMapEntry
+            : row.getMap().entrySet()) {
+      for (Entry<byte[],NavigableMap<Long,byte[]>> colEntry
+              : familyToCellsMapEntry.getValue().entrySet()) {
+        byte[] key = colEntry.getKey();
+        for (Entry<Long,byte[]> cellEntry : colEntry.getValue().entrySet()) {
+          byte[] value = cellEntry.getValue();
+          if (Bytes.equals(key, FOREIGN_KEY_COLUMN)) {
+            entity.setForeignKey(cellEntry.getValue());
+          } else if (key.length > VALUE_COLUMN_PREFIX_BYTES.length
+                  && Bytes.startsWith(key, VALUE_COLUMN_PREFIX_BYTES)) {
+            entity.setValue(Bytes.tail(key, key.length - VALUE_COLUMN_PREFIX_BYTES.length),
+                    value);
+          } else if (key.length > COUNTER_COLUMN_PREFIX_BYTES.length
+                  && Bytes.startsWith(key, COUNTER_COLUMN_PREFIX_BYTES)) {
+            entity.setValue(key, value);
+            if (Bytes.equals(key, COL_COUNTER_QUALIFIER)) {
+              entity.setValue(COL_COUNTER_TIMESTAMP_KEY, Bytes.toBytes(cellEntry.getKey()));
+            } else if (Bytes.equals(key, CELL_COUNTER_QUALIFIER)) {
+              entity.setValue(CELL_COUNTER_TIMESTAMP_KEY, Bytes.toBytes(cellEntry.getKey()));
+            }
+          } else if (key.length > CONFIG_COLUMN_PREFIX_BYTES.length
+                  && Bytes.startsWith(key, CONFIG_COLUMN_PREFIX_BYTES)) {
+            entity.setConfiguration(
+                    Bytes.toString(Bytes.tail(key, key.length - CONFIG_COLUMN_PREFIX_BYTES.length)),
+                    Bytes.toString(cellEntry.getValue()));
+          }
+          break;
+        }
       }
     }
     return entity;
@@ -1641,6 +1708,21 @@ class Repository {
     if (mtd == null) {
       return;
     }
+    // for any previously-discovered ColumnAuditors, reset counters
+    for (MColumnDescriptor mcd : mtd.getMColumnDescriptors()) {
+      for (ColumnAuditor colAuditor : mcd.getColumnAuditors()) {
+        byte[] rowId = new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                mcd.getForeignKey(), colAuditor.getColumnQualifier()).getByteArray();
+        long resetValue = repositoryTable.incrementColumnValue(
+                rowId, REPOSITORY_CF, COL_COUNTER_QUALIFIER, 0) * -1;
+        repositoryTable.incrementColumnValue(
+                rowId, REPOSITORY_CF, COL_COUNTER_QUALIFIER, resetValue);
+        resetValue = repositoryTable.incrementColumnValue(
+                rowId, REPOSITORY_CF, CELL_COUNTER_QUALIFIER, 0) * -1;
+        repositoryTable.incrementColumnValue(
+                rowId, REPOSITORY_CF, CELL_COUNTER_QUALIFIER, resetValue);
+      }
+    }
     // perform full scan w/ KeyOnlyFilter(true), so only col name & length returned
     if (useMapReduce) {
       try {
@@ -1665,7 +1747,7 @@ class Repository {
       }
       try (ResultScanner rows = table.getScanner(colScan)) {
         for (Result row : rows) {
-          putColumnAuditorSchemaEntities(mtd, row, true);
+          putDiscoveredColumnAuditors(mtd, row, true);
         }
       }
     }

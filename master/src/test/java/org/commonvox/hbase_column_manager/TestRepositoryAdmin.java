@@ -25,6 +25,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,7 @@ import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.spi.LoggingEvent;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -199,6 +201,39 @@ public class TestRepositoryAdmin {
     expectedColAuditorsForNamespace3Table1Cf1.add(
             new ColumnAuditor(COLQUALIFIER03).setMaxValueLengthFound(82));
   }
+  private static final Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf1Discovery = new TreeSet<>();
+  static {
+    expectedColAuditorsForNamespace1Table1Cf1Discovery.add(
+            new ColumnAuditor(COLQUALIFIER01).setMaxValueLengthFound(82)
+                    .setValue(Repository.COL_COUNTER_QUALIFIER, Bytes.toBytes((long)2))
+                    .setValue(Repository.CELL_COUNTER_QUALIFIER, Bytes.toBytes((long)3)));
+    expectedColAuditorsForNamespace1Table1Cf1Discovery.add(
+            new ColumnAuditor(COLQUALIFIER02).setMaxValueLengthFound(5)
+                    .setValue(Repository.COL_COUNTER_QUALIFIER, Bytes.toBytes((long)1))
+                    .setValue(Repository.CELL_COUNTER_QUALIFIER, Bytes.toBytes((long)1)));
+    expectedColAuditorsForNamespace1Table1Cf1Discovery.add(
+            new ColumnAuditor(COLQUALIFIER03).setMaxValueLengthFound(9)
+                    .setValue(Repository.COL_COUNTER_QUALIFIER, Bytes.toBytes((long)1))
+                    .setValue(Repository.CELL_COUNTER_QUALIFIER, Bytes.toBytes((long)2)));
+  }
+  private static final Set<ColumnAuditor> expectedColAuditorsForNamespace1Table1Cf2Discovery = new TreeSet<>();
+  static {
+    expectedColAuditorsForNamespace1Table1Cf2Discovery.add(
+            new ColumnAuditor(COLQUALIFIER04).setMaxValueLengthFound(82)
+                    .setValue(Repository.COL_COUNTER_QUALIFIER, Bytes.toBytes((long)1))
+                    .setValue(Repository.CELL_COUNTER_QUALIFIER, Bytes.toBytes((long)2)));
+  }
+  private static final Set<ColumnAuditor> expectedColAuditorsForNamespace3Table1Cf1Discovery = new TreeSet<>();
+  static {
+    expectedColAuditorsForNamespace3Table1Cf1Discovery.add(
+            new ColumnAuditor(COLQUALIFIER01).setMaxValueLengthFound(9)
+                    .setValue(Repository.COL_COUNTER_QUALIFIER, Bytes.toBytes((long)1))
+                    .setValue(Repository.CELL_COUNTER_QUALIFIER, Bytes.toBytes((long)2)));
+    expectedColAuditorsForNamespace3Table1Cf1Discovery.add(
+            new ColumnAuditor(COLQUALIFIER03).setMaxValueLengthFound(82)
+                    .setValue(Repository.COL_COUNTER_QUALIFIER, Bytes.toBytes((long)1))
+                    .setValue(Repository.CELL_COUNTER_QUALIFIER, Bytes.toBytes((long)2)));
+  }
   private static final String ALTERNATE_USERNAME = "testAlternateUserName";
 
   private static final String TEST_ENVIRONMENT_SETUP_PROBLEM
@@ -210,6 +245,8 @@ public class TestRepositoryAdmin {
           = COLUMN_AUDIT_FAILURE + "#getColumnQualifiers method returned unexpected results ";
   private static final String GET_COL_AUDITORS_FAILURE
           = COLUMN_AUDIT_FAILURE + "#getColumnAuditors method returned unexpected results ";
+  private static final String COL_AUDITORS_SET_USER_METADATA_FAILURE
+          = "FAILURE IN setting ColumnAuditor user metadata!! ==>> ";
   private static final String COLUMN_ENFORCE_FAILURE
           = "FAILURE IN Column Enforce PROCESSING!! ==>> ";
   private static final String COL_QUALIFIER_ENFORCE_FAILURE
@@ -397,11 +434,39 @@ public class TestRepositoryAdmin {
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
     createSchemaStructuresInHBase(configuration, true);
-    loadColumnData(configuration, true);
-    doColumnDiscovery(configuration, false);
-    verifyColumnAuditing(configuration);
+    loadColumnDataMultipleCells(configuration, true);
+    doColumnDiscoveryIncludeAllCells(configuration, false);
+    verifyColumnDiscovery(configuration);
+    setUserMetadataForExistingColumnAuditor(configuration);
+    clearTestingEnvironment();
+
     System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
+  }
+
+  private void setUserMetadataForExistingColumnAuditor(Configuration configuration) throws IOException {
+    // Test user-added value & configuration
+    final byte[] USER_VALUE_KEY = Bytes.toBytes("userValueKey");
+    final byte[] USER_VALUE_VALUE = Bytes.toBytes("userValueValue");
+    final String USER_CONFIGURATION_KEY = "userConfigurationKey";
+    final String USER_CONFIGURATION_VALUE = "userConfigurationValue";
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection);
+      Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf1
+              = repositoryAdmin.getColumnAuditors(
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+      for (ColumnAuditor colAuditor : returnedColAuditorsForNamespace1Table1Cf1) {
+        repositoryAdmin.addColumnAuditor(NAMESPACE01_TABLE01, CF01,
+                colAuditor.setValue(USER_VALUE_KEY, USER_VALUE_VALUE));
+        break;
+      }
+      for (ColumnAuditor colAuditor : returnedColAuditorsForNamespace1Table1Cf1) {
+        assertArrayEquals(COL_AUDITORS_SET_USER_METADATA_FAILURE,
+                USER_VALUE_VALUE, colAuditor.getValue(USER_VALUE_KEY));
+        break;
+      }
+    }
   }
 
   @Test
@@ -417,7 +482,8 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, true);
     loadColumnDataMultipleCells(configuration, true);
     doColumnDiscoveryIncludeAllCells(configuration, false);
-    verifyColumnAuditing(configuration);
+    verifyColumnDiscovery(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnDiscoveryWithIncludeAllCells using WILDCARDED EXCLUDE"
             + " config properties has run to completion.");
   }
@@ -433,9 +499,10 @@ public class TestRepositoryAdmin {
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
     createSchemaStructuresInHBase(configuration, true);
-    loadColumnData(configuration, true);
-    doColumnDiscovery(configuration, true);
-    verifyColumnAuditing(configuration);
+    loadColumnDataMultipleCells(configuration, true);
+    doColumnDiscoveryIncludeAllCells(configuration, true);
+    verifyColumnDiscovery(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnDiscovery using WILDCARDED EXCLUDE config properties "
             + "WITH MAPREDUCE has run to completion.");
   }
@@ -453,9 +520,55 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, true);
     loadColumnDataMultipleCells(configuration, true);
     doColumnDiscoveryIncludeAllCells(configuration, true); // useMapReduce == true
-    verifyColumnAuditing(configuration);
+    verifyColumnDiscovery(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnDiscoveryWithIncludeAllCellsUsingMapReduce using "
             + "WILDCARDED EXCLUDE config properties has run to completion.");
+  }
+
+  @Test
+  public void testAddColumnAuditorsWithUserMetadata() throws Exception {
+    System.out.println("#testAddColumnAuditorWithUserMetadata has been invoked.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, true);
+
+    // Test user-added value & configuration
+    final String COL_QUALIFIER_PREFIX = "userColQualifier";
+    final String USER_VALUE_KEY_PREFIX = "userValueKey";
+    final String USER_VALUE_VALUE_PREFIX = "userValueValue";
+    final String USER_CONFIGURATION_KEY_PREFIX = "userConfigurationKey";
+    final String USER_CONFIGURATION_VALUE_PREFIX = "userConfigurationValue";
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection);
+      List<ColumnAuditor> userColumnAuditors = new ArrayList<>();
+      for (int i=0; i > 3; i++) {
+        userColumnAuditors.add(new ColumnAuditor(COL_QUALIFIER_PREFIX + i)
+                .setValue(USER_VALUE_KEY_PREFIX + i, USER_VALUE_VALUE_PREFIX + i)
+                .setConfiguration(USER_CONFIGURATION_KEY_PREFIX + i, USER_CONFIGURATION_VALUE_PREFIX + i));
+      }
+      repositoryAdmin.addColumnAuditors(NAMESPACE01_TABLE01, CF01, userColumnAuditors);
+      int i = 0;
+      for (ColumnAuditor colAuditor : repositoryAdmin.getColumnAuditors(
+              testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
+              testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)))) {
+        assertEquals(COL_AUDITORS_SET_USER_METADATA_FAILURE,
+                COL_QUALIFIER_PREFIX + i, colAuditor.getColumnQualifier());
+        assertEquals(COL_AUDITORS_SET_USER_METADATA_FAILURE,
+                USER_VALUE_VALUE_PREFIX + i, colAuditor.getValue(USER_VALUE_KEY_PREFIX + i));
+        assertEquals(COL_AUDITORS_SET_USER_METADATA_FAILURE,
+                USER_CONFIGURATION_VALUE_PREFIX + i,
+                colAuditor.getConfigurationValue(USER_CONFIGURATION_KEY_PREFIX + i));
+        i++;
+      }
+    }
+    clearTestingEnvironment();
+
+    System.out.println("#testAddColumnAuditorWithUserMetadata has run to completion.");
   }
 
   @Test
@@ -861,6 +974,186 @@ public class TestRepositoryAdmin {
       }
     }
     clearTestingEnvironment();
+  }
+
+  private void verifyColumnDiscovery(Configuration configuration) throws IOException {
+
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+      RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mConnection);
+      // Test #getColumnQualifiers
+      Set<byte[]> returnedColQualifiersForNamespace1Table1Cf1
+              = repositoryAdmin.getColumnQualifiers(
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+      assertTrue(GET_COL_QUALIFIERS_FAILURE,
+              expectedColQualifiersForNamespace1Table1Cf1.equals(
+                      returnedColQualifiersForNamespace1Table1Cf1));
+
+      Set<byte[]> returnedColQualifiersForNamespace1Table1Cf2
+              = repositoryAdmin.getColumnQualifiers(
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF02)));
+      assertTrue(GET_COL_QUALIFIERS_FAILURE,
+              expectedColQualifiersForNamespace1Table1Cf2.equals(
+                      returnedColQualifiersForNamespace1Table1Cf2));
+
+      try {
+        Set<byte[]> returnedColQualifiersForNamespace2Table1Cf1
+              = repositoryAdmin.getColumnQualifiers(
+                      testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+
+      Set<byte[]> returnedColQualifiersForNamespace3Table1Cf1
+              = repositoryAdmin.getColumnQualifiers(
+                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+      assertTrue(GET_COL_QUALIFIERS_FAILURE,
+              expectedColQualifiersForNamespace3Table1Cf1.equals(
+                      returnedColQualifiersForNamespace3Table1Cf1));
+
+      try {
+        Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnQualifiers(
+                        testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
+                        testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+
+      // Test #getColumnQualifiers with alternate signature
+      returnedColQualifiersForNamespace1Table1Cf1
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01, CF01);
+      assertTrue(GET_COL_QUALIFIERS_FAILURE,
+              expectedColQualifiersForNamespace1Table1Cf1.equals(
+                      returnedColQualifiersForNamespace1Table1Cf1));
+
+      returnedColQualifiersForNamespace1Table1Cf2
+              = repositoryAdmin.getColumnQualifiers(NAMESPACE01_TABLE01, CF02);
+      assertTrue(GET_COL_QUALIFIERS_FAILURE,
+              expectedColQualifiersForNamespace1Table1Cf2.equals(
+                      returnedColQualifiersForNamespace1Table1Cf2));
+
+//      returnedColQualifiersForNamespace2Table1Cf1
+//              = repositoryAdmin.getColumnQualifiers(NAMESPACE02_TABLE01, CF01);
+//      assertTrue(GET_COL_QUALIFIERS_FAILURE, returnedColQualifiersForNamespace2Table1Cf1 == null);
+
+      try {
+        Set<byte[]> returnedColQualifiersForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnQualifiers(NAMESPACE03_TABLE02, CF01);
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+
+      // Test #getColumnAuditors
+      Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf1
+              = repositoryAdmin.getColumnAuditors(
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+      colAuditorsValidation(expectedColAuditorsForNamespace1Table1Cf1Discovery,
+                      returnedColAuditorsForNamespace1Table1Cf1);
+      validateColAuditorTimestamps(returnedColAuditorsForNamespace1Table1Cf1);
+
+      Set<ColumnAuditor> returnedColAuditorsForNamespace1Table1Cf2
+              = repositoryAdmin.getColumnAuditors(
+                      testTableNamesAndDescriptors.get(NAMESPACE01_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF02)));
+      colAuditorsValidation(expectedColAuditorsForNamespace1Table1Cf2Discovery,
+                      returnedColAuditorsForNamespace1Table1Cf2);
+      validateColAuditorTimestamps(returnedColAuditorsForNamespace1Table1Cf2);
+
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
+                = repositoryAdmin.getColumnAuditors(
+                        testTableNamesAndDescriptors.get(NAMESPACE02_TABLE01),
+                        testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+
+      Set<ColumnAuditor> returnedColAuditorsForNamespace3Table1Cf1
+              = repositoryAdmin.getColumnAuditors(
+                      testTableNamesAndDescriptors.get(NAMESPACE03_TABLE01),
+                      testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+      colAuditorsValidation(expectedColAuditorsForNamespace3Table1Cf1Discovery,
+                      returnedColAuditorsForNamespace3Table1Cf1);
+      validateColAuditorTimestamps(returnedColAuditorsForNamespace3Table1Cf1);
+
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnAuditors(
+                        testTableNamesAndDescriptors.get(NAMESPACE03_TABLE02),
+                        testColumnFamilyNamesAndDescriptors.get(Bytes.toString(CF01)));
+        fail(GET_COL_AUDITORS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+
+      // Test #getColumnAuditors with alternate signature
+      returnedColAuditorsForNamespace1Table1Cf1
+              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01, CF01);
+      colAuditorsValidation(expectedColAuditorsForNamespace1Table1Cf1Discovery,
+                      returnedColAuditorsForNamespace1Table1Cf1);
+      validateColAuditorTimestamps(returnedColAuditorsForNamespace1Table1Cf1);
+
+      returnedColAuditorsForNamespace1Table1Cf2
+              = repositoryAdmin.getColumnAuditors(NAMESPACE01_TABLE01, CF02);
+      colAuditorsValidation(expectedColAuditorsForNamespace1Table1Cf2Discovery,
+                      returnedColAuditorsForNamespace1Table1Cf2);
+      validateColAuditorTimestamps(returnedColAuditorsForNamespace1Table1Cf2);
+
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace2Table1Cf1
+                = repositoryAdmin.getColumnAuditors(NAMESPACE02_TABLE01, CF01);
+        fail(GET_COL_AUDITORS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+
+      try {
+        Set<ColumnAuditor> returnedColAuditorsForNamespace3Table2Cf1
+                = repositoryAdmin.getColumnAuditors(NAMESPACE03_TABLE02, CF01);
+        fail(GET_COL_QUALIFIERS_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
+      } catch (TableNotIncludedForProcessingException e) {
+      }
+    }
+  }
+
+  // special equality testing bypasses counter timestamps
+  private void colAuditorsValidation(
+          Set<ColumnAuditor> expectedColAuditors, Set<ColumnAuditor> actualColAuditors) {
+    assertEquals(GET_COL_AUDITORS_FAILURE + "ColumnAuditor set-size descrepancy",
+            expectedColAuditors.size(), actualColAuditors.size());
+    for (ColumnAuditor expectedColAuditor : expectedColAuditors) {
+      ColumnAuditor actualColAuditor = null;
+      for (ColumnAuditor examineColAuditor : actualColAuditors) {
+        if (expectedColAuditor.getColumnQualifierAsString()
+              .equals(examineColAuditor.getColumnQualifierAsString())){
+          actualColAuditor = examineColAuditor;
+          break;
+        }
+      }
+      assertTrue(GET_COL_AUDITORS_FAILURE + "ColumnAuditor missing from retrieved set",
+              actualColAuditor != null);
+      assertEquals(GET_COL_AUDITORS_FAILURE + "ColumnAuditor maxLength discrepancy",
+              expectedColAuditor.getMaxValueLengthFound(), actualColAuditor.getMaxValueLengthFound());
+      assertEquals(GET_COL_AUDITORS_FAILURE + "ColumnAuditor columnOccurrencesCount discrepancy",
+              expectedColAuditor.getColumnOccurrencesCount(),
+              actualColAuditor.getColumnOccurrencesCount());
+      assertEquals(GET_COL_AUDITORS_FAILURE + "ColumnAuditor cellOccurrencesCount discrepancy",
+              expectedColAuditor.getCellOccurrencesCount(),
+              actualColAuditor.getCellOccurrencesCount());
+    }
+  }
+
+  private void validateColAuditorTimestamps(Set<ColumnAuditor> colAuditors) {
+    for (ColumnAuditor colAuditor : colAuditors) {
+      final long ONE_HOUR = 3600000;
+      assertTrue(GET_COL_AUDITORS_FAILURE + "column occurrences timestamp invalid",
+              System.currentTimeMillis() - colAuditor.getColumnOccurrencesTimestamp() < ONE_HOUR);
+      assertTrue(GET_COL_AUDITORS_FAILURE + "cell occurrences timestamp invalid",
+              System.currentTimeMillis() - colAuditor.getCellOccurrencesTimestamp() < ONE_HOUR);
+    }
   }
 
   /**
@@ -3169,9 +3462,10 @@ public class TestRepositoryAdmin {
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
-    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCells();
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
@@ -3186,9 +3480,9 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsViaDirectScan();
     // new TestRepositoryAdmin().showAllNamespacesAndTables();
     // new TestRepositoryAdmin().testImportColumnDefinitions();
-    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testOutputReportOnInvalidColumnsUsingMapReduce();
     // new TestRepositoryAdmin().testUtilityRunner();
-    new TestRepositoryAdmin().setupEnvironmentForExternalUtilityTest();
+    // new TestRepositoryAdmin().setupEnvironmentForExternalUtilityTest();
+    // new TestRepositoryAdmin().testAddColumnAuditorsWithUserMetadata();
   }
 }
