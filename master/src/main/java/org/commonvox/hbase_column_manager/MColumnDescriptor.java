@@ -95,7 +95,7 @@ class MColumnDescriptor extends HColumnDescriptor {
     this.setForeignKey(entity.getForeignKey());
     for (Map.Entry<ImmutableBytesWritable, ImmutableBytesWritable> valueEntry
             : entity.getValues().entrySet()) {
-      this.setValue(valueEntry.getKey().copyBytes(), valueEntry.getValue().copyBytes());
+      this.setValue(valueEntry.getKey().get(), valueEntry.getValue().get());
     }
     for (Map.Entry<String, String> configEntry : entity.getConfiguration().entrySet()) {
       this.setConfiguration(configEntry.getKey(), configEntry.getValue());

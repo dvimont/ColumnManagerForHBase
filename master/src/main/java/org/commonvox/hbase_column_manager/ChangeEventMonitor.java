@@ -121,7 +121,10 @@ public class ChangeEventMonitor {
             // bypass ColumnManager-maintained columns
             if (Bytes.equals(attributeName, Repository.FOREIGN_KEY_COLUMN)
                     || Bytes.equals(attributeName, Repository.JAVA_USERNAME_PROPERTY_KEY)
-                    || Bytes.equals(attributeName, Repository.MAX_VALUE_COLUMN_NAME)) {
+                    || Bytes.equals(attributeName, Repository.MAX_VALUE_QUALIFIER)
+                    || Bytes.equals(attributeName, Repository.COL_COUNTER_QUALIFIER)
+                    || Bytes.equals(attributeName, Repository.CELL_COUNTER_QUALIFIER)
+                    ) {
               continue;
             }
             for (Map.Entry<Long, byte[]> cellEntry : colEntry.getValue().entrySet()) {

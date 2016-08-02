@@ -161,6 +161,78 @@ public class RepositoryAdmin {
   }
 
   /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor} to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param tableName name of <i>Table</i> to which {@link ColumnAuditor} is to be added/modified
+   * @param colFamily <i>Column Family</i> to which {@link ColumnAuditor} is to be added/modified
+   * @param colAuditor {@link ColumnAuditor} to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditor(TableName tableName, byte[] colFamily,
+          final ColumnAuditor colAuditor)
+          throws IOException, TableNotIncludedForProcessingException {
+    List<ColumnAuditor> colAuditors
+            = new ArrayList<ColumnAuditor>() { { add(colAuditor); } };
+    repository.putColumnAuditorSchemaEntities(tableName, colFamily, colAuditors);
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor} to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param htd <i>Table</i> to which {@link ColumnAuditor} is to be added/modified
+   * @param hcd <i>Column Descriptor</i> (Column Family) to which {@link ColumnAuditor} is to be
+   * added/modified
+   * @param colAuditor {@link ColumnAuditor} to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditor(HTableDescriptor htd, HColumnDescriptor hcd,
+          ColumnAuditor colAuditor)
+          throws IOException, TableNotIncludedForProcessingException {
+    addColumnAuditor(htd.getTableName(), hcd.getName(), colAuditor);
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor}s to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param tableName name of <i>Table</i> to which {@link ColumnAuditor}s are to be added/modified
+   * @param colFamily <i>Column Family</i> to which {@link ColumnAuditor}s are to be added/modified
+   * @param colAuditors List of {@link ColumnAuditor}s to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditors(TableName tableName, byte[] colFamily,
+          List<ColumnAuditor> colAuditors)
+          throws IOException, TableNotIncludedForProcessingException {
+    repository.putColumnAuditorSchemaEntities(tableName, colFamily, colAuditors);
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor}s to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param htd <i>Table</i> to which {@link ColumnAuditor}s are to be added/modified
+   * @param hcd <i>ColumnAuditor [Family] Descriptor</i> to which {@link ColumnAuditor}s are to
+   * be added/modified
+   * @param colAuditors List of {@link ColumnAuditor}s to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd,
+          List<ColumnAuditor> colAuditors)
+          throws IOException, TableNotIncludedForProcessingException {
+    repository.putColumnAuditorSchemaEntities(htd.getTableName(), hcd.getName(), colAuditors);
+  }
+
+  /**
    * Get {@link ColumnAuditor} objects from the Repository for a specified <i>Table</i> and
    * <i>Column Family</i>.
    *
