@@ -23,14 +23,14 @@
   <parent>
     <groupId>org.commonvox</groupId>
     <artifactId>hbase-column-manager-parent-pom</artifactId>
-    <version>1.2.2-beta-02</version>
+    <version>1.2.2-beta-03</version>
   </parent>
 
   <properties>
     <hbaseVersion>1.2.2</hbaseVersion>
   </properties>
   <artifactId>hbase-column-manager</artifactId>
-  <version>1.2.2-beta-02</version>
+  <version>1.2.2-beta-03</version>
   <packaging>jar</packaging>
 
   <name>CommonVox tools for HBase™ - ColumnManagerAPI for HBase™</name>
