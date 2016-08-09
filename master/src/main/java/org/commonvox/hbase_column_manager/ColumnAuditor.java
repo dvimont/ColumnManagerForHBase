@@ -41,6 +41,7 @@ public class ColumnAuditor extends Column {
    * Key for the MAX_VALUE_LENGTH_KEY attribute.
    */
   static final String MAX_VALUE_LENGTH_KEY = "MAX_VALUE_LENGTH_FOUND";
+  static final byte[] MAX_VALUE_LENGTH_KEY_BYTES = Bytes.toBytes(MAX_VALUE_LENGTH_KEY);
   static final String COL_COUNTER_KEY = Bytes.toString(Repository.COL_COUNTER_QUALIFIER);
   static final String CELL_COUNTER_KEY = Bytes.toString(Repository.CELL_COUNTER_QUALIFIER);
   static final String COL_COUNTER_TIMESTAMP_KEY_STRING

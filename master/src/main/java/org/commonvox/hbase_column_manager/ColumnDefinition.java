@@ -52,8 +52,6 @@ public class ColumnDefinition extends Column {
    * Key for the COLUMN_VALIDATION_REGEX_KEY attribute.
    */
   static final String COLUMN_VALIDATION_REGEX_KEY = "COLUMN_VALIDATION_REGEX";
-//    /** Key for the NAME_IS_REGEX_KEY attribute. */
-//    static final String NAME_IS_REGEX_KEY = "NAME_IS_REGEX";
 
   /**
    * @param columnQualifier Column Qualifier

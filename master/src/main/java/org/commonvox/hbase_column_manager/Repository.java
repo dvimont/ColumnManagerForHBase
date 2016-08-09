@@ -573,7 +573,7 @@ class Repository {
                     Bytes.toBytes(nd.getName()));
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(EMPTY_VALUES, nd.getConfiguration());
-    return putSchemaEntity(namespaceRowId.getByteArray(), entityAttributeMap, false);
+    return putSchemaEntity(namespaceRowId, entityAttributeMap, false);
   }
 
   /**
@@ -595,7 +595,7 @@ class Repository {
     Map<byte[], byte[]> entityAttributeMap
             = buildEntityAttributeMap(htd.getValues(), htd.getConfiguration());
     byte[] tableForeignKey
-            = putSchemaEntity(tableRowId.getByteArray(), entityAttributeMap, false);
+            = putSchemaEntity(tableRowId, entityAttributeMap, false);
 
     // Account for potentially deleted ColumnFamilies
     Set<byte[]> oldMcdNames = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
@@ -653,7 +653,7 @@ class Repository {
             = buildEntityAttributeMap(hcd.getValues(), hcd.getConfiguration());
 
     return putSchemaEntity(new RowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
-                    tableForeignKey, hcd.getName()).getByteArray(), entityAttributeMap, false);
+                    tableForeignKey, hcd.getName()), entityAttributeMap, false);
   }
 
   /**
@@ -702,7 +702,7 @@ class Repository {
             = buildEntityAttributeMap(columnAuditor.getValues(), columnAuditor.getConfiguration());
 
     return putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-            colFamilyForeignKey, columnAuditor.getName()).getByteArray(),
+            colFamilyForeignKey, columnAuditor.getName()),
             entityAttributeMap, false);
   }
 
@@ -808,7 +808,7 @@ class Repository {
                 = buildEntityAttributeMap(newColAuditor.getValues(),
                         newColAuditor.getConfiguration());
         putSchemaEntity(new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-                mcd.getForeignKey(), newColAuditor.getName()).getByteArray(), entityAttributeMap,
+                mcd.getForeignKey(), newColAuditor.getName()), entityAttributeMap,
                 suppressUserName);
       }
     }
@@ -833,8 +833,8 @@ class Repository {
       for (Entry<byte[],NavigableMap<Long,byte[]>> colEntry
               : familyToColumnsMapEntry.getValue().entrySet()) {
         byte[] colQualifier = colEntry.getKey();
-        byte[] rowId = new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
-                mcd.getForeignKey(), colQualifier).getByteArray();
+        RowId rowId = new RowId(SchemaEntityType.COLUMN_AUDITOR.getRecordType(),
+                mcd.getForeignKey(), colQualifier);
         Set<Entry<Long,byte[]>> cellEntries = colEntry.getValue().entrySet();
         for (Entry<Long,byte[]> cellEntry : cellEntries) {
           int colValueLength;
@@ -862,9 +862,10 @@ class Repository {
                           newColAuditor.getConfiguration());
           putSchemaEntity(rowId, entityAttributeMap, suppressUserName);
         }
-        repositoryTable.incrementColumnValue(rowId, REPOSITORY_CF, COL_COUNTER_QUALIFIER, 1);
-        repositoryTable.incrementColumnValue(
-                rowId, REPOSITORY_CF, CELL_COUNTER_QUALIFIER, cellEntries.size());
+        repositoryTable.incrementColumnValue(rowId.getByteArray(), REPOSITORY_CF,
+                COL_COUNTER_QUALIFIER, 1);
+        repositoryTable.incrementColumnValue(rowId.getByteArray(), REPOSITORY_CF,
+                CELL_COUNTER_QUALIFIER, cellEntries.size());
       }
     }
   }
@@ -1067,7 +1068,7 @@ class Repository {
             = buildEntityAttributeMap(colDef.getValues(), colDef.getConfiguration());
 
     return putSchemaEntity(new RowId(SchemaEntityType.COLUMN_DEFINITION.getRecordType(),
-            colFamilyForeignKey, colDef.getName()).getByteArray(), entityAttributeMap, false);
+            colFamilyForeignKey, colDef.getName()), entityAttributeMap, false);
   }
 
   private Map<byte[], byte[]> buildEntityAttributeMap(
@@ -1099,17 +1100,17 @@ class Repository {
   }
 
   private byte[] putSchemaEntity(
-          byte[] rowId, Map<byte[], byte[]> entityAttributeMap, boolean suppressUserName)
+          RowId rowId, Map<byte[], byte[]> entityAttributeMap, boolean suppressUserName)
           throws IOException {
-    Result oldRow = repositoryTable.get(new Get(rowId));
-    Put newRow = new Put(rowId);
+    Result oldRow = repositoryTable.get(new Get(rowId.getByteArray()));
+    Put newRow = new Put(rowId.getByteArray());
     Map<byte[], byte[]> oldEntityAttributeMap;
 
     // ADD Columns to newRow to set foreignKey and entityStatus values appropriately
     byte[] foreignKey;
     if (oldRow.isEmpty()) {
       oldEntityAttributeMap = null;
-      foreignKey = generateUniqueForeignKey();
+      foreignKey = generateUniqueForeignKey(); // note that foreignKey ignored in column-entities
       newRow.addColumn(REPOSITORY_CF, FOREIGN_KEY_COLUMN, foreignKey);
       newRow.addColumn(REPOSITORY_CF, ENTITY_STATUS_COLUMN, ACTIVE_STATUS);
     } else {
@@ -1165,7 +1166,23 @@ class Repository {
       if (!suppressUserName) {
         newRow.addColumn(REPOSITORY_CF, JAVA_USERNAME_PROPERTY_KEY, javaUsername);
       }
-      repositoryTable.put(newRow);
+      if (rowId.entityType == SchemaEntityType.COLUMN_AUDITOR.getRecordType()) {
+        List<Cell> maxValueLengthCells
+                = newRow.get(REPOSITORY_CF, ColumnAuditor.MAX_VALUE_LENGTH_KEY_BYTES);
+        if (maxValueLengthCells == null || maxValueLengthCells.size() == 0) {
+          repositoryTable.put(newRow);
+        } else {
+          // #checkAndPut to prevent bogus overlay of maxValueLength when submitted via mapReduce
+          repositoryTable.checkAndPut(rowId.getByteArray(), REPOSITORY_CF,
+                  ColumnAuditor.MAX_VALUE_LENGTH_KEY_BYTES,
+                  CompareFilter.CompareOp.LESS,
+                  maxValueLengthCells.get(0).getValueArray(),
+                  newRow);
+        }
+
+      } else {
+        repositoryTable.put(newRow);
+      }
     }
     return foreignKey;
   }
@@ -1318,8 +1335,6 @@ class Repository {
     }
     RowId rowId = new RowId(row.getRow());
     SchemaEntity entity = new SchemaEntity(rowId.getEntityType(), rowId.getEntityName());
-//    for (Entry<byte[], byte[]> colEntry : row.getFamilyMap(REPOSITORY_CF).entrySet()) {
-//      byte[] key = colEntry.getKey();
     // full #getMap required to extract timestamps of counter columns
     for (Entry<byte[], NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyToCellsMapEntry
             : row.getMap().entrySet()) {
