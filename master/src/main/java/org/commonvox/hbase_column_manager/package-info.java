@@ -308,8 +308,8 @@
  * <b>Enable enforcement of ColumnDefinitions</b>: Enforcement of the
  * <a href="ColumnDefinition.html">ColumnDefinitions</a> of a given <i>Column Family</i> does
  * not occur until explicitly enabled via the method
- * <a href="RepositoryAdmin.html#setColumnDefinitionsEnforced-boolean-org.apache.hadoop.hbase.TableName-byte:A-">
- * RepositoryAdmin#setColumnDefinitionsEnforced</a>. This same method may be invoked to toggle
+ * <a href="RepositoryAdmin.html#enableColumnDefinitionEnforcement-boolean-org.apache.hadoop.hbase.TableName-byte:A-">
+ * RepositoryAdmin#enableColumnDefinitionEnforcement</a>. This same method may be invoked to toggle
  * enforcement {@code off} again for the <i>Column Family</i>.<br><br>
  * When enforcement is enabled, then (a) any <i>Column Qualifier</i> submitted in a {@code put}
  * (i.e., insert/update) to the <i>Table:Column-Family</i> must correspond to an existing

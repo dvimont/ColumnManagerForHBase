@@ -21,9 +21,13 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
@@ -44,6 +48,7 @@ import org.apache.hadoop.hbase.client.coprocessor.Batch.Call;
 import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
+import org.apache.hadoop.hbase.util.Bytes;
 
 /**
  *
@@ -247,24 +252,32 @@ class MTable implements Table {
 
   @Override
   public void put(Put put) throws IOException {
+    boolean doColumnManagerProcessing = false;
+    if (repository.isActivated() && includeInRepositoryProcessing) {
+      doColumnManagerProcessing = true;
+    }
+
     // ColumnManager validation
-    if (repository.isActivated()
-            && includeInRepositoryProcessing
-            && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
+    if (doColumnManagerProcessing && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, put);
     }
-    // Standard HBase processing
-    wrappedTable.put(put);
-    // ColumnManager auditing
-    if (repository.isActivated() && includeInRepositoryProcessing) {
-      repository.putColumnAuditorSchemaEntities(mTableDescriptor, put);
+
+    if (doColumnManagerProcessing && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      Put putWithAliases = convertQualifiersToAliases(put);
+      wrappedTable.put(putWithAliases);
+    } else {
+      wrappedTable.put(put); // Standard HBase processing
+    }
+
+    if (doColumnManagerProcessing) {
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, put); // ColumnManager auditing
     }
   }
 
   @Override
   public void put(List<Put> list) throws IOException {
     for (Put put : list) {
-      this.put(put); // v1.0.1 fix replaced: wrappedTable.put(put);
+      this.put(put); // replaced: wrappedTable.put(put);
     }
   }
 
@@ -506,4 +519,32 @@ class MTable implements Table {
     return wrappedTable.getRpcTimeout();
   }
   // end of overrides of methods introduced in HBase 1.2.2
+
+  private Put convertQualifiersToAliases(final Put originalPut) throws IOException {
+    // clone Put, but remove all cell entries by setting familyCellMap to empty Map
+    Put modifiedPut = new Put(originalPut).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> colFamilyCellList : originalPut.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = colFamilyCellList.getKey();
+      List<Cell> cellList = colFamilyCellList.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        Map<byte[], byte[]> aliasMap
+                = repository.getAliasMap(mTableDescriptor.getTableName(), colFamily, cellList);
+        for (Cell originalCell : cellList) {
+          modifiedPut.addColumn(colFamilyCellList.getKey(),
+                  aliasMap.get(Bytes.copy(originalCell.getQualifierArray(),
+                          originalCell.getQualifierOffset(), originalCell.getQualifierLength())),
+                  originalCell.getTimestamp(),
+                  Bytes.copy(originalCell.getValueArray(), originalCell.getValueOffset(),
+                          originalCell.getValueLength()));
+        }
+      } else {
+        for (Cell originalCell : cellList) {
+          modifiedPut.add(originalCell);
+        }
+      }
+    }
+    return modifiedPut;
+  }
 }

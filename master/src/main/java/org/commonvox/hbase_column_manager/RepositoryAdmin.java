@@ -81,8 +81,9 @@ public class RepositoryAdmin {
    */
   public static void installRepositoryStructures(Admin hbaseAdmin)
           throws IOException {
-    Repository.createRepositoryNamespace(hbaseAdmin);
-    Repository.createRepositoryTable(hbaseAdmin);
+    Repository.initializeRepositoryNamespace(hbaseAdmin);
+    Repository.initializeRepositoryTable(hbaseAdmin);
+    Repository.initializeAliasTable(hbaseAdmin);
     new RepositoryAdmin(hbaseAdmin.getConnection()).repository.discoverSchema(false, false, false);
   }
 
@@ -110,10 +111,6 @@ public class RepositoryAdmin {
   public static int getRepositoryMaxVersions(Admin hbaseAdmin)
           throws IOException {
     return Repository.getRepositoryMaxVersions(hbaseAdmin);
-  }
-
-  static boolean repositoryTableExists(Admin admin) throws IOException {
-    return Repository.repositoryTableExists(admin);
   }
 
   /**
@@ -524,9 +521,14 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
+  public void enableColumnDefinitionEnforcement(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException, TableNotIncludedForProcessingException {
-    repository.setColumnDefinitionsEnforced(enabled, tableName, colFamily);
+    repository.enableColumnDefinitionEnforcement(enabled, tableName, colFamily);
+  }
+
+  public void enableColumnAliases(boolean enabled, TableName tableName, byte[] colFamily)
+          throws IOException, TableNotIncludedForProcessingException {
+    repository.enableColumnAliases(enabled, tableName, colFamily);
   }
 
   /**
@@ -573,7 +575,7 @@ public class RepositoryAdmin {
    * Create an HTableMultiplexer object.<br><br>
    * <b>SPECIAL NOTE:</b> An HTableMultiplexer returned by this method will (1) validate submitted
    * <i>Column</i> qualifiers and values (if
-   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the related <i>Column Family</i>), (2)
    * process "put" requests in a standard manner (queuing them for subsequent <b>asynchronous</b>
    * processing by HBase) and then (3) perform <b>synchronous</b> ColumnManager Repository

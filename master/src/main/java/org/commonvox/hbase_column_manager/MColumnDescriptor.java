@@ -41,7 +41,8 @@ class MColumnDescriptor extends HColumnDescriptor {
   private final Map<byte[], ColumnDefinition> columnDefinitions
           = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
   private byte[] foreignKeyValue;
-  private static final String COL_DEFINITIONS_ENFORCED_KEY = "_ColDefinitionsEnforced";
+  static final String COL_DEFINITIONS_ENFORCED_KEY = "_ColDefinitionsEnforced";
+  static final String COL_ALIASES_ENABLED_KEY = "_ColAliasesEnabled";
   /**
    *
    * @param colFamily Column Family name.
@@ -190,12 +191,21 @@ class MColumnDescriptor extends HColumnDescriptor {
     this.foreignKeyValue = foreignKeyValue;
   }
 
-  void setColumnDefinitionsEnforced(boolean enabled) {
+  void enableColumnDefinitionEnforcement(boolean enabled) {
     this.setConfiguration(COL_DEFINITIONS_ENFORCED_KEY, String.valueOf(enabled));
   }
 
   boolean columnDefinitionsEnforced() {
     String enabledString = this.getConfigurationValue(COL_DEFINITIONS_ENFORCED_KEY);
+    return enabledString == null ? false : Boolean.valueOf(enabledString);
+  }
+
+  void enableColumnAliases(boolean enabled) {
+    this.setConfiguration(COL_ALIASES_ENABLED_KEY, String.valueOf(enabled));
+  }
+
+  boolean columnAliasesEnabled() {
+    String enabledString = this.getConfigurationValue(COL_ALIASES_ENABLED_KEY);
     return enabledString == null ? false : Boolean.valueOf(enabledString);
   }
 

@@ -335,11 +335,28 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
+  }
+
+  @Test
+  public void testColumnAuditingWithWildcardedExcludesAndColumnAliases() throws IOException {
+    System.out.println("#testColumnAuditing has been invoked using WILDCARDED "
+            + "EXCLUDE config properties AND with COLUMN-ALIASES.");
+
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+    createSchemaStructuresInHBase(configuration, false, true);
+    loadColumnData(configuration, false);
+    verifyColumnAuditing(configuration);
+    System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties "
+            + "AND with COLUMN-ALIASES has run to completion.");
   }
 
   @Test
@@ -359,7 +376,7 @@ public class TestRepositoryAdmin {
             NAMESPACE02_TABLE02.getNameAsString(),
             NAMESPACE02_TABLE03.getNameAsString(),
             NAMESPACE02_TABLE04.getNameAsString());
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using EXPLICIT EXCLUDE config properties has "
@@ -389,7 +406,7 @@ public class TestRepositoryAdmin {
             NAMESPACE01_TABLE04.getNameAsString()
     );
 
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using EXPLICIT INCLUDE config properties has "
@@ -416,7 +433,7 @@ public class TestRepositoryAdmin {
             TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX) + ":*"  // include all namespace01 tables!!
     );
 
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, true);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
     System.out.println("#testColumnAuditing using WILDCARDED INCLUDE config properties has "
@@ -433,7 +450,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
     loadColumnDataMultipleCells(configuration, true);
     doColumnDiscoveryIncludeAllCells(configuration, false);
     verifyColumnDiscovery(configuration);
@@ -479,7 +496,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
     loadColumnDataMultipleCells(configuration, true);
     doColumnDiscoveryIncludeAllCells(configuration, false);
     verifyColumnDiscovery(configuration);
@@ -498,7 +515,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
     loadColumnDataMultipleCells(configuration, true);
     doColumnDiscoveryIncludeAllCells(configuration, true);
     verifyColumnDiscovery(configuration);
@@ -517,7 +534,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
     loadColumnDataMultipleCells(configuration, true);
     doColumnDiscoveryIncludeAllCells(configuration, true); // useMapReduce == true
     verifyColumnDiscovery(configuration);
@@ -535,7 +552,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
 
     // Test user-added value & configuration
     final String COL_QUALIFIER_PREFIX = "userColQualifier";
@@ -581,7 +598,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     createColumnDefinitionsAndPutColumns(configuration);
     clearTestingEnvironment();
 
@@ -642,19 +659,21 @@ public class TestRepositoryAdmin {
   }
 
   private void createSchemaStructuresInHBase(
-          Configuration configuration, boolean bypassColumnManager) throws IOException {
+          Configuration configuration,
+          boolean bypassColumnManager,
+          boolean enableColumnAliases) throws IOException {
     if (bypassColumnManager) {
       try (Admin standardAdmin = ConnectionFactory.createConnection(configuration).getAdmin()) {
-        createNamespaceAndTables(standardAdmin);
+        createNamespaceAndTables(standardAdmin, false);
       }
     } else {
       try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin()) {
-        createNamespaceAndTables(mAdmin);
+        createNamespaceAndTables(mAdmin, enableColumnAliases);
       }
     }
   }
 
-  private void createNamespaceAndTables (Admin admin) throws IOException {
+  private void createNamespaceAndTables (Admin admin, boolean enableColumnAliases) throws IOException {
     int memStoreFlushSize = 60000000;
     int maxVersions = 8;
     boolean alternateBooleanAttribute = false;
@@ -676,6 +695,14 @@ public class TestRepositoryAdmin {
         htd.addFamily(hcd);
       }
       admin.createTable(htd);
+      if (enableColumnAliases) {
+        RepositoryAdmin repositoryAdmin = new RepositoryAdmin(admin.getConnection());
+        for (HColumnDescriptor hcd : htd.getColumnFamilies()) {
+          try {
+            repositoryAdmin.enableColumnAliases(true, htd.getTableName(), hcd.getName());
+          } catch (TableNotIncludedForProcessingException e) {}
+        }
+      }
     }
   }
 
@@ -1171,11 +1198,11 @@ public class TestRepositoryAdmin {
 
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF02);
+      repositoryAdmin.enableColumnDefinitionEnforcement(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.enableColumnDefinitionEnforcement(true, NAMESPACE01_TABLE01, CF02);
        // next def not enforced, since namespace02 tables not included for CM processing!
       try {
-        repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE02_TABLE03, CF01);
+        repositoryAdmin.enableColumnDefinitionEnforcement(true, NAMESPACE02_TABLE03, CF01);
         fail(COL_QUALIFIER_ENFORCE_FAILURE + TABLE_NOT_INCLUDED_EXCEPTION_FAILURE);
       } catch (TableNotIncludedForProcessingException e) {
       }
@@ -1296,7 +1323,7 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
 
     // extract schema into external HBase Schema Archive files
@@ -1438,13 +1465,13 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     createColumnDefinitions(configuration);
     createAdditionalColumnDefinitions(configuration);
     // extract schema into external HBase Schema Archive files
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.enableColumnDefinitionEnforcement(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.exportSchema(exportAllFile);
     }
 
@@ -1452,11 +1479,11 @@ public class TestRepositoryAdmin {
     clearTestingEnvironment();
 
     // Recreate test environment without ColumnDefinitions, and import ColumnDefinitions
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile);
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.enableColumnDefinitionEnforcement(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.exportSchema(exportAllComparisonFile);
     }
     // both export files should be identical, except for timestamp in the comments
@@ -1478,11 +1505,11 @@ public class TestRepositoryAdmin {
     clearTestingEnvironment();
 
     // Recreate test environment without ColumnDefinitions, and import NAMESPACE ColumnDefinitions
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01);
-      repositoryAdmin.setColumnDefinitionsEnforced(true, NAMESPACE01_TABLE01, CF01);
+      repositoryAdmin.enableColumnDefinitionEnforcement(true, NAMESPACE01_TABLE01, CF01);
       repositoryAdmin.exportSchema(exportNamespaceImportedColDefsFile);
     }
     // assure that only specified namespace (i.e. NAMESPACE01) has ColumnDefinitions
@@ -1547,7 +1574,7 @@ public class TestRepositoryAdmin {
     clearTestingEnvironment();
 
     // Recreate test environment without ColumnDefinitions, and import TABLE ColumnDefinitions
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE03_TABLE03);
@@ -1578,7 +1605,7 @@ public class TestRepositoryAdmin {
     clearTestingEnvironment();
 
     // Recreate test environment without ColumnDefinitions, and import COLFAMILY ColumnDefinitions
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection);
       repositoryAdmin.importColumnDefinitions(exportAllFile, NAMESPACE01_TABLE01, CF01);
@@ -1625,7 +1652,7 @@ public class TestRepositoryAdmin {
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
     changeJavaUsername();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     changeJavaUsername();
     createColumnDefinitionsAndPutColumns(configuration);
     deleteTableInHBase(configuration);
@@ -1811,7 +1838,7 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
 
     testRepositoryMaxVersionsOperation(configuration, NAMESPACE01_TABLE01);
 
@@ -1871,7 +1898,7 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
 
     try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
       dropTestTablesAndNamespaces(standardAdmin);
@@ -1908,7 +1935,7 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
 
     // bypass ColumnManager while deleting Tables to cause out of sync condition w/ Repository
     try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
@@ -1951,7 +1978,7 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
 
     // bypass ColumnManager while making mods to cause out of sync condition w/ Repository
     try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
@@ -2048,7 +2075,7 @@ public class TestRepositoryAdmin {
     // add schema and data to HBase
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, false);
+    createSchemaStructuresInHBase(configuration, false, false);
     createColumnDefinitions(configuration);
 
     // For NAMESPACE01_TABLE01 colFamily CF01, only valid colQualifiers are:
@@ -3326,7 +3353,7 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
     loadColumnData(configuration, true);
 
     String[] args = new String[]{
@@ -3412,7 +3439,7 @@ public class TestRepositoryAdmin {
       assertTrue(UTILITY_RUNNER_FAILURE
               + "processing failure in UtilityRunner invocation of "
               + UtilityRunner.UNINSTALL_REPOSITORY,
-              !RepositoryAdmin.repositoryTableExists(standardAdmin));
+              !Repository.repositoryTableExists(standardAdmin));
     }
 
     clearTestingEnvironment();
@@ -3456,17 +3483,24 @@ public class TestRepositoryAdmin {
 
     // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
     Configuration configuration = MConfiguration.create();
-    createSchemaStructuresInHBase(configuration, true);
+    createSchemaStructuresInHBase(configuration, true, false);
     loadColumnData(configuration, true);
+  }
+
+  public void scratchPad() {
+    byte[] alias = Bytes.toBytes(new Long(2084445555).intValue());
+    System.out.println("Length of int alias: " + alias.length);
   }
 
   public static void main(String[] args) throws Exception {
     // new TestRepositoryAdmin().testStaticMethods();
-    new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCells();
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
+    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludesAndColumnAliases();
+    // new TestRepositoryAdmin().scratchPad();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();

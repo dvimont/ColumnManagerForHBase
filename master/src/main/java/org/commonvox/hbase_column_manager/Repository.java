@@ -84,6 +84,9 @@ class Repository {
   private final Connection hbaseConnection;
   private final Admin standardAdmin;
   private final Table repositoryTable;
+  private final Table aliasTable;
+  private static final byte[] ALIAS_INCREMENTOR_COLUMN = Bytes.toBytes("#$$#_aliasIncrementor");
+
 
   static final String PRODUCT_NAME = "ColumnManagerAPI";
   static final byte[] JAVA_USERNAME_PROPERTY_KEY = Bytes.toBytes("user.name");
@@ -113,6 +116,11 @@ class Repository {
                   "column_manager_repository_table");
   static final byte[] REPOSITORY_CF = Bytes.toBytes("se"); // ("se"="SchemaEntities")
   static final int DEFAULT_REPOSITORY_MAX_VERSIONS = 50; // should this be set higher?
+
+  static final TableName ALIAS_DIRECTORY_TABLENAME
+          = TableName.valueOf(REPOSITORY_NAMESPACE_DESCRIPTOR.getName(),
+                  "column_manager_alias_directory_table");
+  static final byte[] ALIAS_CF = Bytes.toBytes("ca"); // ("ca"="ColumnAliases")
 
   static final byte[] NAMESPACE_PARENT_FOREIGN_KEY = {'-'};
   static final byte[] HBASE_DEFAULT_NAMESPACE = Bytes.toBytes("default");
@@ -196,7 +204,9 @@ class Repository {
       logger.info(PRODUCT_NAME + " Repository is ACTIVATED.");
       buildIncludedAndExcludedTablesSets(conf);
       boolean newInstallation = !standardAdmin.tableExists(REPOSITORY_TABLENAME);
-      repositoryTable = initializeRepositoryTable();
+      initializeRepositoryNamespace(standardAdmin);
+      repositoryTable = initializeRepositoryTable(standardAdmin);
+      aliasTable = initializeAliasTable(standardAdmin);
       doSyncCheck();
       if (newInstallation) {
         discoverSchema(false, false, false);
@@ -205,6 +215,7 @@ class Repository {
 //      throw new ColumnManagerIOException(PRODUCT_NAME + " Repository is NOT ACTIVATED.") {};
       columnManagerIsActivated = false;
       repositoryTable = null;
+      aliasTable = null;
       logger.info(PRODUCT_NAME + " Repository is NOT ACTIVATED.");
     }
   }
@@ -282,11 +293,6 @@ class Repository {
     }
   }
 
-  private Table initializeRepositoryTable() throws IOException {
-    createRepositoryNamespace(standardAdmin);
-    return createRepositoryTable(standardAdmin);
-  }
-
   Table getRepositoryTable() {
     return repositoryTable;
   }
@@ -301,7 +307,7 @@ class Repository {
    * @param hbaseAdmin an Admin object
    * @throws IOException if a remote or network exception occurs
    */
-  static void createRepositoryNamespace(Admin hbaseAdmin) throws IOException {
+  static void initializeRepositoryNamespace(Admin hbaseAdmin) throws IOException {
     Admin standardAdmin = getStandardAdmin(hbaseAdmin);
 
     if (namespaceExists(standardAdmin, REPOSITORY_NAMESPACE_DESCRIPTOR)) {
@@ -323,7 +329,7 @@ class Repository {
    * @return repository table
    * @throws IOException if a remote or network exception occurs
    */
-  static Table createRepositoryTable(Admin hbaseAdmin) throws IOException {
+  static Table initializeRepositoryTable(Admin hbaseAdmin) throws IOException {
     Connection standardConnection = getStandardConnection(hbaseAdmin.getConnection());
     Admin standardAdmin = getStandardAdmin(hbaseAdmin);
 
@@ -345,6 +351,36 @@ class Repository {
       staticLogger.info("ColumnManager Repository Table has been created (did not already exist): "
               + REPOSITORY_TABLENAME.getNameAsString());
       return newRepositoryTable;
+    }
+  }
+
+  /**
+   * Creates aliasTable if it does not already exist; in any case, the aliasTable is returned.
+   *
+   * @param hbaseAdmin an Admin object
+   * @return aliasDirectory table
+   * @throws IOException if a remote or network exception occurs
+   */
+  static Table initializeAliasTable(Admin hbaseAdmin) throws IOException {
+    Connection standardConnection = getStandardConnection(hbaseAdmin.getConnection());
+    Admin standardAdmin = getStandardAdmin(hbaseAdmin);
+
+    try (Table existingAliasDirectoryTable = standardConnection.getTable(ALIAS_DIRECTORY_TABLENAME)) {
+      if (standardAdmin.tableExists(existingAliasDirectoryTable.getName())) {
+        staticLogger.info("ColumnManager AliasDirectory Table found: "
+                + ALIAS_DIRECTORY_TABLENAME.getNameAsString());
+        return existingAliasDirectoryTable;
+      }
+    }
+
+    // Create new AliasDirectory Table, since it doesn't already exist
+    standardAdmin.createTable(new HTableDescriptor(ALIAS_DIRECTORY_TABLENAME).
+            addFamily(new HColumnDescriptor(ALIAS_CF).setInMemory(true)));
+    try (Table newAliasDirectoryTable
+            = standardConnection.getTable(ALIAS_DIRECTORY_TABLENAME)) {
+      staticLogger.info("ColumnManager AliasDirectory Table has been created (did not already exist): "
+              + ALIAS_DIRECTORY_TABLENAME.getNameAsString());
+      return newAliasDirectoryTable;
     }
   }
 
@@ -463,6 +499,10 @@ class Repository {
                   Map<ImmutableBytesWritable,ImmutableBytesWritable> hbaseValuesMap) {
 
     for (Entry<String,String> configEntry : repositoryConfigurationMap.entrySet()) {
+      if (configEntry.getKey().equals(MColumnDescriptor.COL_DEFINITIONS_ENFORCED_KEY)
+              || configEntry.getKey().equals(MColumnDescriptor.COL_ALIASES_ENABLED_KEY)) {
+        continue;
+      }
       String configValue = hbaseConfigurationMap.get(configEntry.getKey());
       if (configValue == null || !configValue.equals(configEntry.getValue())) {
         logger.warn(errorMsg + entityName);
@@ -1514,7 +1554,7 @@ class Repository {
     return (mcd == null) ? false : mcd.columnDefinitionsEnforced();
   }
 
-  void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
+  void enableColumnDefinitionEnforcement(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException {
     if (!this.isActivated()) {
       throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
@@ -1528,10 +1568,30 @@ class Repository {
       return;
     }
     if (mcd.columnDefinitionsEnforced() != enabled) {
-      mcd.setColumnDefinitionsEnforced(enabled);
+      mcd.enableColumnDefinitionEnforcement(enabled);
       putColumnFamilySchemaEntity(tableForeignKey, mcd, tableName);
     }
   }
+
+  void enableColumnAliases(boolean enabled, TableName tableName, byte[] colFamily)
+          throws IOException {
+    if (!this.isActivated()) {
+      throw new ColumnManagerIOException(REPOSITORY_NOT_ACTIVATED_MSG) {};
+    }
+    if (!isIncludedTable(tableName)) {
+      throw new TableNotIncludedForProcessingException(tableName.getName(), null);
+    }
+    byte[] tableForeignKey = getTableForeignKey(tableName);
+    MColumnDescriptor mcd = getMColumnDescriptor(tableForeignKey, colFamily);
+    if (mcd == null) {
+      return;
+    }
+    if (mcd.columnAliasesEnabled() != enabled) {
+      mcd.enableColumnAliases(enabled);
+      putColumnFamilySchemaEntity(tableForeignKey, mcd, tableName);
+    }
+  }
+
 
   private String buildOrderedCommaDelimitedString(List<String> list) {
     Set<String> set = new TreeSet<>(list);
@@ -1588,7 +1648,7 @@ class Repository {
    *
    * @param tableName name of <i>Table</i> from which {@link ColumnDefinition} is to be deleted
    * @param colFamily <i>Column Family</i> from which {@link ColumnDefinition} is to be deleted
-   * @param colQualifier qualifier that identifies the {@link ColumnDefinition} to be deleted
+   * @param colQualifier colQualifier that identifies the {@link ColumnDefinition} to be deleted
    * @throws IOException
    */
   void deleteColumnDefinition(TableName tableName, byte[] colFamily, byte[] colQualifier)
@@ -1766,6 +1826,48 @@ class Repository {
         }
       }
     }
+  }
+
+  Map<byte[], byte[]> getAliasMap(TableName tableName, byte[] colFamily, List<Cell> cellList)
+          throws IOException {
+    Map<byte[], byte[]> aliasMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
+    Set<byte[]> colQualifierSet = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
+    for (Cell cell : cellList) {
+      colQualifierSet.add(Bytes.copy(cell.getQualifierArray(), cell.getQualifierOffset(),
+              cell.getQualifierLength()));
+    }
+    // get existing aliases from aliasTable
+    RowId rowId = new RowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
+            getTableForeignKey(tableName), colFamily);
+    Get getAliasRow = new Get(rowId.getByteArray());
+    for (byte[] colQualifier : colQualifierSet) {
+      getAliasRow.addColumn(ALIAS_CF, colQualifier);
+    }
+    Result aliasRow = aliasTable.get(getAliasRow);
+    if (!aliasRow.isEmpty()) {
+      aliasMap.putAll(aliasRow.getFamilyMap(ALIAS_CF));
+    }
+    for (byte[] colQualifier : colQualifierSet) {
+      if (aliasMap.get(colQualifier) == null) {
+        aliasMap.put(colQualifier, getNewAlias(rowId.getByteArray(), colQualifier));
+      }
+    }
+    return aliasMap;
+  }
+
+
+  private byte[] getNewAlias(byte[] aliasTableRowId, byte[] colQualifier) throws IOException {
+    byte[] newAlias = Bytes.toBytes(new Long(aliasTable.incrementColumnValue(
+            aliasTableRowId, ALIAS_CF, ALIAS_INCREMENTOR_COLUMN, 1)).intValue());
+    Put putNewAlias = new Put(aliasTableRowId).addColumn(ALIAS_CF, colQualifier, newAlias);
+    boolean putSucceeded = aliasTable.checkAndPut(
+            aliasTableRowId, ALIAS_CF, colQualifier, null, putNewAlias);
+    // put may NOT have succeeded if concurrent thread already stored an alias for the qualifier
+    if (!putSucceeded) {
+      Get getAlias = new Get(aliasTableRowId).addColumn(ALIAS_CF, colQualifier);
+      newAlias = aliasTable.get(getAlias).getValue(ALIAS_CF, colQualifier);
+    }
+    return newAlias;
   }
 
   private void validateNamespaceTableNameIncludedForProcessing(
@@ -1975,11 +2077,16 @@ class Repository {
       return;
     }
     logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
-            + " Repository table and namespace has been requested.");
+            + " Repository tables and namespace has been requested.");
     standardAdmin.disableTable(REPOSITORY_TABLENAME);
     standardAdmin.deleteTable(REPOSITORY_TABLENAME);
     logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
             + " Repository table has been completed: "
+            + REPOSITORY_TABLENAME.getNameAsString());
+    standardAdmin.disableTable(ALIAS_DIRECTORY_TABLENAME);
+    standardAdmin.deleteTable(ALIAS_DIRECTORY_TABLENAME);
+    logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
+            + " AliasDirectory table has been completed: "
             + REPOSITORY_TABLENAME.getNameAsString());
     standardAdmin.deleteNamespace(REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
     logger.warn("DROP (delete) of " + PRODUCT_NAME + " Repository namespace has been completed: "
