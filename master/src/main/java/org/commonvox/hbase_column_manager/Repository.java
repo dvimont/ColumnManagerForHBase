@@ -2126,7 +2126,7 @@ class Repository {
     }
   }
 
-  private static boolean isPrintable(byte[] bytes) {
+  static boolean isPrintable(byte[] bytes) {
     if (bytes == null) {
       return false;
     }

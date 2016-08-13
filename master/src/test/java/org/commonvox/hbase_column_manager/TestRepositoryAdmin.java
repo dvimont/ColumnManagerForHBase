@@ -25,10 +25,11 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -53,6 +54,9 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.AppenderSkeleton;
@@ -338,6 +342,8 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
+    verifyColumnData(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
   }
@@ -355,8 +361,56 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, true);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
+    verifyColumnData(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties "
             + "AND with COLUMN-ALIASES has run to completion.");
+  }
+
+  private void verifyColumnData(Configuration configuration) throws IOException {
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        List<Result> rows = getUserTableRows(connection, tableName);
+        System.out.println("CONTENTS of user Table: " + tableName.getNameAsString());
+        for (Result row : rows) {
+          System.out.println("  **ROW-ID**: " + Bytes.toString(row.getRow()));
+          NavigableMap<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>> contentMap
+                  = row.getMap();
+          for (Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyMap
+                  : contentMap.entrySet()) {
+            System.out.println("  -- Column Family: " + Bytes.toString(familyMap.getKey()));
+            for (Entry<byte[],NavigableMap<Long,byte[]>> columnMap : familyMap.getValue().entrySet()) {
+              if (Repository.isPrintable(columnMap.getKey())) {
+                System.out.println("    -- Column: " + Bytes.toString(columnMap.getKey()));
+              } else {
+                try {
+                  System.out.println("    -- Column (ALIAS): " + Bytes.toInt(columnMap.getKey()));
+                } catch (IllegalArgumentException e) {
+                  System.out.println("    -- Column name UNPRINTABLE (neither String nor int)!!");
+                }
+              }
+              for (Entry<Long,byte[]> cellMap : columnMap.getValue().entrySet()) {
+                // System.out.println("      -- Cell Timestamp: " + cellMap.getKey().toString());
+                System.out.println("      -- Cell Value: " + Bytes.toString (cellMap.getValue()));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private List<Result> getUserTableRows(Connection connection, TableName tableName)
+          throws IOException {
+    List<Result> rows = new ArrayList<>();
+    try (Table table = connection.getTable(tableName)) {
+      try (ResultScanner results = table.getScanner(new Scan().setMaxVersions())) {
+        for (Result row : results) {
+          rows.add(row);
+        }
+      }
+    }
+    return rows;
   }
 
   @Test
@@ -379,6 +433,7 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnAuditing using EXPLICIT EXCLUDE config properties has "
             + "run to completion.");
   }
@@ -409,6 +464,7 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnAuditing using EXPLICIT INCLUDE config properties has "
             + "run to completion.");
   }
@@ -436,6 +492,7 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, true);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
+    clearTestingEnvironment();
     System.out.println("#testColumnAuditing using WILDCARDED INCLUDE config properties has "
             + "run to completion.");
   }
@@ -609,7 +666,7 @@ public class TestRepositoryAdmin {
   private void clearTestingEnvironment() throws IOException {
     try (Connection standardConnection = ConnectionFactory.createConnection();
             Admin standardAdmin = standardConnection.getAdmin()
-           // RepositoryAdmin repositoryAdmin = new RepositoryAdmin(standardConnection)
+           // RepositoryAdmin repositoryAdmin = new RepositoryAdmin(connection)
             ) {
 
       RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
@@ -1000,7 +1057,6 @@ public class TestRepositoryAdmin {
       } catch (TableNotIncludedForProcessingException e) {
       }
     }
-    clearTestingEnvironment();
   }
 
   private void verifyColumnDiscovery(Configuration configuration) throws IOException {
@@ -1348,6 +1404,7 @@ public class TestRepositoryAdmin {
       repositoryAdmin.importSchema(exportAllFile, true);
     }
     verifyColumnAuditing(configuration);
+    clearTestingEnvironment();
 
     // validate all export files against the XML-schema
     validateXmlAgainstXsd(exportAllFile);
@@ -3499,9 +3556,9 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
+    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludesAndColumnAliases();
     // new TestRepositoryAdmin().scratchPad();
-    // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitExcludes();
     // new TestRepositoryAdmin().testColumnDefinitionAndEnforcement();
