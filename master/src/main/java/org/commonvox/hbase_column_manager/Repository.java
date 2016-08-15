@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -38,6 +39,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.NamespaceNotFoundException;
@@ -1592,7 +1594,6 @@ class Repository {
     }
   }
 
-
   private String buildOrderedCommaDelimitedString(List<String> list) {
     Set<String> set = new TreeSet<>(list);
     StringBuilder stringBuilder = new StringBuilder();
@@ -1828,30 +1829,47 @@ class Repository {
     }
   }
 
-  Map<byte[], byte[]> getAliasMap(TableName tableName, byte[] colFamily, List<Cell> cellList)
+  NavigableMap<byte[], byte[]> getQualifierToAliasMap(
+          TableName tableName, byte[] colFamily, List<Cell> cellList, boolean putContext)
           throws IOException {
-    Map<byte[], byte[]> aliasMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
-    Set<byte[]> colQualifierSet = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
+    NavigableSet<byte[]> colQualifierSet = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
     for (Cell cell : cellList) {
       colQualifierSet.add(Bytes.copy(cell.getQualifierArray(), cell.getQualifierOffset(),
               cell.getQualifierLength()));
     }
+    return getQualifierToAliasMap(tableName, colFamily, colQualifierSet, putContext);
+  }
+
+  NavigableMap<byte[], byte[]> getQualifierToAliasMap(TableName tableName, byte[] colFamily,
+          NavigableSet<byte[]> colQualifierSet, boolean putContext) throws IOException {
+    NavigableMap<byte[], byte[]> aliasMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
+    aliasMap.put(HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY); // no alias for empty qualifier
     // get existing aliases from aliasTable
     RowId rowId = new RowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
     Get getAliasRow = new Get(rowId.getByteArray());
-    for (byte[] colQualifier : colQualifierSet) {
-      getAliasRow.addColumn(ALIAS_CF, colQualifier);
+    if (colQualifierSet == null) {
+      getAliasRow.addFamily(ALIAS_CF);
+    } else {
+      for (byte[] colQualifier : colQualifierSet) {
+        getAliasRow.addColumn(ALIAS_CF, colQualifier);
+      }
     }
     Result aliasRow = aliasTable.get(getAliasRow);
     if (!aliasRow.isEmpty()) {
       aliasMap.putAll(aliasRow.getFamilyMap(ALIAS_CF));
     }
-    for (byte[] colQualifier : colQualifierSet) {
-      if (aliasMap.get(colQualifier) == null) {
-        aliasMap.put(colQualifier, getNewAlias(rowId.getByteArray(), colQualifier));
+    if (colQualifierSet != null) {
+      for (byte[] colQualifier : colQualifierSet) {
+        if (aliasMap.get(colQualifier) == null) {
+          // EMPTY_BYTE_ARRAY qualifier is permitted in HBase and should not be aliased
+          if (putContext && !Bytes.equals(colQualifier, HConstants.EMPTY_BYTE_ARRAY)) {
+            aliasMap.put(colQualifier, getNewAlias(rowId.getByteArray(), colQualifier));
+          }
+        }
       }
     }
+    aliasMap.remove(ALIAS_INCREMENTOR_COLUMN);
     return aliasMap;
   }
 

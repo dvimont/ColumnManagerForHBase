@@ -342,7 +342,7 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, false);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
-    verifyColumnData(configuration);
+    verifyColumnData(configuration, false);
     clearTestingEnvironment();
     System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties has "
             + "run to completion.");
@@ -361,17 +361,32 @@ public class TestRepositoryAdmin {
     createSchemaStructuresInHBase(configuration, false, true);
     loadColumnData(configuration, false);
     verifyColumnAuditing(configuration);
-    verifyColumnData(configuration);
+    verifyColumnData(configuration, false);
+    verifyColumnData(configuration, true);
     clearTestingEnvironment();
     System.out.println("#testColumnAuditing using WILDCARDED EXCLUDE config properties "
             + "AND with COLUMN-ALIASES has run to completion.");
   }
 
-  private void verifyColumnData(Configuration configuration) throws IOException {
+  private void verifyColumnData(Configuration configuration, boolean useDetailedScan)
+          throws IOException {
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
-        List<Result> rows = getUserTableRows(connection, tableName);
-        System.out.println("CONTENTS of user Table: " + tableName.getNameAsString());
+        List<Result> rows;
+        Scan scan = new Scan().setMaxVersions();
+        if (useDetailedScan) {
+//          scan.addFamily(CF01);
+//          scan.addFamily(CF02);
+          scan.addColumn(CF01, COLQUALIFIER01);
+          scan.addColumn(CF01, COLQUALIFIER02);
+          scan.addColumn(CF01, COLQUALIFIER03);
+          scan.addColumn(CF02, COLQUALIFIER04);
+          scan.addColumn(CF01, QUALIFIER_IN_EXCLUDED_TABLE);
+          scan.addColumn(CF02, QUALIFIER_IN_EXCLUDED_TABLE);
+        }
+        rows = getUserTableRows(connection, tableName, scan);
+        System.out.println("CONTENTS of user Table: " + tableName.getNameAsString()
+                + " retrieved with " + (useDetailedScan ? "DETAILED" : "EMPTY") + " Scan parms");
         for (Result row : rows) {
           System.out.println("  **ROW-ID**: " + Bytes.toString(row.getRow()));
           NavigableMap<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>> contentMap
@@ -400,11 +415,11 @@ public class TestRepositoryAdmin {
     }
   }
 
-  private List<Result> getUserTableRows(Connection connection, TableName tableName)
+  private List<Result> getUserTableRows(Connection connection, TableName tableName, Scan scan)
           throws IOException {
     List<Result> rows = new ArrayList<>();
     try (Table table = connection.getTable(tableName)) {
-      try (ResultScanner results = table.getScanner(new Scan().setMaxVersions())) {
+      try (ResultScanner results = table.getScanner(scan)) {
         for (Result row : results) {
           rows.add(row);
         }
@@ -3556,7 +3571,7 @@ public class TestRepositoryAdmin {
     // new TestRepositoryAdmin().testColumnDiscoveryWithIncludeAllCellsUsingMapReduce();
     // new TestRepositoryAdmin().testColumnDiscoveryWithWildcardedExcludesUsingMapReduce();
     // new TestRepositoryAdmin().testColumnAuditingWithWildcardedIncludes();
-    new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
+    // new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludes();
     new TestRepositoryAdmin().testColumnAuditingWithWildcardedExcludesAndColumnAliases();
     // new TestRepositoryAdmin().scratchPad();
     // new TestRepositoryAdmin().testColumnAuditingWithExplicitIncludes();
