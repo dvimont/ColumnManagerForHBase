@@ -285,7 +285,8 @@ class MTable implements Table {
           familyAliasToQualifierMap.put(familyQualifierToAliasEntry.getKey(), aliasToQualifierMap);
         }
         Scan convertedScan = convertQualifiersToAliases(scan, familyQualifierToAliasMap);
-        return new MResultScanner(wrappedTable.getScanner(convertedScan), familyAliasToQualifierMap);
+        return new ResultScannerForAliasedFamilies(
+                wrappedTable.getScanner(convertedScan), familyAliasToQualifierMap);
       }
     }
     return wrappedTable.getScanner(scan);
@@ -304,13 +305,14 @@ class MTable implements Table {
   @Override
   public void put(Put put) throws IOException {
     // ColumnManager validation
-    if (includedInRepositoryProcessing && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, put);
     }
 
-    if (includedInRepositoryProcessing && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
-      Put putWithAliases = convertQualifiersToAliases(put);
-      wrappedTable.put(putWithAliases);
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      wrappedTable.put(convertQualifiersToAliases(put));
     } else {
       wrappedTable.put(put); // Standard HBase processing
     }
@@ -336,7 +338,14 @@ class MTable implements Table {
       repository.validateColumns(mTableDescriptor, put);
     }
     // Standard HBase processing
-    boolean putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, bytes3, put);
+    boolean putPerformed;
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      putPerformed = wrappedTable.checkAndPut(
+              bytes, bytes1, bytes2, bytes3, convertQualifiersToAliases(put));
+    } else {
+      putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, bytes3, put);
+    }
     // ColumnManager auditing
     if (putPerformed && includedInRepositoryProcessing) {
       repository.putColumnAuditorSchemaEntities(mTableDescriptor, put);
@@ -345,14 +354,23 @@ class MTable implements Table {
   }
 
   @Override
-  public boolean checkAndPut(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, Put put) throws IOException {
+  public boolean checkAndPut(
+          byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, Put put)
+          throws IOException {
     // ColumnManager validation
     if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, put);
     }
     // Standard HBase processing
-    boolean putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, co, bytes3, put);
+    boolean putPerformed;
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      putPerformed = wrappedTable.checkAndPut(
+              bytes, bytes1, bytes2, co, bytes3, convertQualifiersToAliases(put));
+    } else {
+      putPerformed = wrappedTable.checkAndPut(bytes, bytes1, bytes2, co, bytes3, put);
+    }
     // ColumnManager auditing
     if (putPerformed && includedInRepositoryProcessing) {
       repository.putColumnAuditorSchemaEntities(mTableDescriptor, put);
@@ -377,12 +395,16 @@ class MTable implements Table {
   }
 
   @Override
-  public boolean checkAndDelete(byte[] bytes, byte[] bytes1, byte[] bytes2, byte[] bytes3, Delete delete) throws IOException {
+  public boolean checkAndDelete(
+          byte[] bytes, byte[] bytes1, byte[] bytes2, byte[] bytes3, Delete delete)
+          throws IOException {
     return wrappedTable.checkAndDelete(bytes, bytes1, bytes2, bytes3, delete);
   }
 
   @Override
-  public boolean checkAndDelete(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, Delete delete) throws IOException {
+  public boolean checkAndDelete(
+          byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, Delete delete)
+          throws IOException {
     return wrappedTable.checkAndDelete(bytes, bytes1, bytes2, co, bytes3, delete);
   }
 
@@ -453,7 +475,8 @@ class MTable implements Table {
   }
 
   @Override
-  public long incrementColumnValue(byte[] bytes, byte[] bytes1, byte[] bytes2, long l, Durability drblt) throws IOException {
+  public long incrementColumnValue(
+          byte[] bytes, byte[] bytes1, byte[] bytes2, long l, Durability drblt) throws IOException {
     // ColumnManager validation
     Increment increment = null;
     if (includedInRepositoryProcessing) {
@@ -509,12 +532,16 @@ class MTable implements Table {
   }
 
   @Override
-  public <R extends Message> void batchCoprocessorService(MethodDescriptor md, Message msg, byte[] bytes, byte[] bytes1, R r, Batch.Callback<R> clbck) throws ServiceException, Throwable {
+  public <R extends Message> void batchCoprocessorService(
+          MethodDescriptor md, Message msg, byte[] bytes, byte[] bytes1, R r,
+          Batch.Callback<R> clbck) throws ServiceException, Throwable {
     wrappedTable.batchCoprocessorService(md, msg, bytes, bytes1, r, clbck);
   }
 
   @Override
-  public boolean checkAndMutate(byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, RowMutations rm) throws IOException {
+  public boolean checkAndMutate(
+          byte[] bytes, byte[] bytes1, byte[] bytes2, CompareOp co, byte[] bytes3, RowMutations rm)
+          throws IOException {
     // ColumnManager validation
     if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
@@ -561,6 +588,19 @@ class MTable implements Table {
   }
   // end of overrides of methods introduced in HBase 1.2.2
 
+  /**
+   * IMPORTANT NOTE: In standard HBase processing, it is perfectly valid for a Scan to be submitted
+   * which designates column qualifiers which do not exist on any row of the targeted Table; but
+   * in column-alias processing, such a column qualifier will have no corresponding entry on the
+   * ColumnManager aliasTable. Thus, any column qualifier found in the user-submitted Scan which
+   * does NOT correspond to an entry in the ColumnManager aliasTable will simply be removed from
+   * the Scan.
+   *
+   * @param originalScan Scan with standard user (full-length) column qualifiers
+   * @param familyQualifierToAliasMap
+   * @return converted Scan (with each user column qualifiers replace with its 4-byte alias)
+   * @throws IOException
+   */
   private Scan convertQualifiersToAliases(final Scan originalScan,
           NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap)
           throws IOException {
@@ -568,7 +608,7 @@ class MTable implements Table {
       return originalScan;
     }
     NavigableMap<byte [], NavigableSet<byte[]>> modifiedFamilyMap
-            = new TreeMap<byte [], NavigableSet<byte[]>>(Bytes.BYTES_COMPARATOR);
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
     for (Entry<byte [], NavigableSet<byte[]>> familyToQualifiersMap
             : originalScan.getFamilyMap().entrySet()) {
       byte[] colFamily = familyToQualifiersMap.getKey();
@@ -579,10 +619,10 @@ class MTable implements Table {
       } else {
         NavigableMap<byte[], byte[]> qualifierToAliasMap
                  = familyQualifierToAliasMap.get(colFamily);
-        NavigableSet<byte[]> aliasSet = new TreeSet<byte[]>(Bytes.BYTES_COMPARATOR);
+        NavigableSet<byte[]> aliasSet = new TreeSet<>(Bytes.BYTES_COMPARATOR);
         for (byte[] qualifier : qualifierSet) {
           byte[] alias = qualifierToAliasMap.get(qualifier);
-          // alias will be null if current qualifier was never Put into Table
+          // NOTE that alias will be null if current qualifier was never Put into Table
           if (alias != null) {
             aliasSet.add(alias);
           }
@@ -623,72 +663,164 @@ class MTable implements Table {
     return modifiedPut;
   }
 
+  private Append convertQualifiersToAliases(final Append originalAppend) throws IOException {
+    // clone Append, but remove all cell entries by setting familyToCellsMap to empty Map
+    Append modifiedAppend = new Append(originalAppend).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap
+            : originalAppend.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                = repository.getQualifierToAliasMap(
+                        mTableDescriptor.getTableName(), colFamily, cellList, true);
+        for (Cell originalCell : cellList) {
+          modifiedAppend.add(colFamily,
+                  qualifierToAliasMap.get(Bytes.copy(originalCell.getQualifierArray(),
+                          originalCell.getQualifierOffset(), originalCell.getQualifierLength())),
+                  Bytes.copy(originalCell.getValueArray(), originalCell.getValueOffset(),
+                          originalCell.getValueLength()));
+        }
+      } else {
+        for (Cell originalCell : cellList) {
+          modifiedAppend.add(originalCell);
+        }
+      }
+    }
+    return modifiedAppend;
+  }
+
+  private Increment convertQualifiersToAliases(final Increment originalIncrement)
+          throws IOException {
+    // clone Increment, but remove all cell entries by setting familyToCellsMap to empty Map
+    Increment modifiedIncrement = new Increment(originalIncrement).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap
+            : originalIncrement.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                = repository.getQualifierToAliasMap(
+                        mTableDescriptor.getTableName(), colFamily, cellList, true);
+        for (Cell originalCell : cellList) {
+          modifiedIncrement.addColumn(colFamily,
+                  qualifierToAliasMap.get(Bytes.copy(originalCell.getQualifierArray(),
+                          originalCell.getQualifierOffset(), originalCell.getQualifierLength())),
+                  Bytes.toLong(Bytes.copy(originalCell.getValueArray(),
+                          originalCell.getValueOffset(), originalCell.getValueLength())));
+        }
+      } else {
+        for (Cell originalCell : cellList) {
+          modifiedIncrement.add(originalCell);
+        }
+      }
+    }
+    return modifiedIncrement;
+  }
+
+  /**
+   * IMPORTANT NOTE: In standard HBase processing, it is perfectly valid for a Delete to be
+   * submitted which designates column qualifiers which do not exist on any row of the targeted
+   * Table; but in column-alias processing, such a column qualifier will have no corresponding
+   * entry on the ColumnManager aliasTable. Thus, any column qualifier found in the user-submitted
+   * Delete which does NOT correspond to an entry in the ColumnManager aliasTable will simply
+   * not be included in the alias-converted Delete.
+   *
+   * @param originalDelete the Delete as submitted by the user application
+   * @return Delete object with column qualifiers replaced by corresponding aliases (for columns in
+   * aliasEnabled Column Families)
+   * @throws IOException
+   */
+  private Delete convertQualifiersToAliases(final Delete originalDelete) throws IOException {
+    // clone Delete, but remove all cell entries by setting familyToCellsMap to empty Map
+    Delete modifiedDelete = new Delete(originalDelete).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap : originalDelete.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                = repository.getQualifierToAliasMap(
+                        mTableDescriptor.getTableName(), colFamily, cellList, false);
+        for (Cell originalCell : cellList) {
+          byte[] colQualifier = Bytes.copy(originalCell.getQualifierArray(),
+                  originalCell.getQualifierOffset(), originalCell.getQualifierLength());
+          byte[] colAlias = qualifierToAliasMap.get(colQualifier);
+          if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode()) {
+            modifiedDelete.addFamilyVersion(colFamily, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamily.getCode()) {
+            modifiedDelete.addFamily(colFamily);
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteColumn.getCode()) {
+            if (colAlias != null) {
+              modifiedDelete.addColumns(colFamily, colAlias, originalCell.getTimestamp());
+            }
+          } else if (originalCell.getTypeByte() == KeyValue.Type.Delete.getCode()) {
+            if (colAlias != null) {
+              modifiedDelete.addColumn(colFamily, colAlias, originalCell.getTimestamp());
+            }
+          }
+        }
+      } else {  // colFamily NOT aliasEnabled, so "clone" cells using standard Delete interface
+        for (Cell originalCell : cellList) {
+          byte[] colQualifier = Bytes.copy(originalCell.getQualifierArray(),
+                  originalCell.getQualifierOffset(), originalCell.getQualifierLength());
+          if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode()) {
+            modifiedDelete.addFamilyVersion(colFamily, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamily.getCode()) {
+            modifiedDelete.addFamily(colFamily);
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteColumn.getCode()) {
+            modifiedDelete.addColumns(colFamily, colQualifier, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.Delete.getCode()) {
+            modifiedDelete.addColumn(colFamily, colQualifier, originalCell.getTimestamp());
+          }
+        }
+      }
+    }
+    return modifiedDelete;
+  }
+
   private Result convertAliasesToQualifiers(Result result,
           NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap) {
-    List<Cell> convertedCells = new ArrayList<>();
-    List<Cell> convertedCellsOfQualifier = new ArrayList<>();
-    NavigableMap<byte[], List<Cell>> qualifierToCellsMap = new TreeMap<>(Bytes.BYTES_COMPARATOR);
-    byte[] previousQualifier = null;
-    byte[] previousFamily = null;
-    /**
-     * IMPORTANT NOTE: There is NO public access to CellComparator, so the following logic seeks
-     * to keep cells in their original order, except for reordering the groups of cells which
-     * belong to a specific qualifier (since alias is being replaced with qualifier).
-     */
+    NavigableSet<Cell> convertedCellSet = new TreeSet<Cell>(KeyValue.COMPARATOR);
     for (Cell originalCell : result.rawCells()) {
       byte[] cellFamily = Bytes.copy(originalCell.getFamilyArray(),
                       originalCell.getFamilyOffset(), originalCell.getFamilyLength());
       NavigableMap<byte[], byte[]> aliasToQualifierMap = familyAliasToQualifierMap.get(cellFamily);
       if (aliasToQualifierMap == null) {
-        convertedCells.add(originalCell); // no conversion done
+        convertedCellSet.add(originalCell); // if no aliasToQualifierMap, no conversion done
       } else {
-        byte[] cellQualifier = aliasToQualifierMap.get(Bytes.copy(originalCell.getQualifierArray(),
-                originalCell.getQualifierOffset(), originalCell.getQualifierLength()));
-        if ((previousQualifier != null && !Bytes.equals(cellQualifier, previousQualifier))
-                || (previousFamily != null && !Bytes.equals(cellFamily, previousFamily))) {
-          qualifierToCellsMap.put(cellQualifier, new ArrayList<>(convertedCellsOfQualifier));
-          convertedCellsOfQualifier = new ArrayList<>();
-        }
-        if (previousFamily != null && !Bytes.equals(cellFamily, previousFamily)) {
-          for (Entry<byte[], List<Cell>> qualifierToCellsEntry : qualifierToCellsMap.entrySet()) {
-            convertedCells.addAll(qualifierToCellsEntry.getValue());
-          }
-          qualifierToCellsMap = new TreeMap<>(Bytes.BYTES_COMPARATOR);
-        }
-        convertedCellsOfQualifier.add(CellUtil.createCell(
+        convertedCellSet.add(CellUtil.createCell(
                 Bytes.copy(originalCell.getRowArray(), originalCell.getRowOffset(),
                         originalCell.getRowLength()),
-                cellFamily, cellQualifier,
+                cellFamily,
+                aliasToQualifierMap.get(Bytes.copy(originalCell.getQualifierArray(),
+                        originalCell.getQualifierOffset(), originalCell.getQualifierLength())),
                 originalCell.getTimestamp(), KeyValue.Type.codeToType(originalCell.getTypeByte()),
                 Bytes.copy(originalCell.getValueArray(), originalCell.getValueOffset(),
                         originalCell.getValueLength()),
                 Bytes.copy(originalCell.getTagsArray(), originalCell.getTagsOffset(),
                         originalCell.getTagsLength())));
-        previousQualifier = cellQualifier;
-        previousFamily = cellFamily;
-      }
-      if (!convertedCellsOfQualifier.isEmpty()) {
-        qualifierToCellsMap.put(previousQualifier, convertedCellsOfQualifier);
-      }
-      if (!qualifierToCellsMap.isEmpty()) {
-        for (Entry<byte[], List<Cell>> qualifierToCellsEntry : qualifierToCellsMap.entrySet()) {
-          convertedCells.addAll(qualifierToCellsEntry.getValue());
-        }
       }
     }
-    return Result.create(convertedCells.toArray(new Cell[convertedCells.size()]));
+    return Result.create(convertedCellSet.toArray(new Cell[convertedCellSet.size()]));
   }
 
   /**
-   * MResultScanner wraps the ResultScanner returned by Table#getScanner and converts any
-   * column-aliases to user-qualifiers within each of the ResultScanner's Result objects
+   * ResultScannerForAliasedFamilies wraps the ResultScanner returned by Table#getScanner
+   * and converts each of its component Result objects by replacing any column-aliases with
+   * user-column-qualifiers.
    */
-  class MResultScanner implements ResultScanner {
+  class ResultScannerForAliasedFamilies implements ResultScanner {
 
     private final ResultScanner wrappedResultScanner;
     private final NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap;
 
-    MResultScanner(ResultScanner resultScanner,
+    ResultScannerForAliasedFamilies(ResultScanner resultScanner,
             NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap) {
       wrappedResultScanner = resultScanner;
       this.familyAliasToQualifierMap = familyAliasToQualifierMap;
