@@ -58,6 +58,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueExcludeFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
@@ -88,6 +89,8 @@ class Repository {
   private final Table repositoryTable;
   private final Table aliasTable;
   private static final byte[] ALIAS_INCREMENTOR_COLUMN = Bytes.toBytes("#$$#_aliasIncrementor");
+  private static final int INVALID_ALIAS_INT = -1;
+  private static final byte[] INVALID_ALIAS = Bytes.toBytes(INVALID_ALIAS_INT);
 
 
   static final String PRODUCT_NAME = "ColumnManagerAPI";
@@ -1829,25 +1832,51 @@ class Repository {
     }
   }
 
+  /**
+   * Returns alias of colQualifier if colFamily has columnAliasesEnabled; otherwise it simply
+   * returns the colQualifier.
+   *
+   * @param mtd
+   * @param colFamily
+   * @param colQualifier
+   * @return alias of colQualifier if colFamily has columnAliasesEnabled; otherwise it simply
+   * returns the colQualifier
+   * @throws IOException
+   */
+  byte[] getAlias(final MTableDescriptor mtd, final byte[] colFamily, final byte[] colQualifier)
+          throws IOException {
+    if (mtd.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+      NavigableSet<byte[]> colQualifierSet = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
+      colQualifierSet.add(colQualifier);
+      return getQualifierToAliasMap(mtd.getTableName(), colFamily, colQualifierSet, false)
+              .get(colQualifier);
+    } else {
+      return colQualifier;
+    }
+  }
+
   NavigableMap<byte[], byte[]> getQualifierToAliasMap(
-          TableName tableName, byte[] colFamily, List<Cell> cellList, boolean putContext)
+          TableName tableName, byte[] colFamily, List<Cell> cellList, boolean addAliasIfNotFound)
           throws IOException {
     NavigableSet<byte[]> colQualifierSet = new TreeSet<>(Bytes.BYTES_RAWCOMPARATOR);
     for (Cell cell : cellList) {
       colQualifierSet.add(Bytes.copy(cell.getQualifierArray(), cell.getQualifierOffset(),
               cell.getQualifierLength()));
     }
-    return getQualifierToAliasMap(tableName, colFamily, colQualifierSet, putContext);
+    return getQualifierToAliasMap(tableName, colFamily, colQualifierSet, addAliasIfNotFound);
   }
 
   NavigableMap<byte[], byte[]> getQualifierToAliasMap(TableName tableName, byte[] colFamily,
-          NavigableSet<byte[]> colQualifierSet, boolean putContext) throws IOException {
+          NavigableSet<byte[]> colQualifierSet, boolean addAliasIfNotFound) throws IOException {
     NavigableMap<byte[], byte[]> aliasMap = new TreeMap<>(Bytes.BYTES_RAWCOMPARATOR);
     aliasMap.put(HConstants.EMPTY_BYTE_ARRAY, HConstants.EMPTY_BYTE_ARRAY); // no alias for empty qualifier
     // get existing aliases from aliasTable
     RowId rowId = new RowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
-    Get getAliasRow = new Get(rowId.getByteArray());
+    // set SingleColumnValueExcludeFilter to exclude ALIAS_INCREMENTOR_COLUMN
+    Get getAliasRow = new Get(rowId.getByteArray()).setFilter(
+            new SingleColumnValueExcludeFilter(ALIAS_CF, ALIAS_INCREMENTOR_COLUMN,
+                              CompareFilter.CompareOp.GREATER, INVALID_ALIAS));
     if (colQualifierSet == null) {
       getAliasRow.addFamily(ALIAS_CF);
     } else {
@@ -1862,14 +1891,15 @@ class Repository {
     if (colQualifierSet != null) {
       for (byte[] colQualifier : colQualifierSet) {
         if (aliasMap.get(colQualifier) == null) {
-          // EMPTY_BYTE_ARRAY qualifier is permitted in HBase and should not be aliased
-          if (putContext && !Bytes.equals(colQualifier, HConstants.EMPTY_BYTE_ARRAY)) {
+          if (addAliasIfNotFound) {
             aliasMap.put(colQualifier, getNewAlias(rowId.getByteArray(), colQualifier));
+          } else {
+            // invalid colQualifier mapped to invalid alias
+            aliasMap.put(colQualifier, INVALID_ALIAS);
           }
         }
       }
     }
-    aliasMap.remove(ALIAS_INCREMENTOR_COLUMN);
     return aliasMap;
   }
 
