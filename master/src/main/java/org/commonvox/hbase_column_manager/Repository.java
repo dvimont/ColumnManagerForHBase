@@ -41,17 +41,21 @@ import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.NamespaceNotFoundException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Row;
 import org.apache.hadoop.hbase.client.RowMutations;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
@@ -61,6 +65,7 @@ import org.apache.hadoop.hbase.filter.KeyOnlyFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueExcludeFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
@@ -91,7 +96,7 @@ class Repository {
   private static final byte[] ALIAS_INCREMENTOR_COLUMN = Bytes.toBytes("#$$#_aliasIncrementor");
   private static final int INVALID_ALIAS_INT = -1;
   private static final byte[] INVALID_ALIAS = Bytes.toBytes(INVALID_ALIAS_INT);
-
+  private static final NavigableSet<byte[]> NULL_NAVIGABLE_SET = null;
 
   static final String PRODUCT_NAME = "ColumnManagerAPI";
   static final byte[] JAVA_USERNAME_PROPERTY_KEY = Bytes.toBytes("user.name");
@@ -2281,4 +2286,590 @@ class Repository {
               .put(rowIdByteBuffer.array()).put(fillerArray).array();
     }
   }
+
+  // ALIAS METHODS START HERE
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, Mutation mutation)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    Class<?> mutationClass = mutation.getClass();
+    if (Append.class.isAssignableFrom(mutationClass)) {
+      familyQualifierToAliasMap
+              = getFamilyQualifierToAliasMap(mTableDescriptor, (Append)mutation);
+    } else if (Increment.class.isAssignableFrom(mutationClass)) {
+      familyQualifierToAliasMap
+              = getFamilyQualifierToAliasMap(mTableDescriptor, (Increment)mutation);
+    } else if (Delete.class.isAssignableFrom(mutationClass)
+            || Put.class.isAssignableFrom(mutationClass)
+            || RowMutations.class.isAssignableFrom(mutationClass)) {
+      // ignore: familyQualifierToAliasMap not passed to alias-processing for these mutation-types
+    }
+    return familyQualifierToAliasMap;
+  }
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, Get get)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    NavigableSet<byte[]> aliasEnabledFamiliesInScan = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+    if (get.hasFamilies()) {
+      for (byte[] colFamily : get.familySet()) {
+        if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+          aliasEnabledFamiliesInScan.add(colFamily);
+        }
+      }
+    } else {
+      for (MColumnDescriptor mColumnDescriptor : mTableDescriptor.getMColumnDescriptors()) {
+        if (mColumnDescriptor.columnAliasesEnabled()) {
+          aliasEnabledFamiliesInScan.add(mColumnDescriptor.getName());
+        }
+      }
+    }
+    if (!aliasEnabledFamiliesInScan.isEmpty()) {
+      if (get.hasFamilies()) {
+        for (Entry<byte[],NavigableSet<byte[]>> familyEntry : get.getFamilyMap().entrySet()) {
+          byte[] colFamily = familyEntry.getKey();
+          NavigableSet<byte[]> colQualifiers = familyEntry.getValue(); // could be null
+          if (aliasEnabledFamiliesInScan.contains(colFamily)) {
+            familyQualifierToAliasMap.put(colFamily,
+                    getQualifierToAliasMap(
+                            mTableDescriptor.getTableName(), colFamily, colQualifiers, false));
+          }
+        }
+      } else {
+        for (byte[] aliasEnabledFamilyInScan : aliasEnabledFamiliesInScan) {
+          familyQualifierToAliasMap.put(aliasEnabledFamilyInScan,
+                  getQualifierToAliasMap(mTableDescriptor.getTableName(),
+                          aliasEnabledFamilyInScan, NULL_NAVIGABLE_SET, false));
+        }
+      }
+    }
+    return familyQualifierToAliasMap;
+  }
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, List<? extends Row> rowList, int intForUniqueSignature)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> masterFamilyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    for (Row row : rowList) {
+      Class<?> rowClass = row.getClass();
+      NavigableMap<byte[], NavigableMap<byte[], byte[]>> partialFamilyQualifierToAliasMap
+              = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+      if (Append.class.isAssignableFrom(rowClass)) {
+        partialFamilyQualifierToAliasMap
+                = getFamilyQualifierToAliasMap(mTableDescriptor, (Append)row);
+      } else if (Get.class.isAssignableFrom(rowClass)) {
+        partialFamilyQualifierToAliasMap = getFamilyQualifierToAliasMap(mTableDescriptor, (Get)row);
+      } else if (Increment.class.isAssignableFrom(rowClass)) {
+        partialFamilyQualifierToAliasMap
+                = getFamilyQualifierToAliasMap(mTableDescriptor, (Increment)row);
+      } else if (Delete.class.isAssignableFrom(rowClass)
+              || Put.class.isAssignableFrom(rowClass)
+              || RowMutations.class.isAssignableFrom(rowClass)) {
+        continue;
+      }
+      for (Entry<byte[], NavigableMap<byte[], byte[]>> partialFamilyEntry
+              : partialFamilyQualifierToAliasMap.entrySet()) {
+        byte[] colFamily = partialFamilyEntry.getKey();
+        NavigableMap<byte[], byte[]> masterQualifierToAliasMap
+                = masterFamilyQualifierToAliasMap.get(colFamily);
+        if (masterQualifierToAliasMap == null) {
+          masterFamilyQualifierToAliasMap.put(colFamily, partialFamilyEntry.getValue());
+        } else {
+          masterQualifierToAliasMap.putAll(partialFamilyEntry.getValue());
+        }
+      }
+    }
+    return masterFamilyQualifierToAliasMap;
+  }
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, List<Get> gets)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    NavigableSet<byte[]> aliasEnabledFamiliesInScan = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+    for (Get get : gets) {
+      if (get.hasFamilies()) {
+        for (byte[] colFamily : get.familySet()) {
+          if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+            aliasEnabledFamiliesInScan.add(colFamily);
+          }
+        }
+      } else {
+        for (MColumnDescriptor mColumnDescriptor : mTableDescriptor.getMColumnDescriptors()) {
+          if (mColumnDescriptor.columnAliasesEnabled()) {
+            aliasEnabledFamiliesInScan.add(mColumnDescriptor.getName());
+          }
+        }
+      }
+    }
+    if (!aliasEnabledFamiliesInScan.isEmpty()) {
+      for (Get get : gets) {
+        if (get.hasFamilies()) {
+          for (Entry<byte[],NavigableSet<byte[]>> familyEntry : get.getFamilyMap().entrySet()) {
+            byte[] colFamily = familyEntry.getKey();
+            NavigableSet<byte[]> colQualifiers = familyEntry.getValue(); // could be null
+            if (aliasEnabledFamiliesInScan.contains(colFamily)) {
+              NavigableMap<byte[], byte[]> qualifierToAliasMap
+                      = familyQualifierToAliasMap.get(colFamily);
+              if (qualifierToAliasMap == null) {
+                familyQualifierToAliasMap.put(colFamily,
+                        getQualifierToAliasMap(
+                                mTableDescriptor.getTableName(), colFamily, colQualifiers, false));
+              } else {
+                qualifierToAliasMap.putAll(getQualifierToAliasMap(
+                                mTableDescriptor.getTableName(), colFamily, colQualifiers, false));
+              }
+            }
+          }
+        } else {
+          // if no families specified in Get, need all alias entries for entire family
+          for (byte[] aliasEnabledFamilyInScan : aliasEnabledFamiliesInScan) {
+            familyQualifierToAliasMap.put(aliasEnabledFamilyInScan,
+                    getQualifierToAliasMap(mTableDescriptor.getTableName(),
+                            aliasEnabledFamilyInScan, NULL_NAVIGABLE_SET, false));
+          }
+        }
+      }
+    }
+    return familyQualifierToAliasMap;
+  }
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, Scan scan)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    NavigableSet<byte[]> aliasEnabledFamiliesInScan = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+    if (scan.hasFamilies()) {
+      for (byte[] colFamily : scan.getFamilies()) {
+        if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+          aliasEnabledFamiliesInScan.add(colFamily);
+        }
+      }
+    } else {
+      for (MColumnDescriptor mColumnDescriptor : mTableDescriptor.getMColumnDescriptors()) {
+        if (mColumnDescriptor.columnAliasesEnabled()) {
+          aliasEnabledFamiliesInScan.add(mColumnDescriptor.getName());
+        }
+      }
+    }
+    if (!aliasEnabledFamiliesInScan.isEmpty()) {
+      if (scan.hasFamilies()) {
+        for (Entry<byte[],NavigableSet<byte[]>> familyEntry : scan.getFamilyMap().entrySet()) {
+          byte[] colFamily = familyEntry.getKey();
+          NavigableSet<byte[]> colQualifiers = familyEntry.getValue(); // could be null
+          if (aliasEnabledFamiliesInScan.contains(colFamily)) {
+            familyQualifierToAliasMap.put(colFamily,
+                    getQualifierToAliasMap(
+                            mTableDescriptor.getTableName(), colFamily, colQualifiers, false));
+          }
+        }
+      } else {
+        for (byte[] aliasEnabledFamilyInScan : aliasEnabledFamiliesInScan) {
+          familyQualifierToAliasMap.put(aliasEnabledFamilyInScan,
+                  getQualifierToAliasMap(mTableDescriptor.getTableName(),
+                          aliasEnabledFamilyInScan, NULL_NAVIGABLE_SET, false));
+        }
+      }
+    }
+    return familyQualifierToAliasMap;
+  }
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, Append append)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    for (Entry<byte[], List<Cell>> familyToCellsMap : append.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        familyQualifierToAliasMap.put (colFamily,
+                getQualifierToAliasMap(mTableDescriptor.getTableName(),
+                        colFamily, cellList, true));
+      }
+    }
+    return familyQualifierToAliasMap;
+  }
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>> getFamilyQualifierToAliasMap(
+          MTableDescriptor mTableDescriptor, Increment increment)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    for (Entry<byte[], List<Cell>> familyToCellsMap : increment.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        familyQualifierToAliasMap.put(colFamily, getQualifierToAliasMap(
+                        mTableDescriptor.getTableName(), colFamily, cellList, true));
+      }
+    }
+    return familyQualifierToAliasMap;
+  }
+
+
+  NavigableMap<byte[], NavigableMap<byte[], byte[]>>  getFamilyAliasToQualifierMap(
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap) {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    for (Entry<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasEntry
+            : familyQualifierToAliasMap.entrySet()) {
+      NavigableMap<byte[], byte[]> aliasToQualifierMap = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+      for (Entry<byte[], byte[]> qualifierToAliasMap
+              : familyQualifierToAliasEntry.getValue().entrySet()) {
+        aliasToQualifierMap.put(qualifierToAliasMap.getValue(), qualifierToAliasMap.getKey());
+      }
+      familyAliasToQualifierMap.put(familyQualifierToAliasEntry.getKey(), aliasToQualifierMap);
+    }
+    return familyAliasToQualifierMap;
+  }
+
+  NavigableMap<byte[],NavigableMap<byte[],byte[]>> getFamilyAliasToQualifierMap(
+          MTableDescriptor mTableDescriptor, byte[] colFamily)
+          throws IOException {
+    return getFamilyAliasToQualifierMap(mTableDescriptor, colFamily, NULL_NAVIGABLE_SET);
+  }
+
+  NavigableMap<byte[],NavigableMap<byte[],byte[]>> getFamilyAliasToQualifierMap(
+          MTableDescriptor mTableDescriptor, byte[] colFamily, byte[] colQualifier)
+          throws IOException {
+    NavigableSet<byte[]> colQualifierSet = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+    colQualifierSet.add(colQualifier);
+    return getFamilyAliasToQualifierMap(mTableDescriptor, colFamily, colQualifierSet);
+  }
+
+  NavigableMap<byte[],NavigableMap<byte[],byte[]>> getFamilyAliasToQualifierMap(
+          MTableDescriptor mTableDescriptor, byte[] colFamily, NavigableSet<byte[]> colQualifierSet)
+          throws IOException {
+    NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+      NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+              = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+      familyQualifierToAliasMap.put(colFamily,
+              getQualifierToAliasMap(mTableDescriptor.getTableName(),
+                      colFamily, colQualifierSet, false));
+      familyAliasToQualifierMap = getFamilyAliasToQualifierMap(familyQualifierToAliasMap);
+    }
+    return familyAliasToQualifierMap;
+  }
+
+  Row convertQualifiersToAliases(MTableDescriptor mTableDescriptor, final Row originalRow,
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap,
+          int intForUniqueSignature)
+          throws IOException {
+    // Append, Delete, Get, Increment, Mutation, Put, RowMutations
+    Class<?> originalRowClass = originalRow.getClass();
+    if (Append.class.isAssignableFrom(originalRowClass)) {
+      return convertQualifiersToAliases(
+              mTableDescriptor, (Append)originalRow, familyQualifierToAliasMap);
+    } else if (Delete.class.isAssignableFrom(originalRowClass)) {
+      return convertQualifiersToAliases(mTableDescriptor, (Delete)originalRow);
+    } else if (Get.class.isAssignableFrom(originalRowClass)) {
+      return convertQualifiersToAliases(
+              mTableDescriptor, (Get)originalRow, familyQualifierToAliasMap);
+    } else if (Increment.class.isAssignableFrom(originalRowClass)) {
+      return convertQualifiersToAliases(
+              mTableDescriptor, (Increment)originalRow, familyQualifierToAliasMap);
+    } else if (Put.class.isAssignableFrom(originalRowClass)) {
+      return convertQualifiersToAliases(mTableDescriptor, (Put)originalRow);
+    } else if (RowMutations.class.isAssignableFrom(originalRowClass)) {
+      return convertQualifiersToAliases(mTableDescriptor, (RowMutations)originalRow);
+    }
+    return null;
+  }
+
+
+  Get convertQualifiersToAliases(MTableDescriptor mTableDescriptor, final Get originalGet,
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap)
+          throws IOException {
+    if (!originalGet.hasFamilies()) {
+      return originalGet;
+    }
+    NavigableMap<byte [], NavigableSet<byte[]>> modifiedFamilyMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    for (Entry<byte [], NavigableSet<byte[]>> familyToQualifiersMap
+            : originalGet.getFamilyMap().entrySet()) {
+      byte[] colFamily = familyToQualifiersMap.getKey();
+      NavigableSet<byte[]> colQualifierSet = familyToQualifiersMap.getValue();
+      if (colQualifierSet == null
+              || !mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        modifiedFamilyMap.put(colFamily, colQualifierSet); // no modifications
+      } else {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap = familyQualifierToAliasMap.get(colFamily);
+        NavigableSet<byte[]> aliasSet = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        for (byte[] qualifier : colQualifierSet) {
+          byte[] alias = qualifierToAliasMap.get(qualifier);
+          aliasSet.add(alias);
+        }
+        modifiedFamilyMap.put(colFamily, aliasSet);
+      }
+    }
+    Get convertedGet = cloneGetWithoutFamilyMap(originalGet);
+    for (Entry<byte [], NavigableSet<byte[]>> modifiedFamilyToQualifiersMap
+            : modifiedFamilyMap.entrySet()) {
+      byte[] colFamily = modifiedFamilyToQualifiersMap.getKey();
+      NavigableSet<byte[]> colQualifierSet = modifiedFamilyToQualifiersMap.getValue();
+      if (colQualifierSet == null) {
+        convertedGet.addFamily(colFamily);
+      } else {
+        for (byte[] colQualifier : colQualifierSet) {
+          convertedGet.addColumn(colFamily, colQualifier);
+        }
+      }
+    }
+    return convertedGet;
+  }
+
+  /**
+   * Method may need modification if Get attributes are added or removed in future HBase releases.
+   *
+   * @param originalGet
+   * @return convertedGet
+   * @throws IOException
+   */
+  Get cloneGetWithoutFamilyMap(Get originalGet) throws IOException {
+    Get convertedGet = new Get(originalGet.getRow());
+    // from Query
+    convertedGet.setFilter(originalGet.getFilter());
+    convertedGet.setReplicaId(originalGet.getReplicaId());
+    convertedGet.setConsistency(originalGet.getConsistency());
+    // from Get
+    convertedGet.setCacheBlocks(originalGet.getCacheBlocks());
+    convertedGet.setMaxVersions(originalGet.getMaxVersions());
+    convertedGet.setMaxResultsPerColumnFamily(originalGet.getMaxResultsPerColumnFamily());
+    convertedGet.setRowOffsetPerColumnFamily(originalGet.getRowOffsetPerColumnFamily());
+    convertedGet.setCheckExistenceOnly(originalGet.isCheckExistenceOnly());
+    convertedGet.setClosestRowBefore(originalGet.isClosestRowBefore());
+    for (Map.Entry<String, byte[]> attr : originalGet.getAttributesMap().entrySet()) {
+      convertedGet.setAttribute(attr.getKey(), attr.getValue());
+    }
+    for (Map.Entry<byte[], TimeRange> entry : originalGet.getColumnFamilyTimeRange().entrySet()) {
+      TimeRange tr = entry.getValue();
+      convertedGet.setColumnFamilyTimeRange(entry.getKey(), tr.getMin(), tr.getMax());
+    }
+    return convertedGet;
+  }
+
+  Scan convertQualifiersToAliases(MTableDescriptor mTableDescriptor,
+          final Scan originalScan,
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap)
+          throws IOException {
+    if (!originalScan.hasFamilies()) {
+      return originalScan;
+    }
+    NavigableMap<byte [], NavigableSet<byte[]>> modifiedFamilyMap
+            = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+    for (Entry<byte [], NavigableSet<byte[]>> familyToQualifiersMap
+            : originalScan.getFamilyMap().entrySet()) {
+      byte[] colFamily = familyToQualifiersMap.getKey();
+      NavigableSet<byte[]> colQualifierSet = familyToQualifiersMap.getValue();
+      if (colQualifierSet == null
+              || !mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        modifiedFamilyMap.put(colFamily, colQualifierSet);
+      } else {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                 = familyQualifierToAliasMap.get(colFamily);
+        NavigableSet<byte[]> aliasSet = new TreeSet<>(Bytes.BYTES_COMPARATOR);
+        for (byte[] qualifier : colQualifierSet) {
+          byte[] alias = qualifierToAliasMap.get(qualifier);
+          aliasSet.add(alias);
+        }
+        modifiedFamilyMap.put(colFamily, aliasSet);
+      }
+    }
+    // clone original Scan, but assign modifiedFamilyMap that has qualifiers replaced by aliases
+    return new Scan(originalScan).setFamilyMap(modifiedFamilyMap);
+  }
+
+  RowMutations convertQualifiersToAliases(MTableDescriptor mTableDescriptor,
+          final RowMutations originalRowMutations)
+          throws IOException{
+    RowMutations modifiedRowMutations = new RowMutations(originalRowMutations.getRow());
+    for (Mutation originalMutation : originalRowMutations.getMutations()) {
+      Class<?> mutationClass = originalMutation.getClass();
+      if (Put.class.isAssignableFrom(mutationClass)) {
+        modifiedRowMutations.add(
+                convertQualifiersToAliases(mTableDescriptor, (Put)originalMutation));
+      } else if (Delete.class.isAssignableFrom(mutationClass)) {
+        modifiedRowMutations.add(
+                convertQualifiersToAliases(mTableDescriptor, (Delete)originalMutation));
+      }
+    }
+    return modifiedRowMutations;
+  }
+
+  Put convertQualifiersToAliases(MTableDescriptor mTableDescriptor, final Put originalPut)
+          throws IOException {
+    // clone Put, but remove all cell entries by setting familyToCellsMap to empty Map
+    Put modifiedPut = new Put(originalPut).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap : originalPut.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                = getQualifierToAliasMap(
+                        mTableDescriptor.getTableName(), colFamily, cellList, true);
+        for (Cell originalCell : cellList) {
+          modifiedPut.addColumn(colFamily,
+                  qualifierToAliasMap.get(Bytes.copy(originalCell.getQualifierArray(),
+                          originalCell.getQualifierOffset(), originalCell.getQualifierLength())),
+                  originalCell.getTimestamp(),
+                  Bytes.copy(originalCell.getValueArray(), originalCell.getValueOffset(),
+                          originalCell.getValueLength()));
+        }
+      } else {
+        for (Cell originalCell : cellList) {
+          modifiedPut.add(originalCell);
+        }
+      }
+    }
+    return modifiedPut;
+  }
+
+  Append convertQualifiersToAliases(MTableDescriptor mTableDescriptor,
+          final Append originalAppend,
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap)
+          throws IOException {
+    // clone Append, but remove all cell entries by setting familyToCellsMap to empty Map
+    Append modifiedAppend = new Append(originalAppend).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap
+            : originalAppend.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        for (Cell originalCell : cellList) {
+          modifiedAppend.add(colFamily,
+                  familyQualifierToAliasMap.get(colFamily).get(
+                          Bytes.copy(originalCell.getQualifierArray(),
+                                  originalCell.getQualifierOffset(),
+                                  originalCell.getQualifierLength())),
+                  Bytes.copy(originalCell.getValueArray(), originalCell.getValueOffset(),
+                          originalCell.getValueLength()));
+        }
+      } else {
+        for (Cell originalCell : cellList) {
+          modifiedAppend.add(originalCell);
+        }
+      }
+    }
+    return modifiedAppend;
+  }
+
+  Increment convertQualifiersToAliases(MTableDescriptor mTableDescriptor,
+          final Increment originalIncrement,
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap)
+          throws IOException {
+    // clone Increment, but remove all cell entries by setting familyToCellsMap to empty Map
+    Increment modifiedIncrement = new Increment(originalIncrement).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap
+            : originalIncrement.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                = familyQualifierToAliasMap.get(colFamily);
+        for (Cell originalCell : cellList) {
+          modifiedIncrement.addColumn(colFamily,
+                  familyQualifierToAliasMap.get(colFamily).get(
+                          Bytes.copy(originalCell.getQualifierArray(),
+                                  originalCell.getQualifierOffset(),
+                                  originalCell.getQualifierLength())),
+                  Bytes.toLong(Bytes.copy(originalCell.getValueArray(),
+                          originalCell.getValueOffset(), originalCell.getValueLength())));
+        }
+      } else {
+        for (Cell originalCell : cellList) {
+          modifiedIncrement.add(originalCell);
+        }
+      }
+    }
+    return modifiedIncrement;
+  }
+
+  Delete convertQualifiersToAliases(MTableDescriptor mTableDescriptor,
+          final Delete originalDelete) throws IOException {
+    // clone Delete, but remove all cell entries by setting familyToCellsMap to empty Map
+    Delete modifiedDelete = new Delete(originalDelete).setFamilyCellMap(
+            new TreeMap<byte [], List<Cell>>(Bytes.BYTES_COMPARATOR));
+
+    for (Entry<byte[], List<Cell>> familyToCellsMap : originalDelete.getFamilyCellMap().entrySet()) {
+      byte[] colFamily = familyToCellsMap.getKey();
+      List<Cell> cellList = familyToCellsMap.getValue();
+      if (mTableDescriptor.getMColumnDescriptor(colFamily).columnAliasesEnabled()) {
+        NavigableMap<byte[], byte[]> qualifierToAliasMap
+                = getQualifierToAliasMap(
+                        mTableDescriptor.getTableName(), colFamily, cellList, false);
+        for (Cell originalCell : cellList) {
+          byte[] colQualifier = Bytes.copy(originalCell.getQualifierArray(),
+                  originalCell.getQualifierOffset(), originalCell.getQualifierLength());
+          byte[] colAlias = qualifierToAliasMap.get(colQualifier);
+          if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode()) {
+            modifiedDelete.addFamilyVersion(colFamily, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamily.getCode()) {
+            modifiedDelete.addFamily(colFamily);
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteColumn.getCode()) {
+            modifiedDelete.addColumns(colFamily, colAlias, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.Delete.getCode()) {
+            modifiedDelete.addColumn(colFamily, colAlias, originalCell.getTimestamp());
+          }
+        }
+      } else {  // colFamily NOT aliasEnabled, so "clone" cells using standard Delete interface
+        for (Cell originalCell : cellList) {
+          byte[] colQualifier = Bytes.copy(originalCell.getQualifierArray(),
+                  originalCell.getQualifierOffset(), originalCell.getQualifierLength());
+          if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamilyVersion.getCode()) {
+            modifiedDelete.addFamilyVersion(colFamily, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteFamily.getCode()) {
+            modifiedDelete.addFamily(colFamily);
+          } else if (originalCell.getTypeByte() == KeyValue.Type.DeleteColumn.getCode()) {
+            modifiedDelete.addColumns(colFamily, colQualifier, originalCell.getTimestamp());
+          } else if (originalCell.getTypeByte() == KeyValue.Type.Delete.getCode()) {
+            modifiedDelete.addColumn(colFamily, colQualifier, originalCell.getTimestamp());
+          }
+        }
+      }
+    }
+    return modifiedDelete;
+  }
+
+  Result convertAliasesToQualifiers(Result result,
+          NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap) {
+    NavigableSet<Cell> convertedCellSet = new TreeSet<Cell>(KeyValue.COMPARATOR);
+    for (Cell originalCell : result.rawCells()) {
+      byte[] cellFamily = Bytes.copy(originalCell.getFamilyArray(),
+                      originalCell.getFamilyOffset(), originalCell.getFamilyLength());
+      NavigableMap<byte[], byte[]> aliasToQualifierMap = familyAliasToQualifierMap.get(cellFamily);
+      if (aliasToQualifierMap == null) {
+        convertedCellSet.add(originalCell); // if no aliasToQualifierMap, no conversion done
+      } else {
+        convertedCellSet.add(CellUtil.createCell(
+                Bytes.copy(originalCell.getRowArray(), originalCell.getRowOffset(),
+                        originalCell.getRowLength()),
+                cellFamily,
+                aliasToQualifierMap.get(Bytes.copy(originalCell.getQualifierArray(),
+                        originalCell.getQualifierOffset(), originalCell.getQualifierLength())),
+                originalCell.getTimestamp(), KeyValue.Type.codeToType(originalCell.getTypeByte()),
+                Bytes.copy(originalCell.getValueArray(), originalCell.getValueOffset(),
+                        originalCell.getValueLength()),
+                Bytes.copy(originalCell.getTagsArray(), originalCell.getTagsOffset(),
+                        originalCell.getTagsLength())));
+      }
+    }
+    return Result.create(convertedCellSet.toArray(new Cell[convertedCellSet.size()]));
+  }
+  // ALIAS METHODS END HERE
 }
