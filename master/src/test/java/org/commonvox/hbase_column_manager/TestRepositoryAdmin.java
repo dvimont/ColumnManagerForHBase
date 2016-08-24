@@ -269,7 +269,6 @@ public class TestRepositoryAdmin {
   private static final String IMPORT_COLDEFINITIONS_FAILURE
           = "FAILURE IN #importColumnDefinitions PROCESSING!! ==>> ";
 
-
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
   private Map<TableName, HTableDescriptor> testTableNamesAndDescriptors;

@@ -1657,7 +1657,7 @@ class Repository {
    *
    * @param tableName name of <i>Table</i> from which {@link ColumnDefinition} is to be deleted
    * @param colFamily <i>Column Family</i> from which {@link ColumnDefinition} is to be deleted
-   * @param colQualifier colQualifier that identifies the {@link ColumnDefinition} to be deleted
+   * @param colQualifier alias that identifies the {@link ColumnDefinition} to be deleted
    * @throws IOException
    */
   void deleteColumnDefinition(TableName tableName, byte[] colFamily, byte[] colQualifier)
@@ -1838,14 +1838,14 @@ class Repository {
   }
 
   /**
-   * Returns alias of colQualifier if colFamily has columnAliasesEnabled; otherwise it simply
-   * returns the colQualifier.
+   * Returns alias of alias if colFamily has columnAliasesEnabled; otherwise it simply
+ returns the alias.
    *
    * @param mtd
    * @param colFamily
    * @param colQualifier
-   * @return alias of colQualifier if colFamily has columnAliasesEnabled; otherwise it simply
-   * returns the colQualifier
+   * @return alias of alias if colFamily has columnAliasesEnabled; otherwise it simply
+ returns the alias
    * @throws IOException
    */
   byte[] getAlias(final MTableDescriptor mtd, final byte[] colFamily, final byte[] colQualifier)
@@ -1878,10 +1878,7 @@ class Repository {
     // get existing aliases from aliasTable
     RowId rowId = new RowId(SchemaEntityType.COLUMN_FAMILY.getRecordType(),
             getTableForeignKey(tableName), colFamily);
-    // set SingleColumnValueExcludeFilter to exclude ALIAS_INCREMENTOR_COLUMN
-    Get getAliasRow = new Get(rowId.getByteArray()).setFilter(
-            new SingleColumnValueExcludeFilter(ALIAS_CF, ALIAS_INCREMENTOR_COLUMN,
-                              CompareFilter.CompareOp.GREATER, INVALID_ALIAS));
+    Get getAliasRow = new Get(rowId.getByteArray());
     if (colQualifierSet == null) {
       getAliasRow.addFamily(ALIAS_CF);
     } else {
@@ -1899,12 +1896,13 @@ class Repository {
           if (addAliasIfNotFound) {
             aliasMap.put(colQualifier, getNewAlias(rowId.getByteArray(), colQualifier));
           } else {
-            // invalid colQualifier mapped to invalid alias
+            // invalid alias mapped to invalid alias
             aliasMap.put(colQualifier, INVALID_ALIAS);
           }
         }
       }
     }
+    aliasMap.remove(ALIAS_INCREMENTOR_COLUMN);
     return aliasMap;
   }
 
@@ -2131,12 +2129,16 @@ class Repository {
     }
     logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
             + " Repository tables and namespace has been requested.");
-    standardAdmin.disableTable(REPOSITORY_TABLENAME);
+    if (standardAdmin.isTableEnabled(REPOSITORY_TABLENAME)) {
+      standardAdmin.disableTable(REPOSITORY_TABLENAME);
+    }
     standardAdmin.deleteTable(REPOSITORY_TABLENAME);
     logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
             + " Repository table has been completed: "
             + REPOSITORY_TABLENAME.getNameAsString());
-    standardAdmin.disableTable(ALIAS_DIRECTORY_TABLENAME);
+    if (standardAdmin.isTableEnabled(ALIAS_DIRECTORY_TABLENAME)) {
+      standardAdmin.disableTable(ALIAS_DIRECTORY_TABLENAME);
+    }
     standardAdmin.deleteTable(ALIAS_DIRECTORY_TABLENAME);
     logger.warn("DROP (disable/delete) of " + PRODUCT_NAME
             + " AliasDirectory table has been completed: "
@@ -2622,7 +2624,7 @@ class Repository {
       } else {
         for (byte[] colQualifier : colQualifierSet) {
           convertedGet.addColumn(colFamily, colQualifier);
-        }
+          }
       }
     }
     return convertedGet;

@@ -28,13 +28,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
@@ -53,7 +48,6 @@ import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.client.coprocessor.Batch.Call;
 import org.apache.hadoop.hbase.client.coprocessor.Batch.Callback;
 import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
-import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -67,7 +61,6 @@ class MTable implements Table {
   private final Repository repository;
   private final MTableDescriptor mTableDescriptor;
   private final boolean includedInRepositoryProcessing;
-//  private static final NavigableSet<byte[]> NULL_NAVIGABLE_SET = null;
 
   MTable(Table userTable, Repository repository)
           throws IOException {
@@ -100,12 +93,35 @@ class MTable implements Table {
 
   @Override
   public boolean exists(Get get) throws IOException {
-    return wrappedTable.exists(get);
+    // Alias processing
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      return wrappedTable.exists(repository.convertQualifiersToAliases(
+              mTableDescriptor, get,
+              repository.getFamilyQualifierToAliasMap(mTableDescriptor, get)));
+    } else {
+      return wrappedTable.exists(get);
+    }
   }
 
   @Override
-  public boolean[] existsAll(List<Get> list) throws IOException {
-    return wrappedTable.existsAll(list);
+  public boolean[] existsAll(List<Get> listOfGets) throws IOException {
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      // convert Gets before invoking "native" method
+      NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+              = repository.getFamilyQualifierToAliasMap(mTableDescriptor, listOfGets);
+      if (!familyQualifierToAliasMap.isEmpty()) {
+        List<Get> convertedGets = new LinkedList<>();
+        for (Get originalGet : listOfGets) {
+          convertedGets.add(repository.convertQualifiersToAliases(
+                  mTableDescriptor, originalGet, familyQualifierToAliasMap));
+        }
+        // invoke "native" HBase method with aliased Gets
+        return wrappedTable.existsAll(convertedGets);
+      }
+    }
+    return wrappedTable.existsAll(listOfGets);
   }
 
   @Override
@@ -177,13 +193,13 @@ class MTable implements Table {
       } else {
         wrappedTable.batch(convertedRows, results);
       }
-      // convert Result objects (if any)
+      // convert Result objects
       NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap
               = repository.getFamilyAliasToQualifierMap(familyQualifierToAliasMap);
       Object[] convertedResults = new Object[results.length];
       int objectIndex = 0;
       for (Object returnedObject : results) {
-        if (Result.class.isAssignableFrom(results.getClass())) {
+        if (Result.class.isAssignableFrom(returnedObject.getClass())) {
           convertedResults[objectIndex]
                   = repository.convertAliasesToQualifiers(
                           (Result)returnedObject, familyAliasToQualifierMap);
@@ -192,7 +208,10 @@ class MTable implements Table {
         }
         objectIndex++;
       }
-      results = convertedResults;
+      objectIndex = 0;
+      for (Object convertedResult : convertedResults) {
+        results[objectIndex++] = convertedResult;
+      }
     } else { // NO alias processing
       if (includeCallback) {
         wrappedTable.batchCallback(actions, results, callback);
@@ -325,7 +344,7 @@ class MTable implements Table {
   @Override
   public void put(List<Put> list) throws IOException {
     for (Put put : list) {
-      this.put(put); // replaced: wrappedTable.put(put);
+      this.put(put);
     }
   }
 

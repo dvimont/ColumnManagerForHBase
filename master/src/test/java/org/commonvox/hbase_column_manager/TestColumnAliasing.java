@@ -1,0 +1,456 @@
+/*
+ * Copyright 2016 Daniel Vimont.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.commonvox.hbase_column_manager;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.TreeMap;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.NamespaceDescriptor;
+import org.apache.hadoop.hbase.NamespaceNotFoundException;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Admin;
+import org.apache.hadoop.hbase.client.Append;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Increment;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Row;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.util.Bytes;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import org.junit.Test;
+
+/**
+ * Running of these methods requires that an up-and-running instance of HBase be accessible. (The
+ * emulation environment provided by HBaseTestUtility is not appropriate for these tests.)
+ *
+ * @author Daniel Vimont
+ */
+public class TestColumnAliasing {
+  private static final List<String> TEST_NAMESPACE_LIST
+          = new ArrayList<>(Arrays.asList("testNamespace01", "testNamespace02", ""));
+  private static final List<String> TEST_TABLE_NAME_LIST
+          = new ArrayList<>(
+                  Arrays.asList("testTable01", "testTable02", "testTable03"));
+  private static final List<byte[]> TEST_COLUMN_FAMILY_LIST
+          = new ArrayList<>(Arrays.asList(Bytes.toBytes("CF1"), Bytes.toBytes("CF2")));
+  private static final List<byte[]> TEST_COLUMN_QUALIFIER_LIST
+          = new ArrayList<>(Arrays.asList(Bytes.toBytes("column01"), Bytes.toBytes("column02"),
+                          Bytes.toBytes("column03"), Bytes.toBytes("column04"),
+                          Bytes.toBytes("column05"), Bytes.toBytes("column06")));
+  private static final byte[] QUALIFIER_IN_EXCLUDED_TABLE = Bytes.toBytes("qualifierOnExcludedTable");
+  private static final byte[] ROW_ID_01 = Bytes.toBytes("rowId01");
+  private static final byte[] ROW_ID_02 = Bytes.toBytes("rowId02");
+  private static final byte[] ROW_ID_03 = Bytes.toBytes("rowId03");
+  private static final byte[] ROW_ID_04 = Bytes.toBytes("rowId04");
+  private static final byte[] ROW_ID_05 = Bytes.toBytes("rowId05");
+  private static final byte[] VALUE_2_BYTES_LONG = Bytes.toBytes("xy");
+  private static final byte[] VALUE_5_BYTES_LONG = Bytes.toBytes("54321");
+  private static final byte[] VALUE_9_BYTES_LONG = Bytes.toBytes("123456789");
+  private static final byte[] VALUE_82_BYTES_LONG = new byte[82];
+  static {
+    Arrays.fill(VALUE_82_BYTES_LONG, (byte) 'A');
+  }
+  // namespace01 has ALL tables included in CM processing
+  private static final int NAMESPACE01_INDEX = 0;
+  // namespace02 is NOT included in CM processing
+  private static final int NAMESPACE02_INDEX = 1;
+  // namespace03's table02 NOT included in CM processing
+  private static final int NAMESPACE03_INDEX = 2;
+  private static final int TABLE01_INDEX = 0;
+  private static final int TABLE02_INDEX = 1;
+  private static final int TABLE03_INDEX = 2;
+  private static final int CF01_INDEX = 0;
+  private static final int CF02_INDEX = 1;
+
+  private static final String NAMESPACE01 = TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX);
+  private static final String NAMESPACE02 = TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX);
+  private static final String NAMESPACE03 = TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX);
+  private static final TableName NAMESPACE01_TABLE01
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
+  private static final TableName NAMESPACE01_TABLE02
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE02_INDEX));
+  private static final TableName NAMESPACE01_TABLE03
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE01_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE03_INDEX));
+  private static final TableName NAMESPACE02_TABLE01
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
+  private static final TableName NAMESPACE02_TABLE02
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE02_INDEX));
+  private static final TableName NAMESPACE02_TABLE03
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE02_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE03_INDEX));
+   private static final TableName NAMESPACE03_TABLE01
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE01_INDEX));
+  private static final TableName NAMESPACE03_TABLE02
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE02_INDEX));
+  private static final TableName NAMESPACE03_TABLE03
+          = TableName.valueOf(TEST_NAMESPACE_LIST.get(NAMESPACE03_INDEX),
+                  TEST_TABLE_NAME_LIST.get(TABLE03_INDEX));
+  private static final byte[] CF01 = TEST_COLUMN_FAMILY_LIST.get(CF01_INDEX);
+  private static final byte[] CF02 = TEST_COLUMN_FAMILY_LIST.get(CF02_INDEX);
+  private static final byte[] COLQUALIFIER01 = TEST_COLUMN_QUALIFIER_LIST.get(0);
+  private static final byte[] COLQUALIFIER02 = TEST_COLUMN_QUALIFIER_LIST.get(1);
+  private static final byte[] COLQUALIFIER03 = TEST_COLUMN_QUALIFIER_LIST.get(2);
+  private static final byte[] COLQUALIFIER04 = TEST_COLUMN_QUALIFIER_LIST.get(3);
+  private static final byte[] COLQUALIFIER05 = TEST_COLUMN_QUALIFIER_LIST.get(4);
+  private static final byte[] COLQUALIFIER06 = TEST_COLUMN_QUALIFIER_LIST.get(5);
+  // non-static fields
+  private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
+  private Map<TableName, HTableDescriptor> testTableNamesAndDescriptors;
+  private Map<String, HColumnDescriptor> testColumnFamilyNamesAndDescriptors;
+
+  @Test
+  public void testMTableReadWrite() throws IOException, InterruptedException {
+    System.out.println("#testMTableReadWrite has been INVOKED.");
+    initializeTestNamespaceAndTableObjects();
+    clearTestingEnvironment();
+    // NOTE that test/resources/hbase-column-manager.xml contains wildcarded excludedTables entries
+    Configuration configuration = MConfiguration.create();
+
+    // STEP 1: Read/Write processing WITHOUT aliasing
+    createSchemaStructuresInHBase(configuration, false); // create Tables with no aliasing
+    persistColumnData(configuration);
+    List<Result> resultListForCompleteScansWithoutAliases
+            = getResultListForCompleteScans(configuration);
+    clearTestingEnvironment();
+
+    // STEP 2: Read/Write processing WITH aliasing
+    createSchemaStructuresInHBase(configuration, true); // create Tables WITH aliasing
+    persistColumnData(configuration);
+    List<Result> resultListForCompleteScansWithAliases
+            = getResultListForCompleteScans(configuration);
+
+    compareResultLists(
+            "Complete result lists (WITHOUT aliasing and WITH aliasing): ",
+            resultListForCompleteScansWithoutAliases,
+            resultListForCompleteScansWithAliases);
+
+    clearTestingEnvironment();
+    System.out.println("#testMTableReadWrite has been COMPLETED.");
+  }
+
+  private void initializeTestNamespaceAndTableObjects() {
+
+    testNamespacesAndDescriptors = new TreeMap<>();
+    testTableNamesAndDescriptors = new TreeMap<>();
+    testColumnFamilyNamesAndDescriptors = new TreeMap<>();
+
+    for (String namespace : TEST_NAMESPACE_LIST) {
+      testNamespacesAndDescriptors.put(namespace, NamespaceDescriptor.create(namespace).build());
+      for (String tableNameString : TEST_TABLE_NAME_LIST) {
+        TableName tableName = TableName.valueOf(namespace, tableNameString);
+        testTableNamesAndDescriptors.put(tableName, new HTableDescriptor(tableName));
+      }
+    }
+    for (byte[] columnFamily : TEST_COLUMN_FAMILY_LIST) {
+      testColumnFamilyNamesAndDescriptors.put(
+              Bytes.toString(columnFamily), new HColumnDescriptor(columnFamily));
+    }
+    int maxVersions = 8;
+    for (HTableDescriptor htd : testTableNamesAndDescriptors.values()) {
+      for (HColumnDescriptor hcd : testColumnFamilyNamesAndDescriptors.values()) {
+        hcd.setMaxVersions(maxVersions);
+        htd.addFamily(hcd);
+      }
+    }
+  }
+
+  private void clearTestingEnvironment() throws IOException {
+    try (Admin standardAdmin = ConnectionFactory.createConnection().getAdmin()) {
+      RepositoryAdmin.uninstallRepositoryStructures(standardAdmin);
+      dropTestTablesAndNamespaces(standardAdmin);
+    }
+  }
+
+  private void dropTestTablesAndNamespaces(Admin standardAdmin) throws IOException {
+    // loop to disable and drop test tables and namespaces
+    for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+      if (!standardAdmin.tableExists(tableName)) {
+        continue;
+      }
+      if (!standardAdmin.isTableDisabled(tableName)) {
+        standardAdmin.disableTable(tableName);
+      }
+      standardAdmin.deleteTable(tableName);
+    }
+    for (String namespaceName : testNamespacesAndDescriptors.keySet()) {
+      if (namespaceName.isEmpty() || namespaceName.equals("default")) {
+        continue;
+      }
+      try { standardAdmin.deleteNamespace(namespaceName);
+      } catch (NamespaceNotFoundException e) {}
+    }
+  }
+
+  private void createSchemaStructuresInHBase(Configuration configuration,
+          boolean enableColumnAliases) throws IOException {
+
+    try (Admin mAdmin = MConnectionFactory.createConnection(configuration).getAdmin()) {
+      for (NamespaceDescriptor nd : testNamespacesAndDescriptors.values()) {
+        if (nd.getName().isEmpty() || nd.getName().equals("default")) {
+          continue;
+        }
+        mAdmin.createNamespace(nd);
+      }
+      for (HTableDescriptor htd : testTableNamesAndDescriptors.values()) {
+        mAdmin.createTable(htd);
+      }
+      if (enableColumnAliases) {
+        RepositoryAdmin repositoryAdmin = new RepositoryAdmin(mAdmin.getConnection());
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE01_TABLE01, CF01);
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE01_TABLE01, CF02);
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE01_TABLE02, CF01);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE01_TABLE02, CF02);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE01_TABLE03, CF01);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE01_TABLE03, CF02);
+
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE02_TABLE01, CF01);
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE02_TABLE01, CF02);
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE02_TABLE02, CF01);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE02_TABLE02, CF02);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE02_TABLE03, CF01);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE02_TABLE03, CF02);
+
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE03_TABLE01, CF01);
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE03_TABLE01, CF02);
+        enableColumnAliases(repositoryAdmin, true, NAMESPACE03_TABLE02, CF01);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE03_TABLE02, CF02);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE03_TABLE03, CF01);
+        enableColumnAliases(repositoryAdmin, false, NAMESPACE03_TABLE03, CF02);
+      }
+    }
+  }
+
+  private void enableColumnAliases(RepositoryAdmin repositoryAdmin, boolean enabled,
+          TableName tableName, byte[] colFamily) throws IOException {
+    try {
+      repositoryAdmin.enableColumnAliases(enabled, tableName, colFamily);
+    } catch (TableNotIncludedForProcessingException e) {}
+  }
+
+  private void persistColumnData(Configuration configuration)
+          throws IOException, InterruptedException {
+    try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
+      // put rows into Table which is INCLUDED for auditing
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        persistDataUsingTableMethods(mConnection, tableName);
+      }
+    }
+  }
+
+  private void persistDataUsingTableMethods(Connection connection, TableName tableName)
+          throws IOException, InterruptedException {
+    final byte[] tablePutWithList = Bytes.toBytes("persisted with table#put(List<Put>)");
+    final byte[] tablePutWithBatch = Bytes.toBytes("persisted with table#batch(List<Row>)");
+
+    try (Table table = connection.getTable(tableName)) {
+      // test Table#put(List<Put>)
+      List<Put> putList = new LinkedList<>();
+      putList.add(new Put(ROW_ID_01).
+              addColumn(CF01, COLQUALIFIER01, tablePutWithList).
+              addColumn(CF01, COLQUALIFIER02, tablePutWithList));
+      putList.add(new Put(ROW_ID_02).
+              addColumn(CF01, COLQUALIFIER01, tablePutWithList).
+              addColumn(CF01, COLQUALIFIER03, tablePutWithList).
+              addColumn(CF02, COLQUALIFIER04, tablePutWithList));
+      table.put(putList);
+      // test Table#put(Put)
+      table.put(new Put(ROW_ID_03).
+              addColumn(CF01, COLQUALIFIER04, tablePutWithList).
+              addColumn(CF02, COLQUALIFIER02, tablePutWithList));
+      // test Table#append
+      // append both to an existing column, AND create a new column
+      table.append(new Append(ROW_ID_02)
+              .add(CF01, COLQUALIFIER03, Bytes.toBytes("appendedString"))
+              .add(CF01, COLQUALIFIER02, Bytes.toBytes("newColumnViaAppend")));
+      // use append to create new row with newly-used colQualifier
+      table.append(new Append(ROW_ID_04)
+              .add(CF01, COLQUALIFIER06, Bytes.toBytes("newColumnViaAppend")));
+      // test Table#increment
+      Result incrementResult
+              = table.increment(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 3));
+      assertEquals("Incremented value incorrect.",
+              3, Bytes.toLong(incrementResult.getValue(CF01, COLQUALIFIER05)));
+      incrementResult
+              = table.increment(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 8));
+      assertEquals("Incremented value incorrect.",
+              11, Bytes.toLong(incrementResult.getValue(CF01, COLQUALIFIER05)));
+      // test Table#incrementColumnValue
+      assertEquals("Incremented value incorrect.",
+              14, table.incrementColumnValue(ROW_ID_02, CF01, COLQUALIFIER05, 3));
+      // tst Table#batch with Append, Delete, Increment, Put, and Get
+      List<Row> actions = new LinkedList<>();
+      actions.add(new Append(ROW_ID_02)
+              .add(CF01, COLQUALIFIER03, Bytes.toBytes("appendedStringViaBatch")));
+      actions.add(new Delete(ROW_ID_03).addColumn(CF01, COLQUALIFIER04));
+      actions.add(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 14));
+      actions.add(new Put(ROW_ID_05).
+              addColumn(CF01, COLQUALIFIER04, tablePutWithList).
+              addColumn(CF02, COLQUALIFIER02, tablePutWithList));
+      actions.add(new Get(ROW_ID_01).addColumn(CF01, COLQUALIFIER02));
+      Object[] returnedObjects = new Object[actions.size()];
+      table.batch(actions, returnedObjects);
+      int index = 0;
+      for (Object returnedObject : returnedObjects) {
+        assertTrue("Table#batch action failed for " + actions.get(index).getClass().getSimpleName(),
+                returnedObject != null);
+        if (Get.class.isAssignableFrom(actions.get(index).getClass())) {
+          Result resultFromGet = (Result)returnedObject;
+          assertTrue("Table#batch Get action returned unexpected Result: expected <"
+                  + Bytes.toString(tablePutWithList) + ">, returned <"
+                  + Bytes.toString(resultFromGet.getValue(CF01, COLQUALIFIER02)) + ">",
+                  Bytes.equals(tablePutWithList, resultFromGet.getValue(CF01, COLQUALIFIER02)));
+        }
+        index++;
+      }
+    }
+  }
+
+  private List<Result> getResultListForCompleteScans(Configuration configuration)
+          throws IOException {
+    List<Result> resultList = new LinkedList<>();
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        ResultScanner resultScanner = getScanner(connection, tableName, new Scan());
+        Iterator<Result> resultIterator = resultScanner.iterator();
+        while (resultIterator.hasNext()) {
+          resultList.add(resultIterator.next());
+        }
+      }
+    }
+    return resultList;
+  }
+
+  private ResultScanner getScanner(Connection connection, TableName tableName, Scan scanObject)
+          throws IOException {
+    try (Table table = connection.getTable(tableName)) {
+      return table.getScanner(scanObject);
+    }
+  }
+
+  private void compareResultLists(String assertFailureMsg,
+          List<Result> resultListWithoutAliases, List<Result> resultListWithAliases) {
+    assertEquals(assertFailureMsg + "List SIZES unequal.",
+            resultListWithoutAliases.size(),
+            resultListWithAliases.size());
+    Iterator<Result> resultIteratorWithoutAliases = resultListWithoutAliases.iterator();
+    Iterator<Result> resultIteratorWithAliases = resultListWithAliases.iterator();
+    while (resultIteratorWithoutAliases.hasNext()) {
+      Set<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>> familyEntrySetWithoutAliases
+              = resultIteratorWithoutAliases.next().getMap().entrySet();
+      Set<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>> familyEntrySetWithAliases
+              = resultIteratorWithAliases.next().getMap().entrySet();
+      assertEquals(assertFailureMsg + "Result Family-Entry Set SIZES unequal.",
+              familyEntrySetWithoutAliases.size(), familyEntrySetWithAliases.size());
+      Iterator<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>>
+              familyEntryIteratorWithoutAliases = familyEntrySetWithoutAliases.iterator();
+      Iterator<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>>
+              familyEntryIteratorWithAliases = familyEntrySetWithAliases.iterator();
+      while (familyEntryIteratorWithoutAliases.hasNext()) {
+        Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyEntryWithoutAliases
+                = familyEntryIteratorWithoutAliases.next();
+        Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>> familyEntryWithAliases
+                = familyEntryIteratorWithAliases.next();
+        assertTrue(assertFailureMsg + "Result Entry COLUMN FAMILIES unequal: <"
+                + Bytes.toString(familyEntryWithoutAliases.getKey()) +  "> NOT EQUAL TO <"
+                + Bytes.toString(familyEntryWithAliases.getKey()),
+                Bytes.equals(familyEntryWithoutAliases.getKey(), familyEntryWithAliases.getKey()));
+        Set<Entry<byte[],NavigableMap<Long,byte[]>>> columnEntrySetWithoutAliases
+                = familyEntryWithoutAliases.getValue().entrySet();
+        Set<Entry<byte[],NavigableMap<Long,byte[]>>> columnEntrySetWithAliases
+                = familyEntryWithAliases.getValue().entrySet();
+        assertEquals(assertFailureMsg + "Result Column-Entry Set SIZES unequal.",
+                columnEntrySetWithoutAliases.size(), columnEntrySetWithAliases.size());
+        Iterator<Entry<byte[],NavigableMap<Long,byte[]>>>
+                columnEntryIteratorWithoutAliases = columnEntrySetWithoutAliases.iterator();
+        Iterator<Entry<byte[],NavigableMap<Long,byte[]>>>
+                columnEntryIteratorWithAliases = columnEntrySetWithAliases.iterator();
+        while (columnEntryIteratorWithoutAliases.hasNext()) {
+          Entry<byte[],NavigableMap<Long,byte[]>> columnEntryWithoutAliases
+                  = columnEntryIteratorWithoutAliases.next();
+          Entry<byte[],NavigableMap<Long,byte[]>> columnEntryWithAliases
+                  = columnEntryIteratorWithAliases.next();
+          assertTrue(assertFailureMsg + "Result Entry COLUMN QUALIFIERS unequal: <"
+                  + Bytes.toString(columnEntryWithoutAliases.getKey()) +  "> NOT EQUAL TO <"
+                  + Bytes.toString(columnEntryWithAliases.getKey()),
+                  Bytes.equals(columnEntryWithoutAliases.getKey(),
+                          columnEntryWithAliases.getKey()));
+          Set<Entry<Long,byte[]>> cellEntrySetWithoutAliases
+                  = columnEntryWithoutAliases.getValue().entrySet();
+          Set<Entry<Long,byte[]>> cellEntrySetWithAliases
+                  = columnEntryWithAliases.getValue().entrySet();
+          assertEquals(assertFailureMsg + "Result Cell-Entry Set SIZES unequal.",
+                  cellEntrySetWithoutAliases.size(), cellEntrySetWithAliases.size());
+          Iterator<Entry<Long,byte[]>>
+                  cellEntryIteratorWithoutAliases = cellEntrySetWithoutAliases.iterator();
+          Iterator<Entry<Long,byte[]>>
+                  cellEntryIteratorWithAliases = cellEntrySetWithAliases.iterator();
+          while (cellEntryIteratorWithoutAliases.hasNext()) {
+            byte[] cellValueWithoutAliases = cellEntryIteratorWithoutAliases.next().getValue();
+            byte[] cellValueWithAliases = cellEntryIteratorWithAliases.next().getValue();
+            assertTrue(assertFailureMsg + "Result Cell-Entry VALUES unequal: <"
+                    + Bytes.toString(cellValueWithoutAliases) +  "> NOT EQUAL TO <"
+                    + Bytes.toString(cellValueWithAliases),
+                    Bytes.equals(cellValueWithoutAliases, cellValueWithAliases));
+            // NOTE: cell timestamps will ALWAYS be unequal -- do NOT compare them!
+          }
+        }
+      }
+    }
+  }
+
+  private void scratch() {
+    Get convertedGet = new Get(Bytes.toBytes("rowId01"));
+    convertedGet.addColumn(Bytes.toBytes("CF"), Bytes.toBytes("Column"));
+    System.out.println("\nConverted Get's RowID: " + Bytes.toString(convertedGet.getRow()));
+    for (Entry<byte[], NavigableSet<byte[]>> familyEntry : convertedGet.getFamilyMap().entrySet()) {
+      System.out.println("Conversions for family: " + Bytes.toString(familyEntry.getKey()));
+      for (byte[] qualifier : familyEntry.getValue()) {
+        System.out.println("  Qualifier: " + Bytes.toString(qualifier));
+      }
+    }
+  }
+
+  public static void main(String[] args) throws IOException, InterruptedException {
+    new TestColumnAliasing().testMTableReadWrite();
+    // new TestColumnAliasing().scratch();
+  }
+}
