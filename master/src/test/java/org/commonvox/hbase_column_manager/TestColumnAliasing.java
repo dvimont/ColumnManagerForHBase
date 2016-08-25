@@ -44,8 +44,10 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Row;
+import org.apache.hadoop.hbase.client.RowMutations;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp;
 import org.apache.hadoop.hbase.util.Bytes;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -69,12 +71,20 @@ public class TestColumnAliasing {
           = new ArrayList<>(Arrays.asList(Bytes.toBytes("column01"), Bytes.toBytes("column02"),
                           Bytes.toBytes("column03"), Bytes.toBytes("column04"),
                           Bytes.toBytes("column05"), Bytes.toBytes("column06")));
-  private static final byte[] QUALIFIER_IN_EXCLUDED_TABLE = Bytes.toBytes("qualifierOnExcludedTable");
+//private static final byte[] QUALIFIER_IN_EXCLUDED_TABLE = Bytes.toBytes("qualifierOnExcludedTable");
   private static final byte[] ROW_ID_01 = Bytes.toBytes("rowId01");
   private static final byte[] ROW_ID_02 = Bytes.toBytes("rowId02");
   private static final byte[] ROW_ID_03 = Bytes.toBytes("rowId03");
   private static final byte[] ROW_ID_04 = Bytes.toBytes("rowId04");
   private static final byte[] ROW_ID_05 = Bytes.toBytes("rowId05");
+  private static final List<byte[]> TEST_ROW_ID_LIST = new LinkedList<>();
+  static {
+    TEST_ROW_ID_LIST.add(ROW_ID_01);
+    TEST_ROW_ID_LIST.add(ROW_ID_02);
+    TEST_ROW_ID_LIST.add(ROW_ID_03);
+    TEST_ROW_ID_LIST.add(ROW_ID_04);
+    TEST_ROW_ID_LIST.add(ROW_ID_05);
+  }
   private static final byte[] VALUE_2_BYTES_LONG = Bytes.toBytes("xy");
   private static final byte[] VALUE_5_BYTES_LONG = Bytes.toBytes("54321");
   private static final byte[] VALUE_9_BYTES_LONG = Bytes.toBytes("123456789");
@@ -132,6 +142,18 @@ public class TestColumnAliasing {
   private static final byte[] COLQUALIFIER04 = TEST_COLUMN_QUALIFIER_LIST.get(3);
   private static final byte[] COLQUALIFIER05 = TEST_COLUMN_QUALIFIER_LIST.get(4);
   private static final byte[] COLQUALIFIER06 = TEST_COLUMN_QUALIFIER_LIST.get(5);
+
+  // static column values for testing CRUD methods
+  private static final byte[] TABLE_SIMPLE_PUT
+          = Bytes.toBytes("persisted with table#put(Put)");
+  private static final byte[] TABLE_PUT_WITH_LIST
+          = Bytes.toBytes("persisted with table#put(List<Put>)");
+  private static final byte[] TABLE_PUT_WITH_CHECKPUT
+          = Bytes.toBytes("persisted with table#checkAndPut");
+  private static final byte[] TABLE_PUT_WITH_BATCH
+          = Bytes.toBytes("persisted with table#batch(List<Row>)");
+
+
   // non-static fields
   private Map<String, NamespaceDescriptor> testNamespacesAndDescriptors;
   private Map<TableName, HTableDescriptor> testTableNamesAndDescriptors;
@@ -149,19 +171,55 @@ public class TestColumnAliasing {
     createSchemaStructuresInHBase(configuration, false); // create Tables with no aliasing
     persistColumnData(configuration);
     List<Result> resultListForCompleteScansWithoutAliases
-            = getResultListForCompleteScans(configuration);
+            = getResultListUsingGetScannerForFullTableScan(configuration);
+    List<Result> resultListForSpecificScansWithoutAliases
+            = getResultListUsingGetScannerForSpecificScan(configuration);
+    List<Result> resultListForFamilyScansWithoutAliases
+            = getResultListUsingGetScannerForFamilyScan(configuration);
+    List<Result> resultListForColumnScansWithoutAliases
+            = getResultListUsingGetScannerForColumnScan(configuration);
+    List<Result> resultListForIndividualGetsWithoutAliases
+            = getResultListUsingIndividualGets(configuration);
+
+
     clearTestingEnvironment();
 
     // STEP 2: Read/Write processing WITH aliasing
     createSchemaStructuresInHBase(configuration, true); // create Tables WITH aliasing
     persistColumnData(configuration);
     List<Result> resultListForCompleteScansWithAliases
-            = getResultListForCompleteScans(configuration);
+            = getResultListUsingGetScannerForFullTableScan(configuration);
+    List<Result> resultListForSpecificScansWithAliases
+            = getResultListUsingGetScannerForSpecificScan(configuration);
+    List<Result> resultListForFamilyScansWithAliases
+            = getResultListUsingGetScannerForFamilyScan(configuration);
+    List<Result> resultListForColumnScansWithAliases
+            = getResultListUsingGetScannerForColumnScan(configuration);
+    List<Result> resultListForIndividualGetsWithAliases
+            = getResultListUsingIndividualGets(configuration);
 
+
+    // STEP 3: Compare Step 1 results with Step 2 results
     compareResultLists(
-            "Complete result lists (WITHOUT aliasing and WITH aliasing): ",
+            "#getScanner with Full-table-Scan result lists (WITHOUT aliasing and WITH aliasing): ",
             resultListForCompleteScansWithoutAliases,
             resultListForCompleteScansWithAliases);
+    compareResultLists(
+            "#getScanner with Specific-Scan result lists (WITHOUT aliasing and WITH aliasing): ",
+            resultListForSpecificScansWithoutAliases,
+            resultListForSpecificScansWithAliases);
+    compareResultLists(
+            "#getScanner with Family-Scan result lists (WITHOUT aliasing and WITH aliasing): ",
+            resultListForFamilyScansWithoutAliases,
+            resultListForFamilyScansWithAliases);
+    compareResultLists(
+            "#getScanner with Column-Scan result lists (WITHOUT aliasing and WITH aliasing): ",
+            resultListForColumnScansWithoutAliases,
+            resultListForColumnScansWithAliases);
+    compareResultLists(
+            "result lists from individual #get invocations (WITHOUT aliasing and WITH aliasing): ",
+            resultListForIndividualGetsWithoutAliases,
+            resultListForIndividualGetsWithAliases);
 
     clearTestingEnvironment();
     System.out.println("#testMTableReadWrite has been COMPLETED.");
@@ -269,7 +327,6 @@ public class TestColumnAliasing {
   private void persistColumnData(Configuration configuration)
           throws IOException, InterruptedException {
     try (Connection mConnection = MConnectionFactory.createConnection(configuration)) {
-      // put rows into Table which is INCLUDED for auditing
       for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
         persistDataUsingTableMethods(mConnection, tableName);
       }
@@ -278,24 +335,29 @@ public class TestColumnAliasing {
 
   private void persistDataUsingTableMethods(Connection connection, TableName tableName)
           throws IOException, InterruptedException {
-    final byte[] tablePutWithList = Bytes.toBytes("persisted with table#put(List<Put>)");
-    final byte[] tablePutWithBatch = Bytes.toBytes("persisted with table#batch(List<Row>)");
 
     try (Table table = connection.getTable(tableName)) {
       // test Table#put(List<Put>)
       List<Put> putList = new LinkedList<>();
       putList.add(new Put(ROW_ID_01).
-              addColumn(CF01, COLQUALIFIER01, tablePutWithList).
-              addColumn(CF01, COLQUALIFIER02, tablePutWithList));
+              addColumn(CF01, COLQUALIFIER01, TABLE_PUT_WITH_LIST).
+              addColumn(CF01, COLQUALIFIER02, TABLE_PUT_WITH_LIST));
       putList.add(new Put(ROW_ID_02).
-              addColumn(CF01, COLQUALIFIER01, tablePutWithList).
-              addColumn(CF01, COLQUALIFIER03, tablePutWithList).
-              addColumn(CF02, COLQUALIFIER04, tablePutWithList));
+              addColumn(CF01, COLQUALIFIER01, TABLE_PUT_WITH_LIST).
+              addColumn(CF01, COLQUALIFIER03, TABLE_PUT_WITH_LIST).
+              addColumn(CF02, COLQUALIFIER04, TABLE_PUT_WITH_LIST));
       table.put(putList);
       // test Table#put(Put)
       table.put(new Put(ROW_ID_03).
-              addColumn(CF01, COLQUALIFIER04, tablePutWithList).
-              addColumn(CF02, COLQUALIFIER02, tablePutWithList));
+              addColumn(CF01, COLQUALIFIER04, TABLE_SIMPLE_PUT).
+              addColumn(CF02, COLQUALIFIER02, TABLE_SIMPLE_PUT));
+      // test Table#checkAndPut
+      assertTrue("Table#checkAndPut unexpectedly failed",
+        table.checkAndPut(ROW_ID_03, CF01, COLQUALIFIER04, TABLE_SIMPLE_PUT,
+                new Put(ROW_ID_03).addColumn(CF01, COLQUALIFIER03, TABLE_PUT_WITH_CHECKPUT)));
+      assertTrue("Table#checkAndPut unexpectedly failed",
+        table.checkAndPut(ROW_ID_03, CF01, COLQUALIFIER03, CompareOp.NOT_EQUAL, TABLE_SIMPLE_PUT,
+                new Put(ROW_ID_03).addColumn(CF01, COLQUALIFIER05, TABLE_PUT_WITH_CHECKPUT)));
       // test Table#append
       // append both to an existing column, AND create a new column
       table.append(new Append(ROW_ID_02)
@@ -309,50 +371,107 @@ public class TestColumnAliasing {
               = table.increment(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 3));
       assertEquals("Incremented value incorrect.",
               3, Bytes.toLong(incrementResult.getValue(CF01, COLQUALIFIER05)));
+      waitBetweenIncrements();
       incrementResult
               = table.increment(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 8));
       assertEquals("Incremented value incorrect.",
               11, Bytes.toLong(incrementResult.getValue(CF01, COLQUALIFIER05)));
+      waitBetweenIncrements();
       // test Table#incrementColumnValue
       assertEquals("Incremented value incorrect.",
               14, table.incrementColumnValue(ROW_ID_02, CF01, COLQUALIFIER05, 3));
-      // tst Table#batch with Append, Delete, Increment, Put, and Get
-      List<Row> actions = new LinkedList<>();
-      actions.add(new Append(ROW_ID_02)
-              .add(CF01, COLQUALIFIER03, Bytes.toBytes("appendedStringViaBatch")));
-      actions.add(new Delete(ROW_ID_03).addColumn(CF01, COLQUALIFIER04));
-      actions.add(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 14));
-      actions.add(new Put(ROW_ID_05).
-              addColumn(CF01, COLQUALIFIER04, tablePutWithList).
-              addColumn(CF02, COLQUALIFIER02, tablePutWithList));
-      actions.add(new Get(ROW_ID_01).addColumn(CF01, COLQUALIFIER02));
-      Object[] returnedObjects = new Object[actions.size()];
-      table.batch(actions, returnedObjects);
-      int index = 0;
-      for (Object returnedObject : returnedObjects) {
-        assertTrue("Table#batch action failed for " + actions.get(index).getClass().getSimpleName(),
-                returnedObject != null);
-        if (Get.class.isAssignableFrom(actions.get(index).getClass())) {
-          Result resultFromGet = (Result)returnedObject;
-          assertTrue("Table#batch Get action returned unexpected Result: expected <"
-                  + Bytes.toString(tablePutWithList) + ">, returned <"
-                  + Bytes.toString(resultFromGet.getValue(CF01, COLQUALIFIER02)) + ">",
-                  Bytes.equals(tablePutWithList, resultFromGet.getValue(CF01, COLQUALIFIER02)));
-        }
-        index++;
-      }
+      waitBetweenIncrements();
+      // test Table#batch with Append, Delete, Increment, Put, and Get
+      testBatchProcessing(table);
+      // test Table#delete
+      table.delete(new Delete(ROW_ID_01).addColumn(CF01, COLQUALIFIER02));
+      // test Table#delete(List)
+      List<Delete> deleteList = new LinkedList<>();
+      deleteList.add(new Delete(ROW_ID_02).addColumn(CF01, COLQUALIFIER02));
+      deleteList.add(new Delete(ROW_ID_03).addColumn(CF01, COLQUALIFIER05));
+      table.delete(deleteList);
+      // test Table#checkAndDelete
+      table.put(new Put(ROW_ID_02).addColumn(CF01, COLQUALIFIER02, TABLE_SIMPLE_PUT));
+      assertTrue("Table#checkAndDelete unexpectedly failed",
+        table.checkAndDelete(ROW_ID_02, CF01, COLQUALIFIER01, TABLE_PUT_WITH_LIST,
+                new Delete(ROW_ID_02).addColumn(CF01, COLQUALIFIER02)));
+      table.put(new Put(ROW_ID_02).addColumn(CF01, COLQUALIFIER02, TABLE_SIMPLE_PUT));
+      assertTrue("Table#checkAndDelete unexpectedly failed",
+        table.checkAndDelete(ROW_ID_02, CF01, COLQUALIFIER01, CompareOp.NOT_EQUAL, TABLE_SIMPLE_PUT,
+                new Delete(ROW_ID_02).addColumn(CF01, COLQUALIFIER02)));
+      // test Table#mutateRow
+      RowMutations rowMutations = new RowMutations(ROW_ID_02);
+      rowMutations.add(new Put(ROW_ID_02).addColumn(CF01, COLQUALIFIER02, TABLE_SIMPLE_PUT));
+      rowMutations.add(new Delete(ROW_ID_02).addColumn(CF01, COLQUALIFIER05));
+      table.mutateRow(rowMutations);
+      // test Table#checkAndMutate
+      rowMutations = new RowMutations(ROW_ID_02);
+      rowMutations.add(new Delete(ROW_ID_02).addColumn(CF01, COLQUALIFIER02));
+      rowMutations.add(new Put(ROW_ID_02).addColumn(CF02, COLQUALIFIER06, TABLE_SIMPLE_PUT));
+      assertTrue("Table#checkAndMutate unexpectedly failed",
+        table.checkAndMutate(ROW_ID_02, CF01, COLQUALIFIER01, CompareOp.NOT_EQUAL, TABLE_SIMPLE_PUT,
+                rowMutations));
     }
   }
 
-  private List<Result> getResultListForCompleteScans(Configuration configuration)
+  private void testBatchProcessing(Table table) throws IOException, InterruptedException {
+    List<Row> actions = new LinkedList<>();
+    actions.add(new Append(ROW_ID_02)
+            .add(CF01, COLQUALIFIER03, Bytes.toBytes("appendedStringViaBatch")));
+    actions.add(new Delete(ROW_ID_03).addColumn(CF01, COLQUALIFIER04));
+    actions.add(new Increment(ROW_ID_02).addColumn(CF01, COLQUALIFIER05, 14));
+    actions.add(new Put(ROW_ID_05).
+            addColumn(CF01, COLQUALIFIER04, TABLE_PUT_WITH_LIST).
+            addColumn(CF02, COLQUALIFIER02, TABLE_PUT_WITH_LIST));
+    actions.add(new Get(ROW_ID_01).addColumn(CF01, COLQUALIFIER02));
+    Object[] returnedObjects = new Object[actions.size()];
+    table.batch(actions, returnedObjects);
+    int index = 0;
+    for (Object returnedObject : returnedObjects) {
+      assertTrue("Table#batch action failed for " + actions.get(index).getClass().getSimpleName(),
+              returnedObject != null);
+      if (Get.class.isAssignableFrom(actions.get(index).getClass())) {
+        Result resultFromGet = (Result)returnedObject;
+        assertTrue("Table#batch Get action returned unexpected Result: expected <"
+                + Bytes.toString(TABLE_PUT_WITH_LIST) + ">, returned <"
+                + Bytes.toString(resultFromGet.getValue(CF01, COLQUALIFIER02)) + ">",
+                Bytes.equals(TABLE_PUT_WITH_LIST, resultFromGet.getValue(CF01, COLQUALIFIER02)));
+      }
+      index++;
+    }
+  }
+
+  private List<Result> getResultListUsingGetScannerForFullTableScan(Configuration configuration)
           throws IOException {
     List<Result> resultList = new LinkedList<>();
     try (Connection connection = MConnectionFactory.createConnection(configuration)) {
       for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
-        ResultScanner resultScanner = getScanner(connection, tableName, new Scan());
-        Iterator<Result> resultIterator = resultScanner.iterator();
+        Iterator<Result> resultIterator = getScanner(connection, tableName, new Scan()).iterator();
         while (resultIterator.hasNext()) {
           resultList.add(resultIterator.next());
+        }
+      }
+    }
+    return resultList;
+  }
+
+  private List<Result> getResultListUsingGetScannerForSpecificScan(Configuration configuration)
+          throws IOException {
+    List<Result> resultList = new LinkedList<>();
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        Scan specificScan = new Scan()
+                .addColumn(CF01, COLQUALIFIER01).addColumn(CF01, COLQUALIFIER02)
+                .addColumn(CF01, COLQUALIFIER03).addColumn(CF01, COLQUALIFIER04)
+                .addColumn(CF01, COLQUALIFIER05).addColumn(CF01, COLQUALIFIER06)
+                .addColumn(CF02, COLQUALIFIER01).addColumn(CF02, COLQUALIFIER02)
+                .addColumn(CF02, COLQUALIFIER03).addColumn(CF02, COLQUALIFIER04)
+                .addColumn(CF02, COLQUALIFIER05).addColumn(CF02, COLQUALIFIER06);
+        try (ResultScanner resultScanner = getScanner(connection, tableName, specificScan)) {
+          Iterator<Result> resultIterator = resultScanner.iterator();
+          while (resultIterator.hasNext()) {
+            resultList.add(resultIterator.next());
+          }
         }
       }
     }
@@ -366,6 +485,72 @@ public class TestColumnAliasing {
     }
   }
 
+  private List<Result> getResultListUsingGetScannerForFamilyScan(Configuration configuration)
+          throws IOException {
+    List<Result> resultList = new LinkedList<>();
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        try (ResultScanner resultScanner = getScannerForFamily(connection, tableName)) {
+          Iterator<Result> resultIterator = resultScanner.iterator();
+          while (resultIterator.hasNext()) {
+            resultList.add(resultIterator.next());
+          }
+        }
+      }
+    }
+    return resultList;
+  }
+
+  private ResultScanner getScannerForFamily(Connection connection, TableName tableName)
+          throws IOException {
+    try (Table table = connection.getTable(tableName)) {
+      return table.getScanner(CF01);
+    }
+  }
+
+  private List<Result> getResultListUsingGetScannerForColumnScan(Configuration configuration)
+          throws IOException {
+    List<Result> resultList = new LinkedList<>();
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        try (ResultScanner resultScanner = getScannerForColumn(connection, tableName)) {
+          Iterator<Result> resultIterator = resultScanner.iterator();
+          while (resultIterator.hasNext()) {
+            resultList.add(resultIterator.next());
+          }
+        }
+      }
+    }
+    return resultList;
+  }
+
+  private ResultScanner getScannerForColumn(Connection connection, TableName tableName)
+          throws IOException {
+    try (Table table = connection.getTable(tableName)) {
+      return table.getScanner(CF01, COLQUALIFIER01);
+    }
+  }
+
+  private List<Result> getResultListUsingIndividualGets(Configuration configuration)
+          throws IOException {
+    List<Result> resultList = new LinkedList<>();
+    try (Connection connection = MConnectionFactory.createConnection(configuration)) {
+      for (TableName tableName : testTableNamesAndDescriptors.keySet()) {
+        try (Table table = connection.getTable(tableName)) {
+          for (byte[] rowId : TEST_ROW_ID_LIST) {
+            resultList.add(table.get(new Get(rowId)));
+            for (byte[] colFamily : TEST_COLUMN_FAMILY_LIST) {
+              for (byte[] colQualifier : TEST_COLUMN_QUALIFIER_LIST) {
+                resultList.add(table.get(new Get(rowId).addColumn(colFamily, colQualifier)));
+              }
+            }
+          }
+        }
+      }
+    }
+    return resultList;
+  }
+
   private void compareResultLists(String assertFailureMsg,
           List<Result> resultListWithoutAliases, List<Result> resultListWithAliases) {
     assertEquals(assertFailureMsg + "List SIZES unequal.",
@@ -374,10 +559,17 @@ public class TestColumnAliasing {
     Iterator<Result> resultIteratorWithoutAliases = resultListWithoutAliases.iterator();
     Iterator<Result> resultIteratorWithAliases = resultListWithAliases.iterator();
     while (resultIteratorWithoutAliases.hasNext()) {
+      Result resultWithoutAliases = resultIteratorWithoutAliases.next();
+      Result resultWithAliases = resultIteratorWithAliases.next();
+      assertEquals(assertFailureMsg + "Result #isEmpty values are unequal.",
+              resultWithoutAliases.isEmpty(), resultWithAliases.isEmpty());
+      if (resultWithoutAliases.isEmpty()) {
+        continue;
+      }
       Set<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>> familyEntrySetWithoutAliases
-              = resultIteratorWithoutAliases.next().getMap().entrySet();
+              = resultWithoutAliases.getMap().entrySet();
       Set<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>> familyEntrySetWithAliases
-              = resultIteratorWithAliases.next().getMap().entrySet();
+              = resultWithAliases.getMap().entrySet();
       assertEquals(assertFailureMsg + "Result Family-Entry Set SIZES unequal.",
               familyEntrySetWithoutAliases.size(), familyEntrySetWithAliases.size());
       Iterator<Entry<byte[],NavigableMap<byte[],NavigableMap<Long,byte[]>>>>
@@ -426,9 +618,14 @@ public class TestColumnAliasing {
           while (cellEntryIteratorWithoutAliases.hasNext()) {
             byte[] cellValueWithoutAliases = cellEntryIteratorWithoutAliases.next().getValue();
             byte[] cellValueWithAliases = cellEntryIteratorWithAliases.next().getValue();
-            assertTrue(assertFailureMsg + "Result Cell-Entry VALUES unequal: <"
-                    + Bytes.toString(cellValueWithoutAliases) +  "> NOT EQUAL TO <"
-                    + Bytes.toString(cellValueWithAliases),
+            assertTrue(assertFailureMsg + "ColumnFamily <"
+                    + Bytes.toString(familyEntryWithoutAliases.getKey())
+                    + "> Qualifier <" + Bytes.toString(columnEntryWithoutAliases.getKey())
+                    + "> -- Result Cell-Entry VALUES unequal: <"
+                    + Repository.getPrintableString(cellValueWithoutAliases)
+                    +  "> NOT EQUAL TO <"
+                    + Repository.getPrintableString(cellValueWithAliases)
+                    + ">",
                     Bytes.equals(cellValueWithoutAliases, cellValueWithAliases));
             // NOTE: cell timestamps will ALWAYS be unequal -- do NOT compare them!
           }
@@ -446,6 +643,18 @@ public class TestColumnAliasing {
       for (byte[] qualifier : familyEntry.getValue()) {
         System.out.println("  Qualifier: " + Bytes.toString(qualifier));
       }
+    }
+  }
+
+  /**
+   * Need to wait between Increment submissions; otherwise, risk having increment-column cells
+   * with IDENTICAL timestamps, which screws up the validation logic of these tests.
+   */
+  private void waitBetweenIncrements() {
+    try {
+      Thread.sleep(5);  // 5 milliseconds
+    } catch(InterruptedException ex) {
+      Thread.currentThread().interrupt();
     }
   }
 
