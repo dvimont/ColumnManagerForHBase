@@ -35,6 +35,7 @@ class MBufferedMutator implements BufferedMutator {
   private final BufferedMutator wrappedBufferedMutator;
   private final Repository repository;
   private final MTableDescriptor mTableDescriptor;
+  private final boolean includedInRepositoryProcessing;
 
   MBufferedMutator(BufferedMutator userBufferedMutator, Repository repository)
           throws IOException {
@@ -42,8 +43,10 @@ class MBufferedMutator implements BufferedMutator {
     this.repository = repository;
     if (this.repository.isActivated()) {
       mTableDescriptor = this.repository.getMTableDescriptor(wrappedBufferedMutator.getName());
+      includedInRepositoryProcessing = repository.isIncludedTable(wrappedBufferedMutator.getName());
     } else {
       mTableDescriptor = null;
+      includedInRepositoryProcessing = false;
     }
   }
 
@@ -60,12 +63,12 @@ class MBufferedMutator implements BufferedMutator {
   @Override
   public void mutate(Mutation mutation) throws IOException {
     // ColumnManager validation
-    if (repository.isActivated()
+    if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, mutation);
     }
     // Alias processing
-    if (repository.isIncludedTable(mTableDescriptor.getTableName())
+    if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
       NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
               = repository.getFamilyQualifierToAliasMap(mTableDescriptor, mutation);
@@ -77,7 +80,7 @@ class MBufferedMutator implements BufferedMutator {
       wrappedBufferedMutator.mutate(mutation);
     }
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (includedInRepositoryProcessing) {
       repository.putColumnAuditorSchemaEntities(mTableDescriptor, mutation);
     }
   }
@@ -85,12 +88,12 @@ class MBufferedMutator implements BufferedMutator {
   @Override
   public void mutate(List<? extends Mutation> mutationList) throws IOException {
     // ColumnManager validation
-    if (repository.isActivated()
+    if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
       repository.validateColumns(mTableDescriptor, mutationList);
     }
     // Alias processing
-    if (repository.isIncludedTable(mTableDescriptor.getTableName())
+    if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
       NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
               = repository.getFamilyQualifierToAliasMap(mTableDescriptor, mutationList, 0);
@@ -107,7 +110,7 @@ class MBufferedMutator implements BufferedMutator {
       wrappedBufferedMutator.mutate(mutationList);
     }
     // ColumnManager auditing
-    if (repository.isActivated()) {
+    if (includedInRepositoryProcessing) {
       repository.putColumnAuditorSchemaEntities(mTableDescriptor, mutationList);
     }
   }

@@ -267,10 +267,12 @@ class MTable implements Table {
         Result[] originalResults = wrappedTable.get(convertedGets);
 
         // do alias-to-qualifier conversion of Results before returning them
+        NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyAliasToQualifierMap
+                = repository.getFamilyAliasToQualifierMap(familyQualifierToAliasMap);
         List<Result> convertedResults = new LinkedList<>();
         for (Result originalResult : originalResults) {
           convertedResults.add(
-                  repository.convertAliasesToQualifiers(originalResult, familyQualifierToAliasMap));
+                  repository.convertAliasesToQualifiers(originalResult, familyAliasToQualifierMap));
         }
         return convertedResults.toArray(new Result[convertedResults.size()]);
       }

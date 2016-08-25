@@ -103,7 +103,7 @@ class MTableMultiplexer extends HTableMultiplexer {
    */
   @Override
   public List<Put> put(TableName tableName, List<Put> puts) {
-    // NOTE: super method calls MTableMultiplexer#put(tn, put, retry), so no CM processing here!
+    // NOTE: super method calls #put(tn, put, retry), so no ColumnManager processing here!
     return super.put(tableName, puts);
   }
 
@@ -133,11 +133,25 @@ class MTableMultiplexer extends HTableMultiplexer {
   }
 
   private boolean put(TableName tableName, Put put, int retry, boolean includeRetry) {
+    boolean includedInRepositoryProcessing = false;
+    MTableDescriptor mtd = null;
+    if (repository.isActivated()
+            && repository.isIncludedTable(tableName)) {
+      includedInRepositoryProcessing = true;
+      try {
+        mtd = repository.getMTableDescriptor(tableName);
+      // must catch IOException (HTableMultiplexer#put does NOT throw such an exception)
+      } catch (IOException e) {
+        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
+        return false;
+      }
+    }
     // ColumnManager validation
-    if (repository.isActivated()) {
+    if (includedInRepositoryProcessing
+            && mtd.hasColDescriptorWithColDefinitionsEnforced()) {
       try {
         repository.validateColumns(tableName, put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
+      // must catch IOException (HTableMultiplexer#put does NOT throw such an exception)
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
         return false;
@@ -145,23 +159,15 @@ class MTableMultiplexer extends HTableMultiplexer {
     }
     boolean putRequestQueued = false;
     // Alias processing
-    if (repository.isIncludedTable(tableName)) {
+    if (includedInRepositoryProcessing
+            && mtd.hasColDescriptorWithColAliasesEnabled()) {
       try {
-        MTableDescriptor mTableDescriptor = repository.getMTableDescriptor(tableName);
-        if (mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
-          if (includeRetry) {
-            putRequestQueued = super.put(
-                    tableName, repository.convertQualifiersToAliases(mTableDescriptor, put), retry);
-          } else {
-            putRequestQueued = super.put(
-                    tableName, repository.convertQualifiersToAliases(mTableDescriptor, put));
-          }
+        if (includeRetry) {
+          putRequestQueued = super.put(
+                  tableName, repository.convertQualifiersToAliases(mtd, put), retry);
         } else {
-          if (includeRetry) {
-            putRequestQueued = super.put(tableName, put, retry); // standard HBase processing
-          } else {
-            putRequestQueued = super.put(tableName, put); // standard HBase processing
-          }
+          putRequestQueued = super.put(
+                  tableName, repository.convertQualifiersToAliases(mtd, put));
         }
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
@@ -176,7 +182,7 @@ class MTableMultiplexer extends HTableMultiplexer {
       }
     }
     // ColumnManager auditing
-    if (repository.isActivated() && putRequestQueued) {
+    if (includedInRepositoryProcessing && putRequestQueued) {
       try {
         repository.putColumnAuditorSchemaEntities(tableName, put);
         // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)

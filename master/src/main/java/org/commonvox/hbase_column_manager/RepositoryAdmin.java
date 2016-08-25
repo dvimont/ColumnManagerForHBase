@@ -572,6 +572,7 @@ public class RepositoryAdmin {
   }
 
   /**
+   * <b>NOTE: THIS METHOD IS NOT YET SUPPORTED!</b><br><br>
    * Create an HTableMultiplexer object.<br><br>
    * <b>SPECIAL NOTE:</b> An HTableMultiplexer returned by this method will (1) validate submitted
    * <i>Column</i> qualifiers and values (if
@@ -591,8 +592,9 @@ public class RepositoryAdmin {
    */
   public HTableMultiplexer createHTableMultiplexer(int perRegionServerBufferQueueSize)
           throws IOException {
-    return new MTableMultiplexer(repository, hbaseConnection.getConfiguration(),
-            perRegionServerBufferQueueSize);
+    throw new UnsupportedOperationException();
+//    return new MTableMultiplexer(repository, hbaseConnection.getConfiguration(),
+//            perRegionServerBufferQueueSize);
   }
 
   /**
