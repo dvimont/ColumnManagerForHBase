@@ -1,4 +1,7 @@
 # ColumnManagerAPI for HBase™
+
+### NEWS FLASH: **COLUMN ALIASING** will be available in the beta-04 release of ColumnManagerAPI for HBase™ (coming to GitHub and the Maven Central Repository in late August)! Borrowing a design feature found in legacy databases, a 4-byte (positive integer) column-alias is stored in each cell in place of the (often much longer) full-length column-qualifier. This works invisibly to the application developer, who continues only working with the standard hbase-client API, reading and writing full-length qualifiers. CMfH works behind the scenes to manage the aliasing processes, *potentially saving **CONSIDERABLE** data-storage resources!*
+
 *ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a>* is an extended **METADATA REPOSITORY SYSTEM for HBase** with options for:
 
 1. **COLUMN AUDITING** -- captures Column metadata (qualifier, max-length, column-occurrences count, and cell-occurrences count) as Tables are updated (or via a discovery facility for previously-existing Tables).

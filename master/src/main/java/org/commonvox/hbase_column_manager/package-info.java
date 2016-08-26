@@ -18,6 +18,16 @@
  * <hr><b>ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a></b>
  * provides an extended <i>METADATA REPOSITORY SYSTEM for HBase</i>
  * with options for:<br><br>
+ * <i><b>NEWS FLASH: **COLUMN ALIASING**</b> will be available in the
+ * beta-04 release of ColumnManagerAPI for HBase™ (coming to GitHub and the Maven Central
+ * Repository in late August)
+ * -- Borrowing a design feature found in legacy databases, a 4-byte (positive integer)
+ * column-alias is stored in each cell in place of the (often much longer) full-length
+ * column-qualifier;
+ * this works invisibly to the application developer, who continues only working with the standard
+ * hbase-client API, reading and writing full-length qualifiers;
+ * CMfH works behind the scenes to manage the aliasing processes, <b>potentially saving CONSIDERABLE
+ * data-storage resources!</b></i><br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures Column metadata
  * (qualifier-name and max-length for each unique column-qualifier)
@@ -64,12 +74,6 @@
  * Apache Software Foundation</a>.</i><br><br>
  * <hr><b>FUTURE ENHANCEMENTS MAY INCLUDE:</b>
  * <ul>
- * <li><b>Additional metadata persisted in ColumnAuditor:</b>
- * In the <b>beta-03</b> release, <a href="ColumnAuditor.html">ColumnAuditor</a> metadata
- * discovery will be enhanced to include the number of rows upon which each column-qualifier is
- * found, and formerly package-private ColumnAuditor methods will be made public to allow users
- * to persist other column-oriented metadata of their choosing.
- * </li>
  * <li><b>GUI interface:</b>
  * A JavaFX-based GUI interface could be built atop the ColumnManagerAPI, for administrative use on
  * Mac, Linux, and Windows desktops. Note that in the current release, a
