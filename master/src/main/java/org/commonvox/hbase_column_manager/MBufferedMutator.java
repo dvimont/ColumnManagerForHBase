@@ -17,11 +17,14 @@
 package org.commonvox.hbase_column_manager;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.NavigableMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Mutation;
+import org.apache.hadoop.hbase.client.Row;
 
 /**
  *
@@ -32,6 +35,7 @@ class MBufferedMutator implements BufferedMutator {
   private final BufferedMutator wrappedBufferedMutator;
   private final Repository repository;
   private final MTableDescriptor mTableDescriptor;
+  private final boolean includedInRepositoryProcessing;
 
   MBufferedMutator(BufferedMutator userBufferedMutator, Repository repository)
           throws IOException {
@@ -39,8 +43,10 @@ class MBufferedMutator implements BufferedMutator {
     this.repository = repository;
     if (this.repository.isActivated()) {
       mTableDescriptor = this.repository.getMTableDescriptor(wrappedBufferedMutator.getName());
+      includedInRepositoryProcessing = repository.isIncludedTable(wrappedBufferedMutator.getName());
     } else {
       mTableDescriptor = null;
+      includedInRepositoryProcessing = false;
     }
   }
 
@@ -55,32 +61,57 @@ class MBufferedMutator implements BufferedMutator {
   }
 
   @Override
-  public void mutate(Mutation mtn) throws IOException {
+  public void mutate(Mutation mutation) throws IOException {
     // ColumnManager validation
-    if (repository.isActivated()
+    if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
-      repository.validateColumns(mTableDescriptor, mtn);
+      repository.validateColumns(mTableDescriptor, mutation);
     }
+    // Alias processing
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+              = repository.getFamilyQualifierToAliasMap(mTableDescriptor, mutation);
+      Mutation convertedMutation = (Mutation)repository.convertQualifiersToAliases(
+                  mTableDescriptor, mutation, familyQualifierToAliasMap, 0);
+      wrappedBufferedMutator.mutate(convertedMutation);
+    } else {
     // Standard HBase processing
-    wrappedBufferedMutator.mutate(mtn);
+      wrappedBufferedMutator.mutate(mutation);
+    }
     // ColumnManager auditing
-    if (repository.isActivated()) {
-      repository.putColumnAuditorSchemaEntities(mTableDescriptor, mtn);
+    if (includedInRepositoryProcessing) {
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, mutation);
     }
   }
 
   @Override
-  public void mutate(List<? extends Mutation> list) throws IOException {
+  public void mutate(List<? extends Mutation> mutationList) throws IOException {
     // ColumnManager validation
-    if (repository.isActivated()
+    if (includedInRepositoryProcessing
             && mTableDescriptor.hasColDescriptorWithColDefinitionsEnforced()) {
-      repository.validateColumns(mTableDescriptor, list);
+      repository.validateColumns(mTableDescriptor, mutationList);
     }
+    // Alias processing
+    if (includedInRepositoryProcessing
+            && mTableDescriptor.hasColDescriptorWithColAliasesEnabled()) {
+      NavigableMap<byte[], NavigableMap<byte[], byte[]>> familyQualifierToAliasMap
+              = repository.getFamilyQualifierToAliasMap(mTableDescriptor, mutationList, 0);
+      List<Mutation> convertedMutations = new LinkedList<>();
+      for (Mutation originalMutation : mutationList) {
+        if (Mutation.class.isAssignableFrom(originalMutation.getClass())) {
+          convertedMutations.add((Mutation)repository.convertQualifiersToAliases(
+                  mTableDescriptor, originalMutation, familyQualifierToAliasMap, 0));
+        }
+      }
+      wrappedBufferedMutator.mutate(convertedMutations);
+    } else {
     // Standard HBase processing
-    wrappedBufferedMutator.mutate(list);
+      wrappedBufferedMutator.mutate(mutationList);
+    }
     // ColumnManager auditing
-    if (repository.isActivated()) {
-      repository.putColumnAuditorSchemaEntities(mTableDescriptor, list);
+    if (includedInRepositoryProcessing) {
+      repository.putColumnAuditorSchemaEntities(mTableDescriptor, mutationList);
     }
   }
 
