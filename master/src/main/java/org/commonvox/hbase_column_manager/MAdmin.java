@@ -19,6 +19,7 @@ package org.commonvox.hbase_column_manager;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.ClusterStatus;
@@ -26,18 +27,23 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.NamespaceDescriptor;
+//import org.apache.hadoop.hbase.ProcedureInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.TableExistsException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
+//import org.apache.hadoop.hbase.client.security.SecurityCapability;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetRegionInfoResponse.CompactionState;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.SnapshotDescription;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.SnapshotDescription.Type;
 import org.apache.hadoop.hbase.protobuf.generated.MasterProtos.SnapshotResponse;
+//import org.apache.hadoop.hbase.quotas.QuotaFilter;
+//import org.apache.hadoop.hbase.quotas.QuotaRetriever;
+//import org.apache.hadoop.hbase.quotas.QuotaSettings;
 import org.apache.hadoop.hbase.regionserver.wal.FailedLogCloseException;
 import org.apache.hadoop.hbase.snapshot.HBaseSnapshotException;
 import org.apache.hadoop.hbase.snapshot.RestoreSnapshotException;
@@ -70,7 +76,7 @@ class MAdmin implements Admin {
     return wrappedHbaseAdmin;
   }
 
-    // Start of overrides which provide Repository functionality in addition to
+  // Start of overrides which provide Repository functionality in addition to
   //    wrapping standard Admin functionality
   @Override
   public void createTable(HTableDescriptor htd) throws IOException {
@@ -176,7 +182,7 @@ class MAdmin implements Admin {
    * @throws IOException
    */
   @Override
-  // @Deprecated // deprecated commented out - this method not yet deprecated in HBase 1.0.1.1
+  // @Deprecated // deprecated commented out - this method not yet deprecated in HBase 1.x
   public void addColumn(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.addColumn(tn, hcd);
     if (repository.isActivated()) {
@@ -184,7 +190,7 @@ class MAdmin implements Admin {
     }
   }
 
-  //@Override // override commented out - this method not yet included in HBase 1.0.1.1
+  //@Override // override commented out - this method not yet included in HBase 1.x
   public void addColumnFamily(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.addColumn(tn, hcd); // with future HBase version should be changed to "addColumnFamily"
     if (repository.isActivated()) {
@@ -193,7 +199,7 @@ class MAdmin implements Admin {
   }
 
   @Override
-  // @Deprecated // deprecated commented out - this method not yet deprecated in HBase 1.0.1.1
+  // @Deprecated // deprecated commented out - this method not yet deprecated in HBase 1.x
   public void modifyColumn(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.modifyColumn(tn, hcd);
     if (repository.isActivated()) {
@@ -201,7 +207,7 @@ class MAdmin implements Admin {
     }
   }
 
-  //@Override // override commented out - this method not yet included in HBase 1.0.1.1
+  //@Override // override commented out - this method not yet included in HBase 1.x
   public void modifyColumnFamily(TableName tn, HColumnDescriptor hcd) throws IOException {
     wrappedHbaseAdmin.modifyColumn(tn, hcd);
     if (repository.isActivated()) {
@@ -217,7 +223,7 @@ class MAdmin implements Admin {
    * @throws IOException
    */
   @Override
-  // @Deprecated // deprecated commented out - this method not yet deprecated in HBase 1.0.1.1
+  // @Deprecated // deprecated commented out - this method not yet deprecated in HBase 1.x
   public void deleteColumn(TableName tn, byte[] name) throws IOException {
     wrappedHbaseAdmin.deleteColumn(tn, name);
     if (repository.isActivated()) {
@@ -231,7 +237,7 @@ class MAdmin implements Admin {
    * @param name
    * @throws IOException
    */
-  //@Override // override commented out - this method not yet included in HBase 1.0.1.1
+  //@Override // override commented out - this method not yet included in HBase 1.x
   public void deleteColumnFamily(TableName tn, byte[] name) throws IOException {
     wrappedHbaseAdmin.deleteColumn(tn, name); // with future HBase version should changed to "deleteColumnFamily"
     if (repository.isActivated()) {
@@ -824,4 +830,70 @@ class MAdmin implements Admin {
   public int hashCode() {
     return wrappedHbaseAdmin.hashCode();
   }
+
+  // beginning of overrides of methods introduced in HBase 1.1.0
+//  @Override
+//  public boolean isBalancerEnabled() throws IOException {
+//    return wrappedHbaseAdmin.isBalancerEnabled();
+//  }
+//
+//  @Override
+//  public long getLastMajorCompactionTimestamp(TableName tn) throws IOException {
+//    return wrappedHbaseAdmin.getLastMajorCompactionTimestamp(tn);
+//  }
+//
+//  @Override
+//  public long getLastMajorCompactionTimestampForRegion(byte[] bytes) throws IOException {
+//    return wrappedHbaseAdmin.getLastMajorCompactionTimestampForRegion(bytes);
+//  }
+//
+//  @Override
+//  public void setQuota(QuotaSettings qs) throws IOException {
+//    wrappedHbaseAdmin.setQuota(qs);
+//  }
+//
+//  @Override
+//  public QuotaRetriever getQuotaRetriever(QuotaFilter qf) throws IOException {
+//    return wrappedHbaseAdmin.getQuotaRetriever(qf);
+//  }
+  // end of overrides of methods introduced in HBase 1.1.0
+
+  // beginning of overrides of methods introduced in HBase 1.1.3
+//  @Override
+//  public boolean abortProcedure(long l, boolean bln) throws IOException {
+//    return wrappedHbaseAdmin.abortProcedure(l, bln);
+//  }
+//
+//  @Override
+//  public ProcedureInfo[] listProcedures() throws IOException {
+//    return wrappedHbaseAdmin.listProcedures();
+//  }
+//
+//  @Override
+//  public Future<Boolean> abortProcedureAsync(long l, boolean bln) throws IOException {
+//    return wrappedHbaseAdmin.abortProcedureAsync(l, bln);
+//  }
+//  // end of overrides of methods introduced in HBase 1.1.3
+//
+//  // beginning of overrides of methods introduced in HBase 1.2.0
+//  @Override
+//  public boolean normalize() throws IOException {
+//    return wrappedHbaseAdmin.normalize();
+//  }
+//
+//  @Override
+//  public boolean isNormalizerEnabled() throws IOException {
+//    return wrappedHbaseAdmin.isNormalizerEnabled();
+//  }
+//
+//  @Override
+//  public boolean setNormalizerRunning(boolean bln) throws IOException {
+//    return wrappedHbaseAdmin.setNormalizerRunning(bln);
+//  }
+//
+//  @Override
+//  public List<SecurityCapability> getSecurityCapabilities() throws IOException {
+//    return wrappedHbaseAdmin.getSecurityCapabilities();
+//  }
+  // end of overrides of methods introduced in HBase 1.2.0
 }
