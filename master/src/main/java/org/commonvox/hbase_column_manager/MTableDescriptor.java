@@ -170,4 +170,14 @@ class MTableDescriptor extends HTableDescriptor {
     }
     return false;
   }
+
+  boolean hasColDescriptorWithColAliasesEnabled() {
+    for (MColumnDescriptor mcd : getMColumnDescriptors()) {
+      if (mcd.columnAliasesEnabled()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 }

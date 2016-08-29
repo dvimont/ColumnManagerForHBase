@@ -25,7 +25,7 @@ import org.apache.hadoop.hbase.client.Put;
 
 /**
  * Extension of standard HTableMultiplexer class which (in addition to providing all superclass
- * functionality) transparently submits Column metadata to the ColumnManager repository.
+ * functionality) transparently performs ColumnManager repository processing, when appropriate.
  *
  * @author Daniel Vimont
  */
@@ -59,35 +59,8 @@ class MTableMultiplexer extends HTableMultiplexer {
   @Override
   @Deprecated
   public List<Put> put(byte[] tableName, List<Put> puts) {
-    // ColumnManager validation
-    if (repository.isActivated()) {
-      try {
-        repository.validateColumns(TableName.valueOf(tableName), puts);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return null;
-      }
-    }
-    // Standard HBase processing
-    List<Put> unqueuedPuts = super.put(tableName, puts);
-    // ColumnManager auditing
-    if (repository.isActivated()) {
-      if (unqueuedPuts != null) {
-        puts.removeAll(unqueuedPuts);
-      }
-      if (!puts.isEmpty()) {
-        try {
-          repository.putColumnAuditorSchemaEntities(TableName.valueOf(tableName), puts);
-          // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-        } catch (IOException e) {
-          repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-          return null;
-        }
-      }
-    }
-    return unqueuedPuts;
-  }
+    return this.put(TableName.valueOf(tableName), puts);
+   }
 
   /**
    * The put request will be buffered by its corresponding buffer queue.
@@ -101,29 +74,7 @@ class MTableMultiplexer extends HTableMultiplexer {
   @Override
   @Deprecated
   public boolean put(byte[] tableName, Put put) {
-    // ColumnManager validation
-    if (repository.isActivated()) {
-      try {
-        repository.validateColumns(TableName.valueOf(tableName), put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return false;
-      }
-    }
-    // Standard HBase processing
-    boolean putRequestQueued = super.put(tableName, put);
-    // ColumnManager auditing
-    if (repository.isActivated() && putRequestQueued) {
-      try {
-        repository.putColumnAuditorSchemaEntities(TableName.valueOf(tableName), put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return false;
-      }
-    }
-    return putRequestQueued;
+    return this.put(TableName.valueOf(tableName), put);
   }
 
   /**
@@ -139,29 +90,7 @@ class MTableMultiplexer extends HTableMultiplexer {
   @Override
   @Deprecated
   public boolean put(byte[] tableName, Put put, int retry) {
-    // ColumnManager validation
-    if (repository.isActivated()) {
-      try {
-        repository.validateColumns(TableName.valueOf(tableName), put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return false;
-      }
-    }
-    // Standard HBase processing
-    boolean putRequestQueued = super.put(tableName, put, retry);
-    // ColumnManager auditing
-    if (repository.isActivated() && putRequestQueued) {
-      try {
-        repository.putColumnAuditorSchemaEntities(TableName.valueOf(tableName), put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return false;
-      }
-    }
-    return putRequestQueued;
+    return this.put(TableName.valueOf(tableName), put, retry);
   }
 
   /**
@@ -174,21 +103,8 @@ class MTableMultiplexer extends HTableMultiplexer {
    */
   @Override
   public List<Put> put(TableName tableName, List<Put> puts) {
-    // ColumnManager validation
-    if (repository.isActivated()) {
-      try {
-        repository.validateColumns(tableName, puts);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return null;
-      }
-    }
-    // Standard HBase processing
-    List<Put> unqueuedPuts = super.put(tableName, puts);
-
-        // super method calls MTableMultiplexer#put(tn, put, retry), so no ColumnManager audit done here!
-    return unqueuedPuts;
+    // NOTE: super method calls #put(tn, put, retry), so no ColumnManager processing here!
+    return super.put(tableName, puts);
   }
 
   /**
@@ -200,29 +116,7 @@ class MTableMultiplexer extends HTableMultiplexer {
    */
   @Override
   public boolean put(TableName tableName, Put put) {
-    // ColumnManager validation
-    if (repository.isActivated()) {
-      try {
-        repository.validateColumns(tableName, put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return false;
-      }
-    }
-    // Standard HBase processing
-    boolean putRequestQueued = super.put(tableName, put);
-    // ColumnManager auditing
-    if (repository.isActivated() && putRequestQueued) {
-      try {
-        repository.putColumnAuditorSchemaEntities(tableName, put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
-      } catch (IOException e) {
-        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
-        return false;
-      }
-    }
-    return putRequestQueued;
+    return put(tableName, put, 0, false);
   }
 
   /**
@@ -235,20 +129,60 @@ class MTableMultiplexer extends HTableMultiplexer {
    */
   @Override
   public boolean put(TableName tableName, Put put, int retry) {
-    // ColumnManager validation
-    if (repository.isActivated()) {
+    return put(tableName, put, retry, true);
+  }
+
+  private boolean put(TableName tableName, Put put, int retry, boolean includeRetry) {
+    boolean includedInRepositoryProcessing = false;
+    MTableDescriptor mtd = null;
+    if (repository.isActivated()
+            && repository.isIncludedTable(tableName)) {
+      includedInRepositoryProcessing = true;
       try {
-        repository.validateColumns(tableName, put);
-        // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)
+        mtd = repository.getMTableDescriptor(tableName);
+      // must catch IOException (HTableMultiplexer#put does NOT throw such an exception)
       } catch (IOException e) {
         repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
         return false;
       }
     }
+    // ColumnManager validation
+    if (includedInRepositoryProcessing
+            && mtd.hasColDescriptorWithColDefinitionsEnforced()) {
+      try {
+        repository.validateColumns(tableName, put);
+      // must catch IOException (HTableMultiplexer#put does NOT throw such an exception)
+      } catch (IOException e) {
+        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
+        return false;
+      }
+    }
+    boolean putRequestQueued = false;
+    // Alias processing
+    if (includedInRepositoryProcessing
+            && mtd.hasColDescriptorWithColAliasesEnabled()) {
+      try {
+        if (includeRetry) {
+          putRequestQueued = super.put(
+                  tableName, repository.convertQualifiersToAliases(mtd, put), retry);
+        } else {
+          putRequestQueued = super.put(
+                  tableName, repository.convertQualifiersToAliases(mtd, put));
+        }
+      } catch (IOException e) {
+        repository.logIOExceptionAsError(e, this.getClass().getSimpleName());
+        return false;
+      }
+    } else {
     // Standard HBase processing
-    boolean putRequestQueued = super.put(tableName, put, retry);
+      if (includeRetry) {
+        putRequestQueued = super.put(tableName, put, retry);
+      } else {
+        putRequestQueued = super.put(tableName, put);
+      }
+    }
     // ColumnManager auditing
-    if (repository.isActivated() && putRequestQueued) {
+    if (includedInRepositoryProcessing && putRequestQueued) {
       try {
         repository.putColumnAuditorSchemaEntities(tableName, put);
         // must catch IOException to enable override of HTableMultiplexer#put (which does NOT throw such an exception)

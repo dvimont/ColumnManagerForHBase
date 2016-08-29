@@ -72,6 +72,17 @@ public class TestMConnectionFactory {
               + Repository.REPOSITORY_TABLENAME.getNameAsString(),
               !standardAdmin.tableExists(Repository.REPOSITORY_TABLENAME));
     }
+    if (standardAdmin.tableExists(Repository.ALIAS_DIRECTORY_TABLENAME)) {
+      try (Table existingRepositoryTable
+              = standardConnection.getTable(Repository.ALIAS_DIRECTORY_TABLENAME)) {
+        standardAdmin.disableTable(Repository.ALIAS_DIRECTORY_TABLENAME);
+        standardAdmin.deleteTable(Repository.ALIAS_DIRECTORY_TABLENAME);
+      }
+      assertTrue(ClasspathSearcher.TEST_ENVIRONMENT_SETUP_ERROR
+              + "The following Repository table could not be manually dropped: "
+              + Repository.ALIAS_DIRECTORY_TABLENAME.getNameAsString(),
+              !standardAdmin.tableExists(Repository.ALIAS_DIRECTORY_TABLENAME));
+    }
     if (namespaceExists(standardAdmin, Repository.REPOSITORY_NAMESPACE_DESCRIPTOR)) {
       standardAdmin.deleteNamespace(Repository.REPOSITORY_NAMESPACE_DESCRIPTOR.getName());
       assertTrue(ClasspathSearcher.TEST_ENVIRONMENT_SETUP_ERROR
@@ -89,5 +100,9 @@ public class TestMConnectionFactory {
       return false;
     }
     return true;
+  }
+
+  public static void main(String[] args) throws Exception {
+    new TestMConnectionFactory().testCreateConnection();
   }
 }

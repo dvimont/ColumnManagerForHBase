@@ -81,8 +81,9 @@ public class RepositoryAdmin {
    */
   public static void installRepositoryStructures(Admin hbaseAdmin)
           throws IOException {
-    Repository.createRepositoryNamespace(hbaseAdmin);
-    Repository.createRepositoryTable(hbaseAdmin);
+    Repository.initializeRepositoryNamespace(hbaseAdmin);
+    Repository.initializeRepositoryTable(hbaseAdmin);
+    Repository.initializeAliasTable(hbaseAdmin);
     new RepositoryAdmin(hbaseAdmin.getConnection()).repository.discoverSchema(false, false, false);
   }
 
@@ -110,10 +111,6 @@ public class RepositoryAdmin {
   public static int getRepositoryMaxVersions(Admin hbaseAdmin)
           throws IOException {
     return Repository.getRepositoryMaxVersions(hbaseAdmin);
-  }
-
-  static boolean repositoryTableExists(Admin admin) throws IOException {
-    return Repository.repositoryTableExists(admin);
   }
 
   /**
@@ -158,6 +155,78 @@ public class RepositoryAdmin {
 
   Repository getRepository() {
     return repository;
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor} to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param tableName name of <i>Table</i> to which {@link ColumnAuditor} is to be added/modified
+   * @param colFamily <i>Column Family</i> to which {@link ColumnAuditor} is to be added/modified
+   * @param colAuditor {@link ColumnAuditor} to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditor(TableName tableName, byte[] colFamily,
+          final ColumnAuditor colAuditor)
+          throws IOException, TableNotIncludedForProcessingException {
+    List<ColumnAuditor> colAuditors
+            = new ArrayList<ColumnAuditor>() { { add(colAuditor); } };
+    repository.putColumnAuditorSchemaEntities(tableName, colFamily, colAuditors);
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor} to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param htd <i>Table</i> to which {@link ColumnAuditor} is to be added/modified
+   * @param hcd <i>Column Descriptor</i> (Column Family) to which {@link ColumnAuditor} is to be
+   * added/modified
+   * @param colAuditor {@link ColumnAuditor} to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditor(HTableDescriptor htd, HColumnDescriptor hcd,
+          ColumnAuditor colAuditor)
+          throws IOException, TableNotIncludedForProcessingException {
+    addColumnAuditor(htd.getTableName(), hcd.getName(), colAuditor);
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor}s to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param tableName name of <i>Table</i> to which {@link ColumnAuditor}s are to be added/modified
+   * @param colFamily <i>Column Family</i> to which {@link ColumnAuditor}s are to be added/modified
+   * @param colAuditors List of {@link ColumnAuditor}s to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditors(TableName tableName, byte[] colFamily,
+          List<ColumnAuditor> colAuditors)
+          throws IOException, TableNotIncludedForProcessingException {
+    repository.putColumnAuditorSchemaEntities(tableName, colFamily, colAuditors);
+  }
+
+  /**
+   * Add (or modify, if already existing) the submitted {@link ColumnAuditor}s to the submitted
+   * <i>Table</i> and <i>Column Family</i>.
+   *
+   * @param htd <i>Table</i> to which {@link ColumnAuditor}s are to be added/modified
+   * @param hcd <i>ColumnAuditor [Family] Descriptor</i> to which {@link ColumnAuditor}s are to
+   * be added/modified
+   * @param colAuditors List of {@link ColumnAuditor}s to be added or modified
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
+  public void addColumnAuditors(HTableDescriptor htd, HColumnDescriptor hcd,
+          List<ColumnAuditor> colAuditors)
+          throws IOException, TableNotIncludedForProcessingException {
+    repository.putColumnAuditorSchemaEntities(htd.getTableName(), hcd.getName(), colAuditors);
   }
 
   /**
@@ -452,9 +521,14 @@ public class RepositoryAdmin {
    * @throws TableNotIncludedForProcessingException if Table not
    * <a href="package-summary.html#config">included in ColumnManager processing</a>
    */
-  public void setColumnDefinitionsEnforced(boolean enabled, TableName tableName, byte[] colFamily)
+  public void enableColumnDefinitionEnforcement(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException, TableNotIncludedForProcessingException {
-    repository.setColumnDefinitionsEnforced(enabled, tableName, colFamily);
+    repository.enableColumnDefinitionEnforcement(enabled, tableName, colFamily);
+  }
+
+  public void enableColumnAliases(boolean enabled, TableName tableName, byte[] colFamily)
+          throws IOException, TableNotIncludedForProcessingException {
+    repository.enableColumnAliases(enabled, tableName, colFamily);
   }
 
   /**
@@ -498,10 +572,11 @@ public class RepositoryAdmin {
   }
 
   /**
+   * <b>NOTE: THIS METHOD IS NOT YET SUPPORTED!</b><br><br>
    * Create an HTableMultiplexer object.<br><br>
    * <b>SPECIAL NOTE:</b> An HTableMultiplexer returned by this method will (1) validate submitted
    * <i>Column</i> qualifiers and values (if
-   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the related <i>Column Family</i>), (2)
    * process "put" requests in a standard manner (queuing them for subsequent <b>asynchronous</b>
    * processing by HBase) and then (3) perform <b>synchronous</b> ColumnManager Repository
@@ -517,8 +592,9 @@ public class RepositoryAdmin {
    */
   public HTableMultiplexer createHTableMultiplexer(int perRegionServerBufferQueueSize)
           throws IOException {
-    return new MTableMultiplexer(repository, hbaseConnection.getConfiguration(),
-            perRegionServerBufferQueueSize);
+    throw new UnsupportedOperationException();
+//    return new MTableMultiplexer(repository, hbaseConnection.getConfiguration(),
+//            perRegionServerBufferQueueSize);
   }
 
   /**

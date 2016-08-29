@@ -20,7 +20,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 /**
  * Thrown when a <i>Column Family</i> has its
- * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+ * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
  * ColumnDefinitionsEnforced} setting enabled, and a <i>Column Qualifier</i> submitted in a
  * {@link org.apache.hadoop.hbase.client.Mutation Put} to that <i>Column Family</i> does NOT
  * correspond to an existing {@link ColumnDefinition}.

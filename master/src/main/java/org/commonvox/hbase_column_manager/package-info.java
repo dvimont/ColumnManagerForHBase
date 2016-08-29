@@ -18,12 +18,23 @@
  * <hr><b>ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a></b>
  * provides an extended <i>METADATA REPOSITORY SYSTEM for HBase</i>
  * with options for:<br><br>
+ * <i><b>NEWS FLASH: **COLUMN ALIASING**</b> will be available in the
+ * beta-04 release of ColumnManagerAPI for HBase™ (coming to GitHub and the Maven Central
+ * Repository in late August)
+ * -- Borrowing a design feature found in legacy databases, a 4-byte (positive integer)
+ * column-alias is stored in each cell in place of the (often much longer) full-length
+ * column-qualifier;
+ * this works invisibly to the application developer, who continues only working with the standard
+ * hbase-client API, reading and writing full-length qualifiers;
+ * CMfH works behind the scenes to manage the aliasing processes, <b>potentially saving CONSIDERABLE
+ * data-storage resources!</b></i><br><br>
  * <BLOCKQUOTE>
  * &nbsp;&nbsp;&nbsp;&nbsp;(1) <b>COLUMN AUDITING/DISCOVERY</b> -- captures Column metadata
  * (qualifier-name and max-length for each unique column-qualifier)
  * -- either via <a href="#column-auditing">real-time auditing</a>
  * as <i>Tables</i> are updated, or via a <a href="#discovery">discovery facility</a>
- * (direct-scan or mapreduce) for previously-existing <i>Tables</i>;<br>
+ * (direct-scan or mapreduce) for previously-existing <i>Tables</i>; the discovery process also
+ * captures column-occurrences count and cell-occurrences count for each unique column-qualifier;<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;(2) <b>COLUMN-DEFINITION FACILITIES</b> --
  * administratively-managed <a href="ColumnDefinition.html">ColumnDefinitions</a>
  * (stipulating valid qualifier-name, column length, and/or value) may be created and
@@ -112,20 +123,37 @@
  * <hr style="height:3px;color:black;background-color:black">
  * <b>II. <u>INSTALLATION</u></b>
  * <BLOCKQUOTE>
- * <b>Step 1: Get the required JAR files via download or by setting Maven project dependencies</b>
+ * <b>Step 1: Get the required JAR files, either (a) via direct download or
+ * (b) by setting Maven project dependencies</b>
  * <br>
- * The most recently released versions of
+ * One of the most recently released versions of
  * <b><a href="https://github.com/dvimont/ColumnManagerForHBase/releases" target="_blank">
  * the JAR files for ColumnManager</a></b>
- * may be downloaded from GitHub and included in the IDE environment's compile and run-time
- * classpath configurations.
+ * may be selected and  downloaded from GitHub and included in the IDE environment's compile
+ * and run-time classpath configurations.
  * <br><br>
- * In the context of a Maven project, a dependency may be set in the project's {@code pom.xml}
- * file as follows:
+ * In the context of a <b>Maven project</b>, a dependency may be set in the project's
+ * {@code pom.xml} file as in the following example. (Note that this example assumes a
+ * current installation of HBase v1.2.1.):
+ * <br><br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;Remove the following <b>{@code hbase-client}</b> dependency element:
+ * <pre>{@code      <dependency>
+ *          <groupId>org.apache.hbase</groupId>
+ *          <artifactId>hbase-client</artifactId>
+ *          <version>1.2.1</version>
+ *      </dependency>}</pre>
+ * &nbsp;&nbsp;&nbsp;&nbsp;... and replace it with the following <b>{@code hbase-column-manager}</b>
+ * dependency element:
  * <br>
- * <pre>{@code      [[MAVEN DEPENDENCY EXAMPLE TO BE INSERTED HERE.]]}</pre>
- * <br>
- * <br>
+ * <pre>{@code      <dependency>
+ *          <groupId>org.commonvox</groupId>
+ *          <artifactId>hbase-column-manager</artifactId>
+ *          <version>1.2.1-beta-02</version>
+ *      </dependency>}</pre>
+ * <i>To access all currently-available versions of hbase-column-manager, please consult</i>
+ * <b><a href="http://bit.ly/ColumnManagerMaven" target="_blank">
+ * the Maven Central Repository</a></b>.
+ * <br><br>
  * <a name="activate"></a>
  * <b>Step 2: Activate ColumnManager</b>
  * <br>
@@ -152,7 +180,9 @@
  * <b>Step 3: Confirm installation (and create ColumnManager Repository <i>Namespace</i> and
  * <i>Table</i>)</b>
  * <br>
- * The following code may be run to confirm successful installation of ColumnManager:
+ * A successful invocation of the method <a href="MConnectionFactory.html#createConnection--">
+ * MConnectionFactory.createConnection()</a>
+ * will confirm proper installation of ColumnManager, as in the following code example:
  * <pre>{@code      import org.apache.hadoop.hbase.client.Connection;
  *      import org.commonvox.hbase_column_manager.MConnectionFactory;
  *
@@ -282,8 +312,8 @@
  * <b>Enable enforcement of ColumnDefinitions</b>: Enforcement of the
  * <a href="ColumnDefinition.html">ColumnDefinitions</a> of a given <i>Column Family</i> does
  * not occur until explicitly enabled via the method
- * <a href="RepositoryAdmin.html#setColumnDefinitionsEnforced-boolean-org.apache.hadoop.hbase.TableName-byte:A-">
- * RepositoryAdmin#setColumnDefinitionsEnforced</a>. This same method may be invoked to toggle
+ * <a href="RepositoryAdmin.html#enableColumnDefinitionEnforcement-boolean-org.apache.hadoop.hbase.TableName-byte:A-">
+ * RepositoryAdmin#enableColumnDefinitionEnforcement</a>. This same method may be invoked to toggle
  * enforcement {@code off} again for the <i>Column Family</i>.<br><br>
  * When enforcement is enabled, then (a) any <i>Column Qualifier</i> submitted in a {@code put}
  * (i.e., insert/update) to the <i>Table:Column-Family</i> must correspond to an existing
@@ -302,6 +332,16 @@
  * <a name="usage"></a>
  * <hr style="height:3px;color:black;background-color:black">
  * <b>V. <u>USAGE IN APPLICATION DEVELOPMENT</u></b>
+ * <br>
+ * <BLOCKQUOTE>
+ * <i>Two brief Gist examples are available on GitHub which illustrate basic usage of
+ * ColumnManager:<br>(1)</i>
+ * <a href="https://gist.github.com/dvimont/201081eef3316a1a1d4d83d571328010" target="_blank">
+ * a Gist demonstrating usage of reporting/auditing functions</a>,
+ * <i>and (2)</i>
+ * <a href="https://gist.github.com/dvimont/66f0431ed6d5e6b86fe03653a298b958" target="_blank">
+ * a Gist demonstrating usage and optional enforcement of ColumnDefinitions.</a>
+ * </BLOCKQUOTE>
  * <BLOCKQUOTE>
  * <b>A. ALWAYS USE {@code MConnectionFactory} INSTEAD OF {@code ConnectionFactory}</b>
  * <BLOCKQUOTE>
@@ -504,7 +544,8 @@
  * <ul>
  * <li>The {@code JAR} file corresponding to your currently-installed version of HBase
  * must be <a href="https://github.com/dvimont/ColumnManagerForHBase/releases" target="_blank">
- * downloaded from Github</a>. <i>(For example, {@code hbase-column-manager-1.0.3-beta-01.jar}
+ * downloaded from Github</a> or from <a href="http://bit.ly/ColumnManagerMaven" target="_blank">
+ * the Maven Central Repository</a>. <i>(For example, {@code hbase-column-manager-1.0.3-beta-02.jar}
  * would be used with an HBase 1.0.3 installation.)</i>
  * </li>
  * <li>
