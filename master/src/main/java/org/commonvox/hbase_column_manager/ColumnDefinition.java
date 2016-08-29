@@ -31,7 +31,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
  * <i>Column Qualifier</i> within a <i>Column Family</i> of a
  * <a href="package-summary.html#config">ColumnManager-included</a> <i>Table</i>;<br>
  * when a <i>Column Family</i> has its
- * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+ * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
  * ColumnDefinitionsEnforced} setting {@code enabled}, then (a) any <i>Column Qualifier</i>
  * submitted in a {@link org.apache.hadoop.hbase.client.Mutation Put} to that <i>Column Family</i>
  * must correspond to an existing {@code ColumnDefinition}, and (b) the corresponding
@@ -52,8 +52,6 @@ public class ColumnDefinition extends Column {
    * Key for the COLUMN_VALIDATION_REGEX_KEY attribute.
    */
   static final String COLUMN_VALIDATION_REGEX_KEY = "COLUMN_VALIDATION_REGEX";
-//    /** Key for the NAME_IS_REGEX_KEY attribute. */
-//    static final String NAME_IS_REGEX_KEY = "NAME_IS_REGEX";
 
   /**
    * @param columnQualifier Column Qualifier
@@ -142,7 +140,7 @@ public class ColumnDefinition extends Column {
   /**
    * Set the defined column length (i.e., the maximum length permitted for any submitted value for
    * this column when
-   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>);
    * setting the value to 0 (the default) will result in NO length validation of column values being
    * performed.
@@ -156,7 +154,7 @@ public class ColumnDefinition extends Column {
 
   /**
    * Get the defined column length (i.e., the maximum length permitted for any submitted value for
-   * this column when    {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * this column when    {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>); if
    * returned value is 0 (the default), NO length validation of column values will be performed.
    *
@@ -170,7 +168,7 @@ public class ColumnDefinition extends Column {
   /**
    * Set the column's validation regex (i.e., the regular expression that any submitted value for
    * this column must match when
-   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>);
    * setting the value to blank (the default) will result in NO regular expression validation of
    * column values being performed.
@@ -185,7 +183,7 @@ public class ColumnDefinition extends Column {
   /**
    * Get the defined column regex (i.e., the regular expression that any submitted value for this
    * column must match when
-   * {@link RepositoryAdmin#setColumnDefinitionsEnforced(boolean, org.apache.hadoop.hbase.TableName, byte[])
+   * {@link RepositoryAdmin#enableColumnDefinitionEnforcement(boolean, org.apache.hadoop.hbase.TableName, byte[])
    * ColumnDefinitionsEnforced} is set to {@code true} for the column's <i>Column Family</i>); if
    * returned value is blank (the default), NO regular expression validation of column values will
    * be performed.
