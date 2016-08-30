@@ -526,6 +526,28 @@ public class RepositoryAdmin {
     repository.enableColumnDefinitionEnforcement(enabled, tableName, colFamily);
   }
 
+  /**
+   * Enable/disable column aliasing for the specified <i>Column Family</i>.
+   * <br>
+   * Column-alias processing involves a 4-byte (positive integer) column-alias being stored in each
+   * cell in place of the full-length <i>Column Qualifier</i>, potentially
+   * conserving considerable data storage space. This works invisibly to the application developer,
+   * who continues working only with the standard hbase-client API interfaces, reading and writing
+   * full-length column-qualifiers.
+   * <br>
+   * Aliasing should only be activated for a newly-defined, completely empty (or freshly truncated)
+   * <i>Column Family</i>, and it should not be deactivated after data has been stored in the
+   * <i>Column Family</i>.
+   *
+   * @param enabled if {@code true}, column aliasing will be enabled; if {@code false}, it
+   * will be disabled
+   * @param tableName Name of <i>Table</i> to which <i>Column Family</i> belongs
+   * @param colFamily Name of <i>Column Family</i> for which column aliasing is to be
+   * enabled or disabled
+   * @throws IOException if a remote or network exception occurs
+   * @throws TableNotIncludedForProcessingException if Table not
+   * <a href="package-summary.html#config">included in ColumnManager processing</a>
+   */
   public void enableColumnAliases(boolean enabled, TableName tableName, byte[] colFamily)
           throws IOException, TableNotIncludedForProcessingException {
     repository.enableColumnAliases(enabled, tableName, colFamily);
