@@ -1,10 +1,12 @@
 # ColumnManagerAPI for HBase™
+
 *ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a>* is an extended **METADATA REPOSITORY SYSTEM for HBase** with options for:
 
 1. **COLUMN AUDITING** -- captures Column metadata (qualifier, max-length, column-occurrences count, and cell-occurrences count) as Tables are updated (or via a discovery facility for previously-existing Tables).
-2. **COLUMN-DEFINITION FACILITIES** -- optionally enforces administratively-managed Column definitions (stipulating valid name, length, and/or value) as Tables are updated, optionally bringing HBase's "on-the-fly" column-qualifier creation under centralized control.
-3. **SCHEMA CHANGE MONITORING** -- tracks and provides an audit trail for structural modifications made to *Namespaces*, *Tables*, and *Column Families*.
+2. **COLUMN ALIASING** -- a 4-byte (positive integer) column-alias is stored in each cell in place of the (often much longer) full-length column-qualifier. This works invisibly to the application developer, who continues only working with the standard hbase-client API, reading and writing full-length column-qualifiers.
+3. **COLUMN-DEFINITION FACILITIES** -- optionally enforces administratively-managed Column definitions (stipulating valid name, length, and/or value) as Tables are updated, optionally bringing HBase's "on-the-fly" column-qualifier creation under centralized control.
 4. **SCHEMA EXPORT/IMPORT** -- provides schema (metadata) export and import facilities for HBase *Namespace*, *Table*, and all table-component structures.
+5. **SCHEMA CHANGE MONITORING** -- tracks and provides an audit trail for structural modifications made to *Namespaces*, *Tables*, and *Column Families*.
 
 A basic COMMAND-LINE INTERFACE is also provided for direct invocation of a number of the above-listed functions without any need for Java coding.
 
