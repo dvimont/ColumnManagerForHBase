@@ -15,7 +15,8 @@
  *
  */
 /**
- * <hr><b>ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a></b>
+ * <hr><img src="doc-files/Tesseract_64pixels.jpg" alt="tesseract" height="56" width="56">
+ * <b>ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a></b>
  * provides an extended <i>METADATA REPOSITORY SYSTEM for HBase</i>
  * with options for:<br><br>
  * <BLOCKQUOTE>
