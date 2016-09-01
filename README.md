@@ -1,4 +1,4 @@
-# ColumnManagerAPI for HBase™
+# ColumnManagerAPI for HBase™ ![tesseract](http://dvimont.github.io/ColumnManagerForHBase/org/commonvox/hbase_column_manager/doc-files/Tesseract_64pixels.jpg "tesseract")
 
 *ColumnManagerAPI for <a href="http://hbase.apache.org/" target="_blank">HBase™</a>* is an extended **METADATA REPOSITORY SYSTEM for HBase** with options for:
 
