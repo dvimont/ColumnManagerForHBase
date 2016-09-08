@@ -23,7 +23,7 @@
 
   <groupId>org.commonvox</groupId>
   <artifactId>hbase-column-manager-parent-pom</artifactId>
-  <version>1.x-SNAPSHOT</version>
+  <version>1.1.6-beta-04</version>
   <packaging>pom</packaging>
 
   <name>CommonVox tools for HBase™ - ColumnManagerAPI for HBase™ parent POM</name>
@@ -38,7 +38,7 @@
          TESTING should be done separately for each build after having started up an instance of hbase
          using that build's corresponding hbase release.  -->
     <module>master</module>
-    <module>1.2.2</module>
+    <module>1.1.6</module>
   </modules>
 
   <licenses>

@@ -34,7 +34,7 @@ import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.TableNotFoundException;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.security.SecurityCapability;
+//import org.apache.hadoop.hbase.client.security.SecurityCapability;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetRegionInfoResponse.CompactionState;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
@@ -876,24 +876,24 @@ class MAdmin implements Admin {
   // end of overrides of methods introduced in HBase 1.1.3
 
   // beginning of overrides of methods introduced in HBase 1.2.0
-  @Override
-  public boolean normalize() throws IOException {
-    return wrappedHbaseAdmin.normalize();
-  }
-
-  @Override
-  public boolean isNormalizerEnabled() throws IOException {
-    return wrappedHbaseAdmin.isNormalizerEnabled();
-  }
-
-  @Override
-  public boolean setNormalizerRunning(boolean bln) throws IOException {
-    return wrappedHbaseAdmin.setNormalizerRunning(bln);
-  }
-
-  @Override
-  public List<SecurityCapability> getSecurityCapabilities() throws IOException {
-    return wrappedHbaseAdmin.getSecurityCapabilities();
-  }
+//  @Override
+//  public boolean normalize() throws IOException {
+//    return wrappedHbaseAdmin.normalize();
+//  }
+//
+//  @Override
+//  public boolean isNormalizerEnabled() throws IOException {
+//    return wrappedHbaseAdmin.isNormalizerEnabled();
+//  }
+//
+//  @Override
+//  public boolean setNormalizerRunning(boolean bln) throws IOException {
+//    return wrappedHbaseAdmin.setNormalizerRunning(bln);
+//  }
+//
+//  @Override
+//  public List<SecurityCapability> getSecurityCapabilities() throws IOException {
+//    return wrappedHbaseAdmin.getSecurityCapabilities();
+//  }
   // end of overrides of methods introduced in HBase 1.2.0
 }

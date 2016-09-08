@@ -2653,10 +2653,10 @@ class Repository {
     for (Map.Entry<String, byte[]> attr : originalGet.getAttributesMap().entrySet()) {
       convertedGet.setAttribute(attr.getKey(), attr.getValue());
     }
-    for (Map.Entry<byte[], TimeRange> entry : originalGet.getColumnFamilyTimeRange().entrySet()) {
-      TimeRange tr = entry.getValue();
-      convertedGet.setColumnFamilyTimeRange(entry.getKey(), tr.getMin(), tr.getMax());
-    }
+//    for (Map.Entry<byte[], TimeRange> entry : originalGet.getColumnFamilyTimeRange().entrySet()) {
+//      TimeRange tr = entry.getValue();
+//      convertedGet.setColumnFamilyTimeRange(entry.getKey(), tr.getMin(), tr.getMax());
+//    }
     return convertedGet;
   }
 
