@@ -51,6 +51,7 @@
       <artifactId>hbase-client</artifactId>
       <version>${hbaseVersion}</version>
     </dependency>
+    <!-- removing extraneous hbase-server dependency from earlier test phase
     <dependency>
         <groupId>org.apache.hbase</groupId>
         <artifactId>hbase-server</artifactId>
@@ -62,5 +63,6 @@
             </exclusion>
         </exclusions>
     </dependency>
+    -->
    </dependencies>
 </project>
