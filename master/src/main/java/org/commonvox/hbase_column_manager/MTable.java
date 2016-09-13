@@ -676,27 +676,27 @@ class MTable implements Table {
     return wrappedTable.hashCode();
   }
 
-  // beginning of overrides of methods introduced in HBase 1.2.2
-  @Override
-  public void setOperationTimeout(int i) {
-    wrappedTable.setOperationTimeout(i);
-  }
-
-  @Override
-  public int getOperationTimeout() {
-    return wrappedTable.getOperationTimeout();
-  }
-
-  @Override
-  public void setRpcTimeout(int i) {
-    wrappedTable.setRpcTimeout(i);
-  }
-
-  @Override
-  public int getRpcTimeout() {
-    return wrappedTable.getRpcTimeout();
-  }
-  // end of overrides of methods introduced in HBase 1.2.2
+  // beginning of overrides of methods introduced in HBase 1.2.2 & removed in 1.2.3
+//  @Override
+//  public void setOperationTimeout(int i) {
+//    wrappedTable.setOperationTimeout(i);
+//  }
+//
+//  @Override
+//  public int getOperationTimeout() {
+//    return wrappedTable.getOperationTimeout();
+//  }
+//
+//  @Override
+//  public void setRpcTimeout(int i) {
+//    wrappedTable.setRpcTimeout(i);
+//  }
+//
+//  @Override
+//  public int getRpcTimeout() {
+//    return wrappedTable.getRpcTimeout();
+//  }
+  // end of overrides of methods introduced in HBase 1.2.2 & removed in 1.2.3
 
   /**
    * ResultScannerForAliasedFamilies wraps the ResultScanner returned by Table#getScanner

@@ -27,7 +27,7 @@
   </parent>
 
   <properties>
-    <hbaseVersion>1.2.2</hbaseVersion>
+    <hbaseVersion>1.2.3</hbaseVersion>
     <maven.deploy.skip>true</maven.deploy.skip>
   </properties>
   <artifactId>hbase-column-manager</artifactId>
@@ -157,12 +157,12 @@
   </build>
 
   <dependencies>
-    <!-- Dependency for hbase-testing-util must precede compile-scoped dependencies. -->
+    <!-- hbase-testing-util in compile scope for MHBaseTestingUtility. -->
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-testing-util</artifactId>
       <version>${hbaseVersion}</version>
-   </dependency>
+    </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-client</artifactId>

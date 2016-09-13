@@ -27,10 +27,10 @@
   </parent>
 
   <properties>
-    <hbaseVersion>1.2.2</hbaseVersion>
+    <hbaseVersion>1.2.3</hbaseVersion>
   </properties>
   <artifactId>hbase-column-manager</artifactId>
-  <version>1.2.2-beta-SNAPSHOT</version>
+  <version>1.2.3-beta-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>CommonVox tools for HBase™ - ColumnManagerAPI for HBase™</name>
