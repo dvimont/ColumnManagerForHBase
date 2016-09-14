@@ -42,6 +42,10 @@
     <module>1.1.0.1</module>
     <module>1.1.1</module>
     <module>1.1.2</module>
+    <module>1.1.0-shaded</module>
+    <module>1.1.0.1-shaded</module>
+    <module>1.1.1-shaded</module>
+    <module>1.1.2-shaded</module>
   </modules>
 
   <licenses>
