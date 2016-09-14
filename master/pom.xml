@@ -157,7 +157,6 @@
   </build>
 
   <dependencies>
-    <!-- Dependency for hbase-testing-util must precede compile-scoped dependencies. -->
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-testing-util</artifactId>
@@ -165,7 +164,7 @@
    </dependency>
     <dependency>
       <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-client</artifactId>
+      <artifactId>hbase-shaded-client</artifactId>
       <version>${hbaseVersion}</version>
     </dependency>
   </dependencies>

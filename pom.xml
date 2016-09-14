@@ -39,6 +39,7 @@
          using that build's corresponding hbase release.  -->
     <module>master</module>
     <module>1.2.3</module>
+    <module>1.2.3-shaded</module>
   </modules>
 
   <licenses>
