@@ -11,3 +11,6 @@
 /1.1.3/dependency-reduced-pom.xml
 /1.1.4/dependency-reduced-pom.xml
 /1.1.4/target/
+/1.1.3/target/
+/1.1.3-shaded/target/
+/1.1.4-shaded/target/
